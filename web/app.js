@@ -19,6 +19,9 @@ function clean(list) {
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(stops)); } catch (e) { console.warn("save failed:", e.message); }
+  // Ask the browser not to clear saved stops when space runs low (Chrome grants it quietly; Firefox asks once).
+  // ponytail: iPhone Safari still clears a site after 7 days unvisited unless it's on the home screen; the tips say how.
+  navigator.storage?.persisted?.().then((p) => p || navigator.storage.persist()).catch((e) => console.warn("persist:", e.message));
   sync();
 }
 // Android app only: hand the stops (without their timetables) and the open tab to the home-screen widget.
@@ -675,4 +678,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=49").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=50").catch((e) => console.warn("sw:", e.message));
