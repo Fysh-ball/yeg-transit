@@ -148,6 +148,7 @@ footer a { color: var(--accent); }
 #intro { text-align: left; max-width: 40rem; margin: 0 auto 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 #intro h2 { color: var(--text); font-size: .95rem; margin: 0 0 6px; }
 #intro p { margin: 0 0 8px; }
+.app #intro { display: none; }
 .policy { line-height: 1.55; max-width: 40rem; }
 .policy h2 { font-size: 1.05rem; margin: 22px 0 6px; }
 .policy a { color: var(--accent); }

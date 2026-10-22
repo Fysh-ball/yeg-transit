@@ -577,7 +577,7 @@ $("#map-sheet").addEventListener("click", (e) => { if (e.target.id === "map-shee
 // Onboarding: the empty screen offers the two ways in; tips show once, after the first stop's settings.
 $("#ob-near").onclick = () => { setAdd(true, false); $("#near").click(); };
 // In the Android app the page is already installed: point at the widget instead of the browser's install menu.
-if (window.YegApp) $("#tip-handy").innerHTML = "<b>Widget:</b> long-press your home screen, tap <b>Widgets</b>, then <b>YEG Bus</b>.";
+if (window.YegApp) $("#tip-handy").innerHTML = "<b>Widget:</b> hold your home screen &rarr; <b>Widgets</b> &rarr; <b>YEG Bus</b>.";
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("#install").hidden = false; });
 function showTips() {
@@ -678,4 +678,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=50").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=51").catch((e) => console.warn("sw:", e.message));
