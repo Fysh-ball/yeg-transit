@@ -55,8 +55,12 @@ header h1 { margin: 0; flex: 1; font-size: 30px; font-weight: 750; font-variatio
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 0%, transparent); } 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent); } }
 .wave { display: block; width: 100%; height: 22px; margin: 12px 0 10px; }
 .wave .track { stroke: color-mix(in srgb, var(--on-pc) 18%, transparent); }
-.wave .done { stroke: var(--primary); stroke-dasharray: 260 1000; animation: crawl 1.6s linear infinite; }
-@keyframes crawl { to { stroke-dashoffset: -40; } }
+.wave .done { stroke: var(--primary); }
+/* Arrival: the badge bounces and a ripple rings out while the wave flattens into a full line. */
+.cookie.arrive { animation: arrive .9s var(--spring); }
+@keyframes arrive { 30% { transform: scale(1.18) rotate(-10deg); } }
+.cookie.arrive::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 3px solid var(--primary); animation: ripple 1.1s ease-out forwards; }
+@keyframes ripple { from { transform: scale(.85); opacity: .9; } to { transform: scale(2); opacity: 0; } }
 .rows { display: flex; flex-direction: column; gap: 3px; }
 .row { display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 10px; background: color-mix(in srgb, var(--surface) 70%, transparent); border-radius: 8px; }
 .row:first-child { border-radius: 22px 22px 8px 8px; }
@@ -119,7 +123,7 @@ header h1 { margin: 0; flex: 1; font-size: 30px; font-weight: 750; font-variatio
       <div class="cookie"><svg viewBox="0 0 100 100"><path class="cookie-path" fill="var(--primary)"/></svg><b>902</b></div>
       <div><span class="big">2</span><span class="unit">min</span><div class="dest">NAIT<span class="live"></span></div></div>
     </div>
-    <svg class="wave" viewBox="0 0 330 22" preserveAspectRatio="none"><path class="track" d="M0 11H330" stroke-width="4" stroke-linecap="round" fill="none"/><path class="done wave-path" stroke-width="5" stroke-linecap="round" fill="none"/></svg>
+    <svg class="wave" viewBox="0 0 330 22" preserveAspectRatio="none"><path class="track" stroke-width="4" stroke-linecap="round" fill="none"/><path class="done wave-path" stroke-width="5" stroke-linecap="round" fill="none"/></svg>
     <div class="rows">
       <div class="row"><span class="pill">8</span><div class="d">Abbottsfield<small>then 17, 46 min</small></div><div class="m">3<small>min</small></div></div>
       <div class="row"><span class="pill">51</span><div class="d">Castle Downs<small>then 32 min</small></div><div class="m">9<small>min</small></div></div>
@@ -162,11 +166,9 @@ const t = document.getElementById("main").innerHTML;
 // Material's 9-scallop "cookie" shape and a wavy progress line, drawn once.
 const cookie = Array.from({ length: 181 }, (_, i) => { const a = i / 180 * 2 * Math.PI, r = 44 + 4 * Math.cos(9 * a);
   return (i ? "L" : "M") + (50 + r * Math.cos(a)).toFixed(2) + " " + (50 + r * Math.sin(a)).toFixed(2); }).join("") + "Z";
-const wave = Array.from({ length: 131 }, (_, i) => (i ? "L" : "M") + (i * 2.54).toFixed(1) + " " + (11 + 5 * Math.sin(i / 4)).toFixed(2)).join("");
 document.querySelectorAll(".screen").forEach((s) => {
   s.insertAdjacentHTML("afterbegin", t);
   s.querySelector(".cookie-path").setAttribute("d", cookie);
-  s.querySelector(".wave-path").setAttribute("d", wave);
   s.querySelector(".gear").onclick = () => s.classList.add("open");
   s.querySelector(".scrim").onclick = () => s.classList.remove("open");
   s.querySelectorAll(".group").forEach((g) => g.onclick = (e) => {
@@ -174,9 +176,29 @@ document.querySelectorAll(".screen").forEach((s) => {
     g.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target));
   });
 });
-// Demo countdown: the hero minute rolls in like a new digit.
-let m = 2;
-setInterval(() => { m = m === 0 ? 5 : m - 1; document.querySelectorAll(".big").forEach((b) => {
-  b.textContent = m || "Now"; b.nextElementSibling.hidden = !m; b.classList.remove("tick"); void b.offsetWidth; b.classList.add("tick"); }); }, 4000);
+// Demo countdown. The wave fills as the bus gets closer (here: minutes left out of 5),
+// and on arrival it fills, flattens and the badge bounces.
+const steps = [3, 2, 1, 0, 0, 5, 4], W = 330;
+let k = 0, m = steps[0], cur = 1 - m / 5, amp = 5, phase = 0;
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function draw() {
+  cur += (1 - m / 5 - cur) * (still ? 1 : .06);
+  amp += ((m ? 5 : 0) - amp) * (still ? 1 : .08);
+  phase += still ? 0 : .08;
+  const end = cur * W, pts = [];
+  for (let x = 0; x <= end; x += 2.5) pts.push((x ? "L" : "M") + x.toFixed(1) + " " + (11 + amp * Math.sin(x / 9 - phase)).toFixed(2));
+  const d = pts.join(""), track = end < W - 10 ? `M${(end + 10).toFixed(1)} 11H${W}` : "";
+  document.querySelectorAll(".wave-path").forEach((p) => p.setAttribute("d", d));
+  document.querySelectorAll(".wave .track").forEach((p) => p.setAttribute("d", track));
+  requestAnimationFrame(draw);
+}
+draw();
+setInterval(() => {
+  const was = m; k = (k + 1) % steps.length; m = steps[k];
+  if (m === was) return;
+  document.querySelectorAll(".big").forEach((b) => {
+    b.textContent = m || "Now"; b.nextElementSibling.hidden = !m; b.classList.remove("tick"); void b.offsetWidth; b.classList.add("tick"); });
+  document.querySelectorAll(".cookie").forEach((c) => { c.classList.remove("arrive"); if (!m) { void c.offsetWidth; c.classList.add("arrive"); } });
+}, 2500);
 </script>
 </body></html>
