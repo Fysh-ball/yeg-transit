@@ -1,0 +1,9 @@
+{
+  "name": "YEG Bus",
+  "short_name": "YEG Bus",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#17694a",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Transparent widget: white text with a shadow reads on any wallpaper, so light and dark are the same. -->
+<resources>
+  <color name="bg">#00000000</color><color name="fg">#FFFFFFFF</color><color name="muted">#E6FFFFFF</color>
+</resources>

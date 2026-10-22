@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The WebView reports prefers-color-scheme from this theme, so night mode needs its own parent. -->
+<resources><style name="App" parent="@android:style/Theme.Material.Light.NoActionBar"/></resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Like the wall board: no title, just each stop's name and its next buses. Tap opens the app. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root"
+  android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+  android:background="@drawable/widget_bg" android:padding="8dp">
+  <LinearLayout android:id="@+id/rows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical"/>
+</LinearLayout>

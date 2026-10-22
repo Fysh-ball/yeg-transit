@@ -1,0 +1,13 @@
+services:
+  yeg-transit:
+    build: .
+    image: yeg-transit:latest
+    container_name: yeg-transit
+    restart: unless-stopped
+    # Loopback only: the host-network cloudflared publishes it as yegbus.com (and the old bus.fysh.site).
+    ports: ["127.0.0.1:8792:8792"]
+    volumes: ["yeg-data:/data"]
+    mem_limit: 512m
+    cpus: 1
+volumes:
+  yeg-data:
