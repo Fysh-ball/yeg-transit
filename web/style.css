@@ -242,3 +242,146 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
   #map-sheet { width: min(720px, 90vw); margin: auto; border-radius: 16px; }
   #map-box { height: min(65dvh, 560px); }
 }
+
+/* ===== Looks (v52). Material 3 Expressive on Android, Liquid Glass on iPhone; Settings > Look overrides.
+   Same markup for both: only tokens, shapes and motion change. The base rules above stay the fallback. ===== */
+:root {
+  --spring: linear(0, .06 3%, .24 7%, .52 12%, .79 18%, .96 24%, 1.04 30%, 1.06 35%, 1.04 42%, 1.01 52%, .995 65%, 1);
+  --spring-fast: linear(0, .2 6%, .6 14%, .95 24%, 1.05 32%, 1.02 45%, 1);
+  --pc: var(--card); --on-pc: var(--text); --tc: var(--card); --on-tc: var(--text); --s3: var(--card-2);
+}
+/* Material: colours from the YEG Bus green as the seed. */
+:root[data-look="material"] {
+  --bg: #f4fbf5; --card: #e9efe9; --card-2: #f4fbf5; --text: #161d19; --muted: #3f4943; --line: #bfc9c1;
+  --accent: #17694a; --accent-text: #fff; --live: #17694a; --shadow: none;
+  --pc: #9ff5c6; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15; --tc: #b8eafb; --on-tc: #001f27; --s3: #e2e9e3;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-look="material"]:not([data-theme="light"]) {
+    --bg: #0e1511; --card: #1a211d; --card-2: #0e1511; --text: #dde4de; --muted: #bfc9c1; --line: #3f4943;
+    --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac;
+    --pc: #005237; --on-pc: #9ff5c6; --sc: #33493d; --on-sc: #cfe9d9; --tc: #144d5b; --on-tc: #b8eafb; --s3: #252c27;
+  }
+}
+:root[data-look="material"][data-theme="dark"] {
+  --bg: #0e1511; --card: #1a211d; --card-2: #0e1511; --text: #dde4de; --muted: #bfc9c1; --line: #3f4943;
+  --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac;
+  --pc: #005237; --on-pc: #9ff5c6; --sc: #33493d; --on-sc: #cfe9d9; --tc: #144d5b; --on-tc: #b8eafb; --s3: #252c27;
+}
+/* Glass: the page stays plain; controls float on frosted glass. */
+:root[data-look="glass"] { --glass: rgb(255 255 255 / .6); --glass-line: rgb(255 255 255 / .85); --glass-shadow: 0 8px 30px rgb(16 24 40 / .14); }
+@media (prefers-color-scheme: dark) {
+  :root[data-look="glass"]:not([data-theme="light"]) { --glass: rgb(40 46 56 / .6); --glass-line: rgb(255 255 255 / .14); --glass-shadow: 0 8px 30px rgb(0 0 0 / .5); }
+}
+:root[data-look="glass"][data-theme="dark"] { --glass: rgb(40 46 56 / .6); --glass-line: rgb(255 255 255 / .14); --glass-shadow: 0 8px 30px rgb(0 0 0 / .5); }
+
+/* Shared motion: presses squash and spring back, panels spring in. */
+button { transition: transform .45s var(--spring-fast), border-radius .45s var(--spring-fast), background-color .2s, color .2s; }
+button:active { transform: scale(.95); }
+#prefs:not([hidden]), #add:not([hidden]), #tips:not([hidden]) { animation: spring-in .55s var(--spring) both; }
+@keyframes spring-in { from { opacity: 0; transform: translateY(-14px) scale(.98); } }
+.grp-body:not([hidden]) { animation: open-down .35s var(--spring) both; }
+@keyframes open-down { from { opacity: 0; transform: translateY(-6px); } }
+#map-sheet[open] { animation: sheet-up .55s var(--spring) both; }
+@keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
+main > .stop { animation: rise .5s var(--spring) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+.lead .when.tick { animation: tick .6s var(--spring); }
+@keyframes tick { from { transform: translateY(-35%); opacity: 0; } }
+.route.arrive { animation: arrive .9s var(--spring); }
+@keyframes arrive { 30% { transform: scale(1.18) rotate(-10deg); } }
+
+/* The lead bus: only on the first card on screen, never on the wall board. */
+.wave { display: none; }
+body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead {
+  grid-template-columns: auto 1fr; grid-template-areas: "r w" "r h" "v v"; column-gap: 16px; row-gap: 2px; align-items: end;
+}
+body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .route { grid-area: r; align-self: center; }
+body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .when {
+  grid-area: w; text-align: left; font-size: 3.6rem; line-height: .95; font-weight: 820; letter-spacing: -.03em; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+}
+body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .when small { font-size: .85rem; letter-spacing: 0; }
+body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .head { grid-area: h; align-self: start; font-weight: 600; white-space: normal; }
+body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .wave { display: block; grid-area: v; width: 100%; height: 24px; margin: 10px 0 2px; overflow: visible; }
+.when .u { font-size: .6em; font-weight: 650; letter-spacing: 0; }
+.wave path { fill: none; stroke-linecap: round; }
+.wave .track { stroke: color-mix(in srgb, currentColor 18%, transparent); stroke-width: 4; }
+.wave .fill { stroke: var(--accent); stroke-width: 5; }
+
+/* ---- Material ---- */
+[data-look="material"] body { font-family: Roboto, system-ui, sans-serif; }
+[data-look="material"] h1 { font-size: 1.6rem; font-weight: 750; }
+[data-look="material"] .brand img { width: 40px; height: 40px; border-radius: 12px; }
+[data-look="material"] button { border: 0; background: var(--s3); border-radius: 999px; }
+[data-look="material"] .primary { background: var(--accent); color: var(--accent-text); border-radius: 18px; }
+[data-look="material"] .primary:active { border-radius: 26px; }
+[data-look="material"] .icon-btn { width: 48px; height: 48px; border-radius: 50%; color: var(--text); }
+[data-look="material"] .icon-btn:active { border-radius: 16px; }
+[data-look="material"] .stop-head .icon-btn { width: 40px; height: 40px; min-width: 40px; background: none; color: var(--muted); }
+[data-look="material"] #groups:not([hidden]) { display: flex; flex-wrap: nowrap; gap: 3px; }
+[data-look="material"] #groups .chip { flex: 1; min-height: 48px; border-radius: 8px; font-weight: 600; color: var(--muted); }
+[data-look="material"] #groups .chip:first-child { border-radius: 24px 8px 8px 24px; }
+[data-look="material"] #groups .chip:last-child { border-radius: 8px 24px 24px 8px; }
+[data-look="material"] #groups .chip[aria-pressed="true"] { border-radius: 24px; color: var(--accent-text); }
+[data-look="material"] .stop, [data-look="material"] #add, [data-look="material"] #prefs { background: var(--card); border: 0; border-radius: 30px; padding: 8px 14px 12px; box-shadow: none; }
+[data-look="material"] .stop-head h2 { font-size: 1.12rem; }
+[data-look="material"] .deps { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+[data-look="material"] .deps .dep, [data-look="material"] .deps .grp-head { border: 0; background: var(--card-2); border-radius: 6px; padding: 10px 12px; }
+[data-look="material"] .deps > .grp:first-child > .dep { border-radius: 22px 22px 6px 6px; }
+[data-look="material"] .deps > .grp:last-child > .dep { border-radius: 6px 6px 22px 22px; }
+[data-look="material"] .deps > .grp:only-child > .dep { border-radius: 22px; }
+[data-look="material"] .grp-body { border-left: 0; margin: 4px 0 4px 12px; }
+[data-look="material"] .grp-body .dep { background: none; }
+[data-look="material"] .route { border-radius: 14px; min-width: 3.1em; padding: 9px 4px; }
+[data-look="material"] .when { font-size: 1.45rem; font-weight: 800; }
+[data-look="material"] .stop.walk { background: var(--tc); color: var(--on-tc); }
+[data-look="material"] .stop.walk .sub, [data-look="material"] .stop.walk .then { color: inherit; opacity: .78; }
+[data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) { background: var(--pc); color: var(--on-pc); }
+[data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .sub,
+[data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .then { color: inherit; opacity: .78; }
+[data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .deps .dep { background: color-mix(in srgb, var(--card-2) 70%, transparent); }
+[data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .deps .dep.lead { background: none; padding: 6px 2px 2px; }
+[data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .route {
+  width: 84px; height: 84px; padding: 0; display: grid; place-items: center; font-size: 1.5rem; border-radius: 0; box-shadow: none;
+  -webkit-mask: url(cookie.svg) center / contain no-repeat; mask: url(cookie.svg) center / contain no-repeat;
+}
+[data-look="material"] input { border: 0; background: var(--s3); border-radius: 999px; padding: 12px 18px; }
+[data-look="material"] .settings, [data-look="material"] #prefs select, [data-look="material"] .settings select { border-radius: 16px; }
+[data-look="material"] #map-sheet { border-radius: 30px 30px 0 0; }
+[data-look="material"] .sms { border-radius: 999px; }
+
+/* ---- Glass ---- */
+[data-look="glass"] h1 { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; }
+[data-look="glass"] .brand img { width: 36px; height: 36px; border-radius: 10px; }
+[data-look="glass"] header { background: color-mix(in srgb, var(--bg) 72%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); margin: 0 -16px; padding-inline: 16px; }
+[data-look="glass"] button { border-radius: 999px; }
+[data-look="glass"] .icon-btn, [data-look="glass"] #groups {
+  background: var(--glass); border: 1px solid var(--glass-line); box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
+}
+[data-look="glass"] header .icon-btn { width: 44px; height: 44px; color: var(--text); }
+[data-look="glass"] .stop-head .icon-btn { background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-look="glass"] #groups:not([hidden]) { display: flex; flex-wrap: nowrap; gap: 0; padding: 4px; border-radius: 999px; }
+[data-look="glass"] #groups .chip { flex: 1; border: 0; background: none; color: var(--muted); font-weight: 600; min-height: 40px; }
+[data-look="glass"] #groups .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+[data-look="glass"] .stop, [data-look="glass"] #add, [data-look="glass"] #prefs { border: 0; border-radius: 26px; padding: 6px 16px 10px; }
+[data-look="glass"] .stop-head h2 { font-size: 1.1rem; letter-spacing: -.01em; }
+[data-look="glass"] .route { border-radius: 10px; padding: 6px 4px; }
+[data-look="glass"] .when { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+[data-look="glass"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead { border-top: 0; padding-top: 4px; }
+[data-look="glass"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .route { width: 72px; height: 72px; display: grid; place-items: center; font-size: 1.4rem; border-radius: 22px; padding: 0; }
+[data-look="glass"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .when { color: var(--accent); }
+[data-look="glass"] input { border-radius: 999px; padding: 11px 16px; }
+[data-look="glass"] #map-sheet { border-radius: 30px 30px 0 0; }
+[data-look="glass"] .sms { border-radius: 999px; }
+
+/* Android app only (no ads there): the add button floats bottom-right. */
+.native body:not(.board) { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+.native body:not(.board) #add-btn { position: fixed; z-index: 5; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); min-height: 64px; padding: 0 24px;
+  font-size: 1.05rem; box-shadow: 0 6px 18px rgb(0 0 0 / .22); }
+[data-look="glass"].native body:not(.board) #add-btn { border-radius: 999px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: .01s !important; }
+}
+[data-look="material"] body.board .deps .dep { background: var(--s3); }

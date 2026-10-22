@@ -52,7 +52,7 @@ function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 function clock(t) { return new Date(t * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 function mins(t, now) {
   const m = Math.round((t - now) / 60);
-  return m <= 0 ? `<span class="due">Due</span>` : m < 60 ? `${m} min` : clock(t);
+  return m <= 0 ? `<span class="due">Due</span>` : m < 60 ? `${m}<span class="u"> min</span>` : clock(t);
 }
 
 // ETS short names are zero-padded ("005") and headsigns repeat the number ("5 Coliseum").
@@ -90,20 +90,54 @@ function grouped(s, list, now) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(d);
   }
-  return [...groups].slice(0, s.n || 3).map(([key, ds]) => {
+  const html = [...groups].slice(0, s.n || 3).map(([key, ds], i) => {
     const open = expanded.has(key);
+    // The soonest bus leads: the first card on screen shows it big, with a wave that fills as the bus gets closer.
+    const lead = (h) => i ? h : h.replace('class="dep', 'class="dep lead').replace(/<\/(div|button)>$/, wave(s, ds[0], now) + "</$1>");
     if (ds.length === 1) { // one bus: nothing to expand, the line itself opens the map
       const note = ds[0].live && ds[0].trip ? "no more soon \u00B7 tap for map" : "no more soon";
-      return `<div class="grp">${row(ds[0], now, walkOf(s), s.id).replace('</span><span class="when">', `<span class="then">${note}</span></span><span class="when">`)}</div>`;
+      return `<div class="grp">${lead(row(ds[0], now, walkOf(s), s.id).replace('</span><span class="when">', `<span class="then">${note}</span></span><span class="when">`))}</div>`;
     }
     const then = ds.slice(1, 3).map((d) => Math.max(0, Math.round((d.time - walk - now) / 60))).join(", ");
     const head = row(ds[0], now, walkOf(s)).replace(/^<div class="dep"[^>]*>/, `<button class="dep grp-head" data-expand="${esc(key)}" aria-expanded="${open}">`)
       .replace(/<\/div>$/, "</button>")
       .replace('</span><span class="when">', `<span class="then">${then ? `then ${then} min` : "no more soon"}</span></span><span class="when">`);
-    return `<div class="grp">${head}<div class="grp-body"${open ? "" : " hidden"}>${ds[0].live && ds[0].trip ? `<button class="dep map-link" data-trip="${esc(ds[0].trip)}" data-stop="${esc(s.id)}">Next bus on map \u203A</button>` : ""}${ds.slice(1).map((d) => row(d, now, walkOf(s), s.id)
+    return `<div class="grp">${lead(head)}<div class="grp-body"${open ? "" : " hidden"}>${ds[0].live && ds[0].trip ? `<button class="dep map-link" data-trip="${esc(ds[0].trip)}" data-stop="${esc(s.id)}">Next bus on map \u203A</button>` : ""}${ds.slice(1).map((d) => row(d, now, walkOf(s), s.id)
       .replace(/<span class="head">[^<]*<\/span>/, `<span class="head">${d.live && d.trip ? "Show on map \u203A" : "Scheduled, no map"}</span>`)).join("")}</div></div>`;
   }).join("");
+  return html && `<div class="deps">${html}</div>`;
 }
+
+// Wave under the lead bus: full when it's time to go, filling over the last 15 minutes. Drawn by drawWaves().
+function wave(s, d, now) {
+  const m = (d.time - walkOf(s) * 60 - now) / 60;
+  const f = Math.min(1, Math.max(0.04, 1 - m / 15));
+  return `<svg class="wave" data-stop="${esc(s.id)}" data-f="${f.toFixed(3)}" viewBox="0 0 330 24" preserveAspectRatio="none" aria-hidden="true"><path class="track"/><path class="fill"/></svg>`;
+}
+// Big waves on the left shrink to flat at the tip, which runs into the track line. On arrival it fills, flattens,
+// and the route badge bounces once. State per stop survives the 30 s re-render so the wave glides, not jumps.
+const waves = new Map(), still = matchMedia("(prefers-reduced-motion: reduce)");
+function drawWaves() {
+  for (const svg of document.querySelectorAll(".stop:not([hidden]) .lead .wave")) {
+    if (!svg.getClientRects().length) continue; // hidden by the look or the wall board
+    const f = +svg.dataset.f, id = svg.dataset.stop, W = 330;
+    const w = waves.get(id) || { cur: f, amp: f >= 1 ? 0 : 8, phase: 0, arrived: false };
+    const k = still.matches ? 1 : 0.04;
+    w.cur += (f - w.cur) * k;
+    w.amp += ((f >= 1 ? 0 : 8) - w.amp) * (still.matches ? 1 : 0.08);
+    w.phase += still.matches ? 0 : 0.045;
+    if (f >= 1 && !w.arrived) { w.arrived = true; svg.closest(".dep").querySelector(".route").classList.add("arrive"); }
+    if (f < 1) w.arrived = false;
+    waves.set(id, w);
+    const end = w.cur * W, pts = [];
+    for (let x = 0; x <= end; x += 2.5) pts.push(`${x ? "L" : "M"}${x.toFixed(1)} ${(12 + w.amp * Math.pow(1 - x / end, 0.85) * Math.sin(x / 9 - w.phase)).toFixed(2)}`);
+    pts.push(`L${end.toFixed(1)} 12`);
+    svg.querySelector(".fill").setAttribute("d", pts.join(""));
+    svg.querySelector(".track").setAttribute("d", end < W ? `M${end.toFixed(1)} 12H${W}` : "");
+  }
+  requestAnimationFrame(drawWaves);
+}
+requestAnimationFrame(drawWaves);
 const editing = new Set();
 let firstStop = null;
 function settingsPanel(s) {
@@ -219,7 +253,10 @@ async function renderStop(s, el) {
     body += `<p class="note">Scheduled times only. Buses may be early or late.</p>`;
   }
   if (offline && smsOk(s)) body += `<a class="sms" href="${smsLink(s)}">Text ${esc(s.code)} to 31100 for live times</a>`;
+  const was = el.querySelector(".lead .when")?.firstChild?.textContent;
   el.innerHTML = stopHead(s) + (editing.has(s.id) ? settingsPanel(s) : "") + body;
+  const now2 = el.querySelector(".lead .when");
+  if (was && now2 && now2.firstChild?.textContent !== was) now2.classList.add("tick"); // the new minute rolls in
   return offline;
 }
 
@@ -237,6 +274,7 @@ async function renderAll() {
       main.append(el);
     }
     el.hidden = !!group && s.group !== group;
+    el.classList.toggle("walk", !!s.walk); // walk time set: the card leads with when to leave
     return renderStop(s, el);
   }));
   const off = results.some(Boolean);
@@ -602,6 +640,12 @@ $("#theme").onchange = (e) => {
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   try { t ? localStorage.setItem("yeg.theme", t) : localStorage.removeItem("yeg.theme"); } catch (err) { console.warn("theme:", err.message); }
 };
+// Look: "" follows the phone (glass on iPhone, Material elsewhere; setLook is in index.html so it applies before paint).
+try { $("#look").value = localStorage.getItem("yeg.look") || ""; } catch { /* storage blocked: Match phone */ }
+$("#look").onchange = (e) => {
+  setLook(e.target.value);
+  try { e.target.value ? localStorage.setItem("yeg.look", e.target.value) : localStorage.removeItem("yeg.look"); } catch (err) { console.warn("look:", err.message); }
+};
 
 // Wall board: big type, clock, screen kept awake. On with #board, or when a touch device is turned
 // sideways (laptops are landscape too, so pointer:coarse keeps them in the normal view).
@@ -678,4 +722,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=51").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=52").catch((e) => console.warn("sw:", e.message));
