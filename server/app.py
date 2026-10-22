@@ -13,7 +13,7 @@ WEB = os.path.join(ROOT, "web")
 DB = os.path.join(DATA, "gtfs.db")
 try:  # written by scripts/deploy.sh into the build context, never committed
     SHA = open(os.path.join(ROOT, "server", "VERSION")).read().strip()
-except OSError:
+except FileNotFoundError:  # only a missing file means a dev run; an unreadable one must fail loudly, not report "dev"
     SHA = "dev"
 GTFS_URL = "https://gtfs.edmonton.ca/TMGTFSRealTimeWebService/GTFS/GTFS.zip"
 RT_URL = "https://gtfs.edmonton.ca/TMGTFSRealTimeWebService/TripUpdate/TripUpdates.pb"

@@ -16,7 +16,8 @@ stale=$(grep -rnoE '\?v=[0-9]+' web | grep -v "?v=${V#yeg-v}\$" || true)
 SHA=$(git rev-parse HEAD)
 echo "deploying $SHA ($V)"
 rsync -a server/ "$H:$D/server/"
-echo "$SHA" | ssh "$H" "cat > $D/server/VERSION"
+# chmod: the pool's inherited ACL makes new files owner-only, and the container runs as nobody
+echo "$SHA" | ssh "$H" "cat > $D/server/VERSION && chmod 644 $D/server/VERSION"
 rsync -a web/ "$H:$D/web/"
 rsync -a --exclude __pycache__ tests/ "$H:/tmp/yeg-tests/"
 ${DEPLOY_WRAP:-} ssh -n "$H" "cd $D && docker compose build -q && \
