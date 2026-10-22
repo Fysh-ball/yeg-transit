@@ -1,0 +1,75 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YEG Bus sample</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #7a7f87; font: 16px/1.35 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; display: flex; gap: 24px; padding: 24px; justify-content: center; }
+.phone { width: 390px; height: 844px; overflow: hidden; border-radius: 48px; position: relative;
+  --bg: #eef1f5; --card: #fff; --text: #14181d; --muted: #5b6672; --line: #e8ebef; --accent: #17694a; --on-accent: #fff; --live: #11823b;
+  --glass: rgb(255 255 255 / .55); --glass-line: rgb(255 255 255 / .8); --glass-shadow: 0 8px 30px rgb(16 24 40 / .14); }
+.phone.dark { --bg: #0d1117; --card: #161b22; --text: #e8edf2; --muted: #96a2ae; --line: #262e38; --accent: #5ccf91; --on-accent: #06150d; --live: #4fd187;
+  --glass: rgb(40 46 56 / .55); --glass-line: rgb(255 255 255 / .14); --glass-shadow: 0 8px 30px rgb(0 0 0 / .5); }
+.screen { background: var(--bg); color: var(--text); height: 100%; padding: 58px 14px 0; position: relative; }
+.glass { background: var(--glass); backdrop-filter: blur(22px) saturate(1.8); -webkit-backdrop-filter: blur(22px) saturate(1.8);
+  border: 1px solid var(--glass-line); box-shadow: var(--glass-shadow); }
+header { display: flex; align-items: center; gap: 10px; margin: 0 4px 16px; }
+header img { width: 36px; height: 36px; border-radius: 10px; }
+header h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 0; flex: 1; }
+.round { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--text); }
+.card { background: var(--card); border-radius: 26px; padding: 16px 16px 6px; margin-bottom: 14px; }
+.light .card { box-shadow: 0 1px 2px rgb(16 24 40 / .05), 0 2px 8px rgb(16 24 40 / .05); }
+.card h2 { font-size: 18px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+.card .sub { color: var(--muted); font-size: 13px; margin: 2px 0 8px; }
+.row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.pill { background: var(--accent); color: var(--on-accent); font-weight: 800; font-size: 16px; border-radius: 10px; min-width: 48px; text-align: center; padding: 5px 6px; }
+.dest { flex: 1; min-width: 0; }
+.dest b { display: block; font-weight: 600; font-size: 16px; }
+.dest small { color: var(--muted); font-size: 13px; }
+.min { text-align: right; font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1; }
+.min small { font-size: 14px; font-weight: 600; margin-left: 2px; }
+.min.now { color: var(--accent); font-size: 22px; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--live); margin-left: 6px; vertical-align: 4px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 25%, transparent); }
+.bar { position: absolute; left: 18px; right: 18px; bottom: 30px; display: flex; gap: 10px; align-items: center; }
+.tabs { flex: 1; display: flex; border-radius: 999px; padding: 4px; }
+.tabs span { flex: 1; text-align: center; padding: 10px 0; border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--muted); }
+.tabs .on { background: var(--accent); color: var(--on-accent); }
+.add { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--on-accent); font-size: 30px; font-weight: 400; box-shadow: var(--glass-shadow); }
+.dim { position: absolute; inset: 0; background: rgb(0 0 0 / .28); }
+.sheet { position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 40px; padding: 10px 18px 22px; }
+.grab { width: 40px; height: 5px; border-radius: 3px; background: var(--muted); opacity: .4; margin: 0 auto 10px; }
+.sheet h2 { font-size: 22px; margin: 4px 4px 12px; }
+.group { background: var(--card); border-radius: 22px; margin-bottom: 12px; }
+.set { display: flex; justify-content: space-between; align-items: center; padding: 0 16px; min-height: 48px; border-top: 1px solid var(--line); }
+.set:first-child { border-top: 0; }
+.set i { font-style: normal; color: var(--muted); }
+.lic { color: var(--muted); font-size: 12px; margin: 4px 6px 0; }
+</style></head>
+<body>
+<template id="main">
+  <header><img src="../../web/icon.svg" alt=""><h1>YEG Bus</h1>
+    <div class="round glass"><svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></div></header>
+  <div class="card"><h2>Southgate Transit Centre</h2><p class="sub">Stop #2002 &middot; Southbound</p>
+    <div class="row"><span class="pill">4</span><div class="dest"><b>Capilano</b><small>then 12, 22 min</small></div><div class="min now">Now</div></div>
+    <div class="row"><span class="pill">902</span><div class="dest"><b>NAIT</b><small>then 14, 26 min</small></div><div class="min">2<small>min</small><span class="dot"></span></div></div>
+    <div class="row"><span class="pill">8</span><div class="dest"><b>Abbottsfield</b><small>then 17, 46 min</small></div><div class="min">3<small>min</small><span class="dot"></span></div></div>
+    <div class="row"><span class="pill">51</span><div class="dest"><b>Castle Downs</b><small>then 32, 62 min</small></div><div class="min">9<small>min</small><span class="dot"></span></div></div>
+  </div>
+  <div class="card"><h2>University Station</h2><p class="sub">Leave in 4 min &middot; 7 min walk</p>
+    <div class="row"><span class="pill">9</span><div class="dest"><b>Eaux Claires</b><small>then 25 min</small></div><div class="min">11<small>min</small><span class="dot"></span></div></div>
+  </div>
+  <div class="bar"><div class="tabs glass"><span class="on">All</span><span>Home</span><span>Work</span></div><div class="add">+</div></div>
+</template>
+<div class="phone light"><div class="screen"></div></div>
+<div class="phone dark"><div class="screen"></div></div>
+<div class="phone light"><div class="screen"><div class="dim"></div>
+  <div class="sheet glass"><div class="grab"></div><h2>Settings</h2>
+    <div class="group"><div class="set"><span>Appearance</span><i>Match phone</i></div><div class="set"><span>Wall board</span><i>When sideways</i></div></div>
+    <div class="group"><div class="set"><span>Add to Home Screen</span><i>&rsaquo;</i></div><div class="set"><span>How to use YEG Bus</span><i>&rsaquo;</i></div><div class="set"><span>No data? Text 31100</span><i>&rsaquo;</i></div></div>
+    <div class="group"><div class="set"><span>Buy me a coffee</span><i>&rsaquo;</i></div><div class="set"><span>Privacy &middot; About</span><i>&rsaquo;</i></div></div>
+    <p class="lic">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.</p>
+  </div></div></div>
+<script>
+const t = document.getElementById("main").innerHTML;
+document.querySelectorAll(".screen").forEach((s) => s.insertAdjacentHTML("afterbegin", t));
+</script>
+</body></html>

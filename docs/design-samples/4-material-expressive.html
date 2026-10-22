@@ -1,0 +1,87 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YEG Bus sample</title>
+<style>
+/* Material 3 Expressive look, colours from the YEG Bus green (#17694a) as the seed. A design sample, not app code. */
+* { box-sizing: border-box; }
+body { margin: 0; background: #7a7f87; font: 16px/1.4 Roboto, "Google Sans", system-ui, sans-serif; display: flex; gap: 24px; padding: 24px; justify-content: center; }
+.phone { width: 390px; height: 844px; overflow: hidden; border-radius: 40px; position: relative;
+  --primary: #17694a; --on-primary: #fff; --pc: #a6f2c9; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15;
+  --tc: #bce9f6; --on-tc: #001f26; --surface: #f5fbf5; --sc-low: #eff5ef; --sc-mid: #e9efe9; --sc-high: #e3eae3;
+  --text: #171d19; --muted: #404943; --outline: #c0c9c1; }
+.phone.dark { --primary: #8bd6ae; --on-primary: #003825; --pc: #00513a; --on-pc: #a6f2c9; --sc: #344b3e; --on-sc: #cfe9d9;
+  --tc: #1f4d58; --on-tc: #bce9f6; --surface: #0f1511; --sc-low: #171d19; --sc-mid: #1b211d; --sc-high: #252b27;
+  --text: #dee4de; --muted: #c0c9c1; --outline: #404943; }
+.screen { background: var(--surface); color: var(--text); height: 100%; padding: 52px 12px 0; position: relative; }
+header { display: flex; align-items: center; gap: 12px; padding: 8px 6px 18px; }
+header img { width: 40px; height: 40px; border-radius: 14px; }
+header h1 { font-size: 28px; font-weight: 700; margin: 0; flex: 1; letter-spacing: -.01em; }
+.icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--sc-high); color: var(--text); }
+.chips { display: flex; gap: 8px; margin: 0 4px 14px; }
+.chip { height: 36px; padding: 0 16px; border-radius: 12px; display: flex; align-items: center; font-size: 14px; font-weight: 500; border: 1px solid var(--outline); color: var(--muted); }
+.chip.on { background: var(--sc); color: var(--on-sc); border-color: transparent; }
+.chip.on::before { content: "\2713"; margin-right: 6px; }
+.card { background: var(--sc-mid); border-radius: 28px; padding: 18px 14px 8px; margin-bottom: 12px; }
+.card h2 { font-size: 20px; font-weight: 600; margin: 0 4px; }
+.card .sub { color: var(--muted); font-size: 14px; margin: 2px 4px 12px; }
+.row { display: flex; align-items: center; gap: 14px; padding: 10px; background: var(--surface); border-radius: 6px; margin-bottom: 3px; }
+.row:first-of-type { border-radius: 20px 20px 6px 6px; }
+.row:last-child { border-radius: 6px 6px 20px 20px; margin-bottom: 8px; }
+.row:only-of-type { border-radius: 20px; }
+.badge { background: var(--pc); color: var(--on-pc); font-weight: 800; font-size: 17px; min-width: 52px; height: 44px; display: grid; place-items: center; border-radius: 16px; }
+.dest { flex: 1; min-width: 0; }
+.dest b { display: block; font-weight: 500; font-size: 16px; }
+.dest small { color: var(--muted); font-size: 13px; }
+.min { text-align: right; font-size: 28px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.min small { display: block; font-size: 12px; font-weight: 500; color: var(--primary); margin-top: 3px; }
+.min.now { color: var(--primary); font-size: 24px; }
+.toolbar { position: absolute; left: 16px; bottom: 24px; display: flex; gap: 4px; padding: 6px; border-radius: 999px; background: var(--sc-high); box-shadow: 0 3px 8px rgb(0 0 0 / .15); }
+.toolbar span { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); }
+.toolbar .on { background: var(--sc); color: var(--on-sc); width: auto; padding: 0 16px; border-radius: 999px; gap: 6px; display: flex; font-weight: 500; font-size: 14px; }
+.fab { position: absolute; right: 16px; bottom: 24px; width: 72px; height: 72px; border-radius: 22px; background: var(--pc); color: var(--on-pc); display: grid; place-items: center; font-size: 34px; box-shadow: 0 4px 10px rgb(0 0 0 / .2); }
+.scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .32); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--sc-low); border-radius: 28px 28px 0 0; padding: 12px 16px 26px; }
+.handle { width: 32px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .5; margin: 4px auto 18px; }
+.sheet h2 { font-size: 22px; font-weight: 500; margin: 0 8px 14px; }
+.item { display: flex; align-items: center; gap: 16px; padding: 0 12px; min-height: 56px; background: var(--surface); border-radius: 6px; margin-bottom: 3px; }
+.item.first { border-radius: 20px 20px 6px 6px; }
+.item.last { border-radius: 6px 6px 20px 20px; margin-bottom: 12px; }
+.item .ic { width: 24px; text-align: center; color: var(--primary); }
+.item span { flex: 1; }
+.item i { font-style: normal; color: var(--muted); font-size: 14px; }
+.lic { color: var(--muted); font-size: 12px; margin: 2px 8px 0; }
+</style></head>
+<body>
+<template id="main">
+  <header><img src="../../web/icon.svg" alt=""><h1>YEG Bus</h1>
+    <div class="icon"><svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></div></header>
+  <div class="chips"><span class="chip on">All</span><span class="chip">Home</span><span class="chip">Work</span></div>
+  <div class="card"><h2>Southgate Transit Centre</h2><p class="sub">Stop #2002 &middot; Southbound</p>
+    <div class="row"><span class="badge">4</span><div class="dest"><b>Capilano</b><small>then 12, 22 min</small></div><div class="min now">Now</div></div>
+    <div class="row"><span class="badge">902</span><div class="dest"><b>NAIT</b><small>then 14, 26 min</small></div><div class="min">2<small>min &middot; live</small></div></div>
+    <div class="row"><span class="badge">8</span><div class="dest"><b>Abbottsfield</b><small>then 17, 46 min</small></div><div class="min">3<small>min &middot; live</small></div></div>
+  </div>
+  <div class="card"><h2>University Station</h2><p class="sub">Leave in 4 min &middot; 7 min walk</p>
+    <div class="row"><span class="badge">9</span><div class="dest"><b>Eaux Claires</b><small>then 25 min</small></div><div class="min">11<small>min &middot; live</small></div></div>
+  </div>
+  <div class="toolbar"><span class="on">&#9679; Stops</span><span>&#9906;</span><span>&#9733;</span></div>
+  <div class="fab">+</div>
+</template>
+<div class="phone"><div class="screen"></div></div>
+<div class="phone dark"><div class="screen"></div></div>
+<div class="phone"><div class="screen"><div class="scrim"></div>
+  <div class="sheet"><div class="handle"></div><h2>Settings</h2>
+    <div class="item first"><b class="ic">&#9681;</b><span>Appearance</span><i>Match phone</i></div>
+    <div class="item last"><b class="ic">&#9645;</b><span>Wall board</span><i>When sideways</i></div>
+    <div class="item first"><b class="ic">&#8862;</b><span>Add widget</span><i>&rsaquo;</i></div>
+    <div class="item"><b class="ic">?</b><span>How to use YEG Bus</span><i>&rsaquo;</i></div>
+    <div class="item last"><b class="ic">&#9993;</b><span>No data? Text 31100</span><i>&rsaquo;</i></div>
+    <div class="item first"><b class="ic">&#9749;</b><span>Buy me a coffee</span><i>&rsaquo;</i></div>
+    <div class="item last"><b class="ic">i</b><span>Privacy &middot; About</span><i>&rsaquo;</i></div>
+    <p class="lic">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.</p>
+  </div></div></div>
+<script>
+const t = document.getElementById("main").innerHTML;
+document.querySelectorAll(".screen").forEach((s) => s.insertAdjacentHTML("afterbegin", t));
+</script>
+</body></html>
