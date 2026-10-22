@@ -145,6 +145,7 @@ function settingsPanel(s) {
   const chips = all.map((r) => `<button class="chip" aria-pressed="${!s.only || s.only.includes(r)}" data-route="${esc(r)}">${esc(routeLabel(r))}</button>`).join("");
   const opt = (vals, cur, f) => vals.map((v) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${f(v)}</option>`).join("");
   return `<div class="settings" data-stop="${esc(s.id)}">
+    <div class="prefs-bar"><button class="icon-btn" type="button" data-settings="${esc(s.id)}" aria-label="Back" title="Back"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h2>${esc(s.name)}<span class="sub">Stop #${esc(s.code)}</span></h2></div>
     ${s.id === firstStop ? `<p class="note">Pick the routes you ride and how long your walk is. Change it any time with the sliders button.</p>` : ""}
     ${all.length ? `<p class="label">Pick routes</p><div class="chips">${chips}</div>` : ""}
     <label>Walk to this stop <span><input type="number" data-set="walk" min="0" max="60" step="1" inputmode="numeric" value="${Number(s.walk) || 0}"> min</span></label>
@@ -255,6 +256,7 @@ async function renderStop(s, el) {
   if (offline && smsOk(s)) body += `<a class="sms" href="${smsLink(s)}">Text ${esc(s.code)} to 31100 for live times</a>`;
   const was = el.querySelector(".lead .when")?.firstChild?.textContent;
   el.innerHTML = stopHead(s) + (editing.has(s.id) ? settingsPanel(s) : "") + body;
+  el.classList.toggle("editing", editing.has(s.id));
   const now2 = el.querySelector(".lead .when");
   if (was && now2 && now2.firstChild?.textContent !== was) now2.classList.add("tick"); // the new minute rolls in
   return offline;
@@ -264,6 +266,7 @@ async function renderAll() {
   const main = $("#stops");
   renderTabs();
   $("#empty").hidden = stops.length > 0;
+  if (!stops.length) $("#tips").hidden = true;
   [...main.children].forEach((c) => { if (!stops.some((s) => s.id === c.dataset.id)) c.remove(); });
   const results = await Promise.all(stops.map((s) => {
     let el = main.querySelector(`[data-id="${CSS.escape(s.id)}"]`);
@@ -371,11 +374,27 @@ function setAdd(open, focus = true) {
 }
 
 $("#add-btn").onclick = () => setAdd($("#add").hidden);
-$("#prefs-btn").onclick = () => {
-  const open = $("#prefs").hidden;
+// Settings is its own page: a history entry, so the phone's back button closes it.
+function setPrefs(open) {
+  if ($("#prefs").hidden === !open) return;
   $("#prefs").hidden = !open;
   $("#prefs-btn").setAttribute("aria-expanded", String(open));
-};
+  document.body.classList.toggle("in-prefs", open);
+  if (open) { history.pushState({ prefs: 1 }, ""); scrollTo(0, 0); }
+}
+$("#prefs-btn").onclick = () => setPrefs(true);
+$("#prefs-back").onclick = () => (history.state?.prefs ? history.back() : setPrefs(false));
+addEventListener("popstate", () => { setPrefs(false); setEdit(null); });
+// A stop's settings are a page of their own too, never a form inside its coloured card.
+function setEdit(id) {
+  const was = [...editing][0];
+  if (was === id) return;
+  editing.clear();
+  if (id) editing.add(id);
+  document.body.classList.toggle("in-edit", !!id);
+  if (was) { if (was === firstStop) { firstStop = null; showTips(); } rerender(was); }
+  if (id) { history.pushState({ edit: id }, ""); scrollTo(0, 0); rerender(id); }
+}
 $("#results").onkeydown = (e) => { if (e.key === "Enter" && e.target.matches(".pick")) e.target.click(); };
 
 $("#q").oninput = () => {
@@ -408,7 +427,7 @@ document.addEventListener("click", (e) => {
   const add = e.target.closest("[data-add]");
   if (add) {
     const s = JSON.parse(add.dataset.add);
-    if (!stops.length) { firstStop = s.id; editing.add(s.id); } // onboarding: straight into its settings
+    if (!stops.length) { firstStop = s.id; setEdit(s.id); } // onboarding: straight into its settings
     if (!stops.some((x) => x.id === s.id)) { stops.push(s); save(); }
     setAdd(false);
     renderAll();
@@ -430,9 +449,9 @@ document.addEventListener("click", (e) => {
   const gear = e.target.closest("[data-settings]");
   if (gear) {
     const id = gear.dataset.settings;
-    editing.has(id) ? editing.delete(id) : editing.add(id);
-    if (id === firstStop && !editing.has(id)) { firstStop = null; showTips(); }
-    rerender(id);
+    if (!editing.has(id)) setEdit(id);
+    else if (history.state?.edit) history.back(); // popstate closes it, so the phone's back button and ours match
+    else setEdit(null);
   }
   const chip = e.target.closest("[data-route]");
   if (chip) {
@@ -618,6 +637,9 @@ $("#ob-near").onclick = () => { setAdd(true, false); $("#near").click(); };
 if (window.YegApp) $("#tip-handy").innerHTML = "<b>Widget:</b> hold your home screen &rarr; <b>Widgets</b> &rarr; <b>YEG Bus</b>.";
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("#install").hidden = false; });
+// The Android app's floating add button slides away while you scroll down and comes back on the way up.
+let lastY = 0;
+addEventListener("scroll", () => { document.body.classList.toggle("down", scrollY > lastY && scrollY > 80); lastY = scrollY; }, { passive: true });
 function showTips() {
   try { if (localStorage.getItem("yeg.tips")) return; } catch { /* storage blocked: show them */ }
   $("#tips").hidden = false;
@@ -667,7 +689,7 @@ function checkStale() {
   const at = [...$("#stops").children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live);
   const old = at.length && $("#offline").hidden && Date.now() / 1000 - Math.min(...at) > 90;
   $("#stale").hidden = !old && !newVersion;
-  $("#stale span").textContent = newVersion ? "YEG Bus has been updated." : old ? `Times may be out of date (last live ${clock(Math.min(...at))}).` : "";
+  $("#stale span").textContent = newVersion ? "New version ready" : old ? `Times may be out of date (last live ${clock(Math.min(...at))}).` : "";
 }
 async function checkVersion() {
   try {
@@ -682,7 +704,7 @@ $("#stale-reload").onclick = () => location.reload();
 function applyBoard() {
   const on = isBoard();
   document.body.classList.toggle("board", on);
-  if (on) { setAdd(false); $("#prefs").hidden = true; $("#prefs-btn").setAttribute("aria-expanded", "false"); wake(); } else if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  if (on) { setAdd(false); setPrefs(false); setEdit(null); wake(); } else if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
 }
 tick(); setInterval(tick, 10000);
 sideways.addEventListener("change", () => { if (!sideways.matches) boardExited = false; applyBoard(); });
@@ -722,4 +744,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=52").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=53").catch((e) => console.warn("sw:", e.message));

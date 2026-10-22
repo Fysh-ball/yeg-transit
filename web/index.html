@@ -43,7 +43,7 @@ setLook(look);
 // Opened as an app (Android app, or added to the home screen): it's been chosen already, so skip the pitch.
 if (window.YegApp || navigator.standalone || matchMedia("(display-mode: standalone)").matches) de.classList.add("app");
 if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add button can float</script>
-<link rel="stylesheet" href="style.css?v=52">
+<link rel="stylesheet" href="style.css?v=53">
 </head>
 <body>
 <header>
@@ -57,7 +57,7 @@ if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add 
 </header>
 
 <section id="prefs" class="stop" hidden>
-  <h2>Settings</h2>
+  <div class="prefs-bar"><button id="prefs-back" class="icon-btn" type="button" aria-label="Back" title="Back"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h2>Settings</h2></div>
   <label>Look <select id="look">
     <option value="">Match phone</option>
     <option value="material">Material (Android)</option>
@@ -74,10 +74,12 @@ if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add 
     <option value="off">Off</option>
   </select></label>
   <p class="hint">Wall board shows big times and a clock and keeps the screen on, for a tablet by the door.</p>
+  <p class="links"><a href="guide.html">How to use YEG Bus</a><a href="about.html">About</a><a href="privacy.html">Privacy</a><a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
+  <p class="hint">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.</p>
 </section>
 
 <div id="offline" role="status" hidden></div>
-<div id="stale" role="status" hidden><span></span> <button type="button" id="stale-reload">Refresh</button></div>
+<div id="stale" role="status" hidden><span></span><button type="button" id="stale-reload">Refresh</button></div>
 
 <section id="add" hidden>
   <form id="search-form">
@@ -124,9 +126,9 @@ if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add 
     <p>When your phone has no data, saved stops still show the timetable, and a button texts the stop number to ETS's 31100 service for live times. When ETS closes a stop for construction, the card tells you and offers the replacement stop. Turn a tablet sideways for a wall board by the front door, or add the Android widget to your home screen.</p>
     <p><a href="guide.html">How to use YEG Bus</a> &middot; <a href="about.html">About</a> &middot; <a href="about.html#contact">Contact</a></p>
   </section>
-  Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
-  <a href="guide.html">Help</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a>
+  <p class="legal">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
+  <a href="guide.html">Help</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
 </footer>
-<script src="app.js?v=52"></script>
+<script src="app.js?v=53"></script>
 </body>
 </html>

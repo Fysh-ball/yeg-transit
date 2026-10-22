@@ -254,19 +254,19 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
 :root[data-look="material"] {
   --bg: #f4fbf5; --card: #e9efe9; --card-2: #f4fbf5; --text: #161d19; --muted: #3f4943; --line: #bfc9c1;
   --accent: #17694a; --accent-text: #fff; --live: #17694a; --shadow: none;
-  --pc: #9ff5c6; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15; --tc: #b8eafb; --on-tc: #001f27; --s3: #e2e9e3;
+  --pc: #9ff5c6; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15; --tc: #b8eafb; --on-tc: #001f27; --s3: #e2e9e3; --tint: rgb(255 255 255 / .55);
 }
 @media (prefers-color-scheme: dark) {
   :root[data-look="material"]:not([data-theme="light"]) {
     --bg: #0e1511; --card: #1a211d; --card-2: #0e1511; --text: #dde4de; --muted: #bfc9c1; --line: #3f4943;
     --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac;
-    --pc: #005237; --on-pc: #9ff5c6; --sc: #33493d; --on-sc: #cfe9d9; --tc: #144d5b; --on-tc: #b8eafb; --s3: #252c27;
+    --pc: #005237; --on-pc: #9ff5c6; --sc: #33493d; --on-sc: #cfe9d9; --tc: #144d5b; --on-tc: #b8eafb; --s3: #252c27; --tint: rgb(159 245 198 / .1);
   }
 }
 :root[data-look="material"][data-theme="dark"] {
   --bg: #0e1511; --card: #1a211d; --card-2: #0e1511; --text: #dde4de; --muted: #bfc9c1; --line: #3f4943;
   --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac;
-  --pc: #005237; --on-pc: #9ff5c6; --sc: #33493d; --on-sc: #cfe9d9; --tc: #144d5b; --on-tc: #b8eafb; --s3: #252c27;
+  --pc: #005237; --on-pc: #9ff5c6; --sc: #33493d; --on-sc: #cfe9d9; --tc: #144d5b; --on-tc: #b8eafb; --s3: #252c27; --tint: rgb(159 245 198 / .1);
 }
 /* Glass: the page stays plain; controls float on frosted glass. */
 :root[data-look="glass"] { --glass: rgb(255 255 255 / .6); --glass-line: rgb(255 255 255 / .85); --glass-shadow: 0 8px 30px rgb(16 24 40 / .14); }
@@ -339,7 +339,8 @@ body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .le
 [data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) { background: var(--pc); color: var(--on-pc); }
 [data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .sub,
 [data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .then { color: inherit; opacity: .78; }
-[data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .deps .dep { background: color-mix(in srgb, var(--card-2) 70%, transparent); }
+/* Rows on a coloured card take a tint of it, not a dark slab. */
+:is([data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), [data-look="material"] .stop.walk) .deps .dep { background: var(--tint); color: inherit; }
 [data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .deps .dep.lead { background: none; padding: 6px 2px 2px; }
 [data-look="material"] body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .lead .route {
   width: 84px; height: 84px; padding: 0; display: grid; place-items: center; font-size: 1.5rem; border-radius: 0; box-shadow: none;
@@ -353,7 +354,9 @@ body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .le
 /* ---- Glass ---- */
 [data-look="glass"] h1 { font-size: 1.45rem; font-weight: 800; letter-spacing: -.02em; }
 [data-look="glass"] .brand img { width: 36px; height: 36px; border-radius: 10px; }
-[data-look="glass"] header { background: color-mix(in srgb, var(--bg) 72%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); margin: 0 -16px; padding-inline: 16px; }
+[data-look="glass"] header { background: none; margin: 0 -16px; padding-inline: 16px; isolation: isolate; }
+/* The blur sits on a layer behind the header: a backdrop-filter on the header itself would pin the app's floating add button inside it. */
+[data-look="glass"] header::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--bg) 72%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); }
 [data-look="glass"] button { border-radius: 999px; }
 [data-look="glass"] .icon-btn, [data-look="glass"] #groups {
   background: var(--glass); border: 1px solid var(--glass-line); box-shadow: var(--glass-shadow);
@@ -380,6 +383,53 @@ body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop) .le
 .native body:not(.board) #add-btn { position: fixed; z-index: 5; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom)); min-height: 64px; padding: 0 24px;
   font-size: 1.05rem; box-shadow: 0 6px 18px rgb(0 0 0 / .22); }
 [data-look="glass"].native body:not(.board) #add-btn { border-radius: 999px; }
+.native body:not(.board) #add-btn { transition: transform .3s var(--spring); }
+.native body.down:not(.board) #add-btn:not([aria-expanded="true"]) { transform: translateY(calc(100% + 40px)); } /* out of the way while reading down */
+
+/* Settings is its own page (v53): everything else steps aside, rows are tiles, the licence lives here. */
+body.in-prefs > :is(header, main, #add, #empty, #groups, #tips, #offline, .updated, footer) { display: none !important; }
+body.in-prefs #prefs:not([hidden]) { background: none; border: 0; box-shadow: none; padding: 4px 0 24px; margin: 0; animation: page-in .45s var(--spring) both; }
+@keyframes page-in { from { opacity: 0; transform: translateX(36px); } }
+#prefs .prefs-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 16px -4px; }
+#prefs .prefs-bar h2 { margin: 0; font-size: 1.6rem; font-weight: 750; }
+#prefs .prefs-bar .icon-btn { background: none; border: 0; box-shadow: none; color: var(--text); }
+#prefs label, #prefs .links a { background: var(--card); padding: 12px 14px 12px 18px; margin: 0 0 3px; border-radius: 6px; min-height: 36px; }
+#prefs label:first-of-type, #prefs .links a:first-child { border-radius: 22px 22px 6px 6px; }
+#prefs label:last-of-type, #prefs .links a:last-child { border-radius: 6px 6px 22px 22px; }
+#prefs .hint { margin: 10px 18px 22px; }
+#prefs .links { display: flex; flex-direction: column; margin: 0; }
+#prefs .links a { display: flex; align-items: center; color: var(--text); text-decoration: none; font-weight: 500; }
+#prefs .links a::after { content: "\203A"; margin-left: auto; font-size: 1.4rem; color: var(--muted); }
+#prefs .links + .hint { font-size: .75rem; }
+[data-look="glass"] #prefs label, [data-look="glass"] #prefs .links a { background: var(--glass); border: 1px solid var(--glass-line); }
+.app footer .legal { display: none; } /* the app keeps it in Settings */
+/* Update and out-of-date notes: a small pill floating at the bottom, not a box in the page. */
+#stale:not([hidden]) { position: fixed; z-index: 6; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
+  margin: 0; padding: 4px 4px 4px 16px; gap: 6px; border: 0; border-radius: 999px; font-size: .85rem; background: var(--text); color: var(--bg);
+  box-shadow: 0 6px 20px rgb(0 0 0 / .25); animation: pill-up .5s var(--spring) both; }
+#stale span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stale button { flex: none; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: inherit; font-weight: 700; font-size: .85rem; text-decoration: underline; text-underline-offset: 3px; }
+.native body:not(.board) #stale:not([hidden]) { bottom: calc(100px + env(safe-area-inset-bottom)); } /* above the floating add button */
+@keyframes pill-up { from { opacity: 0; translate: 0 20px; } }
+
+/* A stop's settings page: only that stop's form shows, on the plain page background, rows as tiles. */
+body.in-edit > :is(header, #groups, #tips, #offline, #add, #empty, #prefs, .updated, footer), body.in-edit main > .stop:not(.editing) { display: none !important; }
+body.in-edit main > .stop.editing { background: none !important; color: var(--text) !important; border: 0; box-shadow: none; padding: 4px 0 24px; margin: 0; animation: page-in .45s var(--spring) both; }
+.stop.editing > :not(.settings) { display: none !important; }
+.stop.editing .settings { display: block; background: none; padding: 0; margin: 0; }
+.settings .prefs-bar { display: flex; align-items: center; gap: 8px; margin: 0 0 16px -4px; }
+.settings .prefs-bar h2 { margin: 0; font-size: 1.4rem; font-weight: 750; line-height: 1.2; }
+.settings .prefs-bar .sub { display: block; font-size: .85rem; font-weight: 400; color: var(--muted); }
+.settings .prefs-bar .icon-btn { background: none; border: 0; box-shadow: none; color: var(--text); flex: none; }
+.stop.editing .settings .note { margin: 0 4px 14px; }
+.stop.editing .settings .label { margin: 0; padding: 14px 18px 4px; background: var(--card); border-radius: 22px 22px 6px 6px; color: var(--muted); }
+.stop.editing .settings .chips { background: var(--card); padding: 6px 14px 14px; margin: 0 0 12px; border-radius: 0 0 22px 22px; }
+.stop.editing .settings label { background: var(--card); padding: 10px 14px 10px 18px; margin: 0 0 3px; border-radius: 6px; min-height: 40px; }
+.stop.editing .settings label:first-of-type { border-radius: 22px 22px 6px 6px; }
+.stop.editing .settings label:last-of-type { border-radius: 6px 6px 22px 22px; margin-bottom: 16px; }
+.stop.editing .settings select, .stop.editing .settings input { background: var(--s3, var(--card-2)); color: var(--text); }
+.stop.editing .settings > .primary { width: 100%; min-height: 52px; }
+[data-look="glass"] .stop.editing .settings :is(label, .label, .chips) { background: var(--glass); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: .01s !important; }
