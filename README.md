@@ -48,7 +48,7 @@ CI runs the same on every push (`.github/workflows/test.yml`).
 
 1. Commit your change. For any change under `web/`, bump the version everywhere: `yeg-vNN` in `web/sw.js` and every `?v=NN` in `web/*.html`, `web/app.js` and `web/sw.js`. Phones and Cloudflare keep the old files otherwise; `deploy.sh` refuses a mismatch.
 2. Put `DEPLOY_HOST=user@host` and `DEPLOY_DIR=/path/to/compose/stack` in `scripts/deploy.conf` (gitignored).
-3. Run `scripts/deploy.sh` from the repo root. It copies the code, builds the image, runs the tests inside it, starts it, and only says `landed` once the live site serves the new `sw.js` version and `/api/version` returns the commit you deployed.
+3. Run `scripts/deploy.sh` from the repo root. It copies the code, builds the image, runs the tests inside it, starts it, and only says `landed` once the live site serves the new `sw.js` version and `/api/version` returns the commit you deployed. It keeps the previous image as `yeg-transit:prev` and prints the one-line `rollback:` command either way; nothing rolls back on its own.
 
 ## Android
 
