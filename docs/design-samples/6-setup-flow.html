@@ -47,11 +47,17 @@ h1 { font-size: 34px; line-height: 1.12; font-weight: 780; font-variation-settin
 .bus span:not(.n):not(.check) small { display: block; font-size: 14px; font-weight: 400; color: var(--muted); }
 .check { flex: none; width: 32px; height: 32px; border-radius: 10px; border: 2.5px solid var(--outline); display: grid; place-items: center; }
 .on .check { background: var(--primary); border-color: var(--primary); color: #fff; }
-.walk { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-.walk div { height: 96px; border-radius: 28px; background: var(--s3); display: grid; place-items: center; text-align: center; font-size: 30px; font-weight: 800; font-variation-settings: "wdth" 118; line-height: 1; }
-.walk div small { display: block; font-size: 15px; font-weight: 500; margin-top: 4px; }
-.walk div.on { background: var(--primary); color: #fff; border-radius: 48px; }
-.walk div.wide { grid-column: span 2; height: 64px; font-size: 18px; font-weight: 600; }
+.walknum { text-align: center; font-size: 88px; line-height: 1; font-weight: 820; font-variation-settings: "wdth" 125, "opsz" 144; color: var(--primary); margin: 6px 0 0; }
+.walknum small { font-size: 26px; font-weight: 650; margin-left: 4px; }
+.guess { text-align: center; color: var(--muted); font-size: 15px; margin: 4px 0 18px; }
+.slide { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.slide button { width: 56px; height: 56px; border-radius: 50%; background: var(--s3); font-size: 28px; font-weight: 600; flex: none; }
+.slide input { flex: 1; -webkit-appearance: none; appearance: none; height: 16px; border-radius: 8px; margin: 0;
+  background: linear-gradient(90deg, var(--primary) var(--p, 7%), var(--s3) var(--p, 7%)); }
+.slide input::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 48px; border-radius: 5px; background: var(--primary); box-shadow: 0 0 0 4px #f4fbf5; }
+.slide input::-moz-range-thumb { width: 10px; height: 48px; border-radius: 5px; background: var(--primary); border: 0; }
+.ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 14px; margin: 0 66px 14px; }
+.skip { display: block; margin: 0 auto 14px; height: 52px; padding: 0 22px; border-radius: 26px; background: var(--s3); font-weight: 600; }
 .hint { background: var(--tc); color: var(--on-tc); border-radius: 22px; padding: 14px 16px; font-size: 16px; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tile { height: 150px; border-radius: 32px; background: var(--s3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 20px; font-weight: 650; }
@@ -122,7 +128,11 @@ h1 { font-size: 34px; line-height: 1.12; font-weight: 780; font-variation-settin
   <div class="top"><span class="back">&larr;</span><div class="dots"><i class="done"></i><i class="done"></i><i class="done"></i><i class="on"></i><i></i></div></div>
   <h1>How long is your walk to the stop?</h1>
   <p class="lead">Then we tell you when to leave the house, not just when the bus comes.</p>
-  <div class="walk"><div class="on">2<small>min &middot; our guess</small></div><div>5<small>min</small></div><div>10<small>min</small></div><div>15<small>min</small></div><div class="wide">I don't need this</div></div>
+  <div class="walknum"><span id="wn">2</span><small>min</small></div>
+  <p class="guess">Our guess from where you are</p>
+  <div class="slide"><button id="wm" aria-label="One minute less">&minus;</button><input id="wr" type="range" min="0" max="30" step="1" value="2" aria-label="Walk in minutes"><button id="wp" aria-label="One minute more">+</button></div>
+  <div class="ends"><span>0</span><span>30 min</span></div>
+  <button class="skip">I don't need this</button>
   <div class="hint">On snowy or very cold days we add a little extra time for you.</div>
   <div class="spacer"></div>
   <div class="cta">Next</div>
@@ -170,5 +180,12 @@ h1 { font-size: 34px; line-height: 1.12; font-weight: 780; font-variation-settin
 const d = Array.from({ length: 181 }, (_, i) => { const a = i / 180 * 2 * Math.PI, r = 44 + 4 * Math.cos(9 * a);
   return (i ? "L" : "M") + (50 + r * Math.cos(a)).toFixed(2) + " " + (50 + r * Math.sin(a)).toFixed(2); }).join("") + "Z";
 document.getElementById("ck").setAttribute("d", d);
+const wr = document.getElementById("wr"), wn = document.getElementById("wn");
+const setW = (v) => { wr.value = Math.min(30, Math.max(0, v)); wn.textContent = wr.value; wr.style.setProperty("--p", wr.value / 30 * 100 + "%");
+  document.querySelector(".guess").textContent = +wr.value === 2 ? "Our guess from where you are" : wr.value === "0" ? "Right outside your door" : "Drag, or tap − and +"; };
+wr.oninput = () => setW(+wr.value);
+document.getElementById("wm").onclick = () => setW(+wr.value - 1);
+document.getElementById("wp").onclick = () => setW(+wr.value + 1);
+setW(2);
 </script>
 </body></html>
