@@ -1,0 +1,182 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YEG Bus sample</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wdth,wght@8..144,25..151,100..1000&display=swap" rel="stylesheet">
+<style>
+/* Material 3 Expressive sample, take 2. Modelled on Google's own redesigns (Clock 8.1, Gmail, Google TV):
+   one hero per screen in big variable type, tonal containers instead of lines, shapes that carry meaning,
+   a connected button group, labelled floating toolbar, springy motion. Seed colour: YEG Bus green #17694a. */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { margin: 0; background: #6f757d; font: 16px/1.35 "Roboto Flex", Roboto, system-ui, sans-serif; display: flex; flex-wrap: wrap; gap: 24px; padding: 24px; justify-content: center; }
+:root { --spring: linear(0, .06 3%, .24 7%, .52 12%, .79 18%, .96 24%, 1.04 30%, 1.06 35%, 1.04 42%, 1.01 52%, .995 65%, 1);
+  --spring-fast: linear(0, .2 6%, .6 14%, .95 24%, 1.05 32%, 1.02 45%, 1); }
+.phone { width: 390px; height: 844px; overflow: hidden; border-radius: 44px; position: relative;
+  --primary: #17694a; --on-primary: #fff; --pc: #9ff5c6; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15;
+  --tert: #2f6574; --tc: #b8eafb; --on-tc: #001f27; --surface: #f4fbf5; --s1: #eef5ef; --s2: #e8efe9; --s3: #e2e9e3;
+  --text: #161d19; --muted: #3f4943; --outline: #bfc9c1; }
+.phone.dark { --primary: #84d8ac; --on-primary: #003824; --pc: #005237; --on-pc: #9ff5c6; --sc: #33493d; --on-sc: #cfe9d9;
+  --tert: #a0cfdf; --tc: #144d5b; --on-tc: #b8eafb; --surface: #0e1511; --s1: #161d19; --s2: #1a211d; --s3: #252c27;
+  --text: #dde4de; --muted: #bfc9c1; --outline: #3f4943; }
+.screen { background: var(--surface); color: var(--text); height: 100%; padding: 50px 14px 0; position: relative; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+/* Press feedback everywhere: a quick squash that springs back. */
+.press { transition: transform .45s var(--spring-fast), border-radius .45s var(--spring-fast), background-color .25s; }
+.press:active { transform: scale(.94); }
+
+header { display: flex; align-items: center; gap: 12px; padding: 4px 2px 16px; }
+header svg.logo { width: 40px; height: 40px; }
+header h1 { margin: 0; flex: 1; font-size: 30px; font-weight: 750; font-variation-settings: "wdth" 118; letter-spacing: -.01em; }
+.gear { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--s3); }
+.gear:active { border-radius: 16px; }
+
+/* Connected button group: the picked one becomes a full pill, its neighbours keep tight inner corners. */
+.group { display: flex; gap: 3px; margin-bottom: 14px; }
+.group button { flex: 1; height: 48px; background: var(--s3); color: var(--muted); font-weight: 560; font-size: 15px; border-radius: 8px; }
+.group button:first-child { border-radius: 24px 8px 8px 24px; }
+.group button:last-child { border-radius: 8px 24px 24px 8px; }
+.group button.on { background: var(--primary); color: var(--on-primary); border-radius: 24px; }
+
+/* Hero: the next bus at your first stop, as big as Clock's time. */
+.hero { background: var(--pc); color: var(--on-pc); border-radius: 36px; padding: 20px 18px 14px; margin-bottom: 10px; }
+.hero h2 { margin: 0; font-size: 19px; font-weight: 650; }
+.hero .sub { margin: 1px 0 10px; font-size: 14px; opacity: .78; }
+.next { display: flex; align-items: center; gap: 16px; }
+.cookie { width: 84px; height: 84px; position: relative; display: grid; place-items: center; flex: none; }
+.cookie svg { position: absolute; inset: 0; animation: spin 24s linear infinite; }
+.cookie b { position: relative; font-size: 26px; font-weight: 850; font-variation-settings: "wdth" 110; color: var(--on-primary); }
+@keyframes spin { to { transform: rotate(1turn); } }
+.big { font-size: 76px; line-height: .9; font-weight: 820; font-variation-settings: "wdth" 125, "opsz" 144; letter-spacing: -.03em; font-variant-numeric: tabular-nums; display: inline-block; }
+.big.tick { animation: tick .6s var(--spring); }
+@keyframes tick { from { transform: translateY(-40%); opacity: 0; } }
+.unit { font-size: 22px; font-weight: 650; margin-left: 4px; }
+.dest { font-size: 16px; font-weight: 560; margin-top: 4px; }
+.live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); margin-left: 6px; vertical-align: 2px; animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 0%, transparent); } 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent); } }
+.wave { display: block; width: 100%; height: 22px; margin: 12px 0 10px; }
+.wave .track { stroke: color-mix(in srgb, var(--on-pc) 18%, transparent); }
+.wave .done { stroke: var(--primary); stroke-dasharray: 260 1000; animation: crawl 1.6s linear infinite; }
+@keyframes crawl { to { stroke-dashoffset: -40; } }
+.rows { display: flex; flex-direction: column; gap: 3px; }
+.row { display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 10px; background: color-mix(in srgb, var(--surface) 70%, transparent); border-radius: 8px; }
+.row:first-child { border-radius: 22px 22px 8px 8px; }
+.row:last-child { border-radius: 8px 8px 22px 22px; }
+.row:only-child { border-radius: 22px; }
+.pill { min-width: 50px; height: 40px; border-radius: 14px; display: grid; place-items: center; background: var(--primary); color: var(--on-primary); font-weight: 800; font-variation-settings: "wdth" 110; }
+.row .d { flex: 1; font-weight: 520; }
+.row .d small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
+.row .m { font-size: 26px; font-weight: 800; font-variation-settings: "wdth" 115; font-variant-numeric: tabular-nums; }
+.row .m small { font-size: 13px; font-weight: 600; margin-left: 2px; }
+
+/* A second stop: tertiary colour, its own hero is the leave time. */
+.card2 { background: var(--tc); color: var(--on-tc); border-radius: 36px; padding: 18px 18px 14px; }
+.card2 h2 { margin: 0; font-size: 17px; font-weight: 600; opacity: .85; }
+.leave { white-space: nowrap; margin: 2px 0 12px; font-size: 34px; font-weight: 800; font-variation-settings: "wdth" 120; }
+.leave span { font-size: 15px; font-weight: 500; opacity: .8; }
+.card2 .pill { background: var(--tert); color: var(--tc); }
+.card2 .row .d small { color: inherit; opacity: .75; }
+
+/* Floating toolbar with labels (Google's research: labels kept it usable). */
+.dock { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; gap: 6px; padding: 8px; border-radius: 999px; background: var(--s3); box-shadow: 0 6px 18px rgb(0 0 0 / .18); }
+.dock button { white-space: nowrap; height: 52px; padding: 0 18px; border-radius: 26px; display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+.dock .add { background: var(--primary); color: var(--on-primary); border-radius: 18px; padding: 0 22px; }
+.dock .add:active { border-radius: 26px; }
+
+/* Settings sheet springs up. */
+.scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .36); opacity: 0; pointer-events: none; transition: opacity .3s; }
+.sheet { position: absolute; left: 6px; right: 6px; bottom: 6px; background: var(--s1); border-radius: 38px; padding: 10px 16px 20px; transform: translateY(105%); transition: transform .6s var(--spring); }
+.open .scrim { opacity: 1; pointer-events: auto; }
+.open .sheet { transform: none; }
+.handle { width: 36px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .45; margin: 4px auto 14px; }
+.sheet h2 { margin: 0 6px 14px; font-size: 26px; font-weight: 700; font-variation-settings: "wdth" 115; }
+.label { font-size: 13px; font-weight: 600; color: var(--primary); margin: 0 8px 8px; }
+.sheet .group { margin-bottom: 16px; }
+.sheet .group button { height: 44px; background: var(--s3); }
+.sheet .group button.on { background: var(--sc); color: var(--on-sc); }
+.items { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+.item { display: flex; align-items: center; gap: 14px; min-height: 58px; padding: 0 14px 0 10px; background: var(--surface); border-radius: 8px; text-align: left; }
+.item:first-child { border-radius: 22px 22px 8px 8px; }
+.item:last-child { border-radius: 8px 8px 22px 22px; }
+.item .ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--sc); color: var(--on-sc); font-size: 17px; }
+.item span:not(.ic) { flex: 1; font-weight: 520; }
+.item i { font-style: normal; color: var(--muted); }
+.switch { width: 52px; height: 32px; border-radius: 16px; background: var(--primary); position: relative; }
+.switch::after { content: ""; position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--on-primary); }
+.lic { font-size: 12px; color: var(--muted); margin: 0 8px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition-duration: .01s !important; } }
+</style></head>
+<body>
+<template id="main">
+  <header>
+    <svg class="logo" viewBox="0 0 512 512"><rect width="512" height="512" rx="140" fill="#17694a"/><rect x="136" y="112" width="240" height="248" rx="36" fill="#fff"/><rect x="164" y="148" width="184" height="96" rx="12" fill="#17694a"/><circle cx="196" cy="304" r="22" fill="#17694a"/><circle cx="316" cy="304" r="22" fill="#17694a"/><rect x="160" y="360" width="40" height="44" rx="10" fill="#fff"/><rect x="312" y="360" width="40" height="44" rx="10" fill="#fff"/></svg>
+    <h1>YEG Bus</h1>
+    <button class="gear press" aria-label="Settings"><svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>
+  </header>
+  <div class="group stops-group"><button class="press on">All</button><button class="press">Home</button><button class="press">Work</button></div>
+  <section class="hero">
+    <h2>Southgate Transit Centre</h2><p class="sub">Stop 2002 &middot; Southbound</p>
+    <div class="next">
+      <div class="cookie"><svg viewBox="0 0 100 100"><path class="cookie-path" fill="var(--primary)"/></svg><b>902</b></div>
+      <div><span class="big">2</span><span class="unit">min</span><div class="dest">NAIT<span class="live"></span></div></div>
+    </div>
+    <svg class="wave" viewBox="0 0 330 22" preserveAspectRatio="none"><path class="track" d="M0 11H330" stroke-width="4" stroke-linecap="round" fill="none"/><path class="done wave-path" stroke-width="5" stroke-linecap="round" fill="none"/></svg>
+    <div class="rows">
+      <div class="row"><span class="pill">8</span><div class="d">Abbottsfield<small>then 17, 46 min</small></div><div class="m">3<small>min</small></div></div>
+      <div class="row"><span class="pill">51</span><div class="d">Castle Downs<small>then 32 min</small></div><div class="m">9<small>min</small></div></div>
+    </div>
+  </section>
+  <section class="card2">
+    <h2>University Station &middot; 7 min walk</h2>
+    <div class="leave">Leave in 4 min</div>
+    <div class="rows"><div class="row"><span class="pill">9</span><div class="d">Eaux Claires<small>then 25 min</small></div><div class="m">11<small>min</small></div></div></div>
+  </section>
+  <nav class="dock">
+    <button class="press"><svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/></svg>Near me</button>
+    <button class="press add"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>Add stop</button>
+  </nav>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="handle"></div><h2>Settings</h2>
+    <p class="label">Appearance</p>
+    <div class="group"><button class="press on">Match phone</button><button class="press">Light</button><button class="press">Dark</button></div>
+    <div class="items">
+      <div class="item"><span class="ic">&#9645;</span><span>Wall board when sideways</span><div class="switch"></div></div>
+    </div>
+    <div class="items">
+      <button class="item press"><span class="ic">&#8862;</span><span>Add the widget</span><i>&rsaquo;</i></button>
+      <button class="item press"><span class="ic">?</span><span>How to use YEG Bus</span><i>&rsaquo;</i></button>
+      <button class="item press"><span class="ic">&#9993;</span><span>No data? Text 31100</span><i>&rsaquo;</i></button>
+    </div>
+    <div class="items">
+      <button class="item press"><span class="ic">&#9749;</span><span>Buy me a coffee</span><i>&rsaquo;</i></button>
+      <button class="item press"><span class="ic">i</span><span>Privacy &middot; About</span><i>&rsaquo;</i></button>
+    </div>
+    <p class="lic">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.</p>
+  </div>
+</template>
+<div class="phone"><div class="screen"></div></div>
+<div class="phone dark"><div class="screen"></div></div>
+<div class="phone"><div class="screen open"></div></div>
+<script>
+const t = document.getElementById("main").innerHTML;
+// Material's 9-scallop "cookie" shape and a wavy progress line, drawn once.
+const cookie = Array.from({ length: 181 }, (_, i) => { const a = i / 180 * 2 * Math.PI, r = 44 + 4 * Math.cos(9 * a);
+  return (i ? "L" : "M") + (50 + r * Math.cos(a)).toFixed(2) + " " + (50 + r * Math.sin(a)).toFixed(2); }).join("") + "Z";
+const wave = Array.from({ length: 131 }, (_, i) => (i ? "L" : "M") + (i * 2.54).toFixed(1) + " " + (11 + 5 * Math.sin(i / 4)).toFixed(2)).join("");
+document.querySelectorAll(".screen").forEach((s) => {
+  s.insertAdjacentHTML("afterbegin", t);
+  s.querySelector(".cookie-path").setAttribute("d", cookie);
+  s.querySelector(".wave-path").setAttribute("d", wave);
+  s.querySelector(".gear").onclick = () => s.classList.add("open");
+  s.querySelector(".scrim").onclick = () => s.classList.remove("open");
+  s.querySelectorAll(".group").forEach((g) => g.onclick = (e) => {
+    if (e.target.tagName !== "BUTTON") return;
+    g.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === e.target));
+  });
+});
+// Demo countdown: the hero minute rolls in like a new digit.
+let m = 2;
+setInterval(() => { m = m === 0 ? 5 : m - 1; document.querySelectorAll(".big").forEach((b) => {
+  b.textContent = m || "Now"; b.nextElementSibling.hidden = !m; b.classList.remove("tick"); void b.offsetWidth; b.classList.add("tick"); }); }, 4000);
+</script>
+</body></html>
