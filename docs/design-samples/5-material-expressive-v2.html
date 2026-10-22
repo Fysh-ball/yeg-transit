@@ -182,9 +182,9 @@ const steps = [3, 2, 1, 0, 0, 5, 4], W = 330;
 let k = 0, m = steps[0], cur = 1 - m / 5, amp = 8, phase = 0;
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function draw() {
-  cur += (1 - m / 5 - cur) * (still ? 1 : .045);
+  cur += (1 - m / 5 - cur) * (still ? 1 : .04);
   amp += ((m ? 8 : 0) - amp) * (still ? 1 : .08);
-  phase += still ? 0 : .05;
+  phase += still ? 0 : .045;
   const end = cur * W, pts = [];
   // Big waves on the left shrink steadily to flat at the tip, so it runs straight into the track line.
   for (let x = 0; x <= end; x += 2.5) {
