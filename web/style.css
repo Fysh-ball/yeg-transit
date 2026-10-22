@@ -134,7 +134,10 @@ input {
 #empty p { margin: 8px auto 20px; max-width: 26em; }
 #empty h2 { color: var(--text); font-size: 1.2rem; margin: 16px 0 0; }
 .big { display: block; width: 100%; max-width: 22em; margin: 10px auto 0; min-height: 48px; font-weight: 600; }
+.tips-head { display: flex; align-items: center; justify-content: space-between; }
 #tips h2 { font-size: 1.05rem; margin: 10px 0 4px; }
+#tips-ok { min-width: 44px; min-height: 44px; font-size: 1.4rem; line-height: 1; background: none; border-color: transparent; color: var(--muted); }
+#install { margin: 0 0 8px; }
 #tips ul { margin: 0 0 6px; padding-left: 1.2em; line-height: 1.5; }
 #tips li { margin: 6px 0; }
 #tips[hidden] { display: none; }

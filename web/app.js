@@ -579,7 +579,6 @@ window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); inst
 function showTips() {
   try { if (localStorage.getItem("yeg.tips")) return; } catch { /* storage blocked: show them */ }
   $("#tips").hidden = false;
-  $("#tips").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 $("#tips-ok").onclick = () => {
   $("#tips").hidden = true;
@@ -589,7 +588,7 @@ $("#install").onclick = async () => {
   if (!installEvt) return;
   installEvt.prompt();
   await installEvt.userChoice.catch(() => {});
-  installEvt = null; $("#install").hidden = true;
+  installEvt = null; $("#tips-ok").click();
 };
 
 // Theme: "" follows the phone, otherwise forced light or dark (applied before paint by index.html).
@@ -654,4 +653,4 @@ nearestGroup();
 setInterval(() => { if (!document.hidden) renderAll(); }, 30000);
 setInterval(loadWeather, 15 * 60000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=46").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=47").catch((e) => console.warn("sw:", e.message));
