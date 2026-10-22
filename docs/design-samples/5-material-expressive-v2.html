@@ -53,7 +53,7 @@ header h1 { margin: 0; flex: 1; font-size: 30px; font-weight: 750; font-variatio
 .dest { font-size: 16px; font-weight: 560; margin-top: 4px; }
 .live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); margin-left: 6px; vertical-align: 2px; animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 0%, transparent); } 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent); } }
-.wave { display: block; width: 100%; height: 22px; margin: 12px 0 10px; }
+.wave { display: block; width: 100%; height: 22px; overflow: visible; margin: 12px 0 10px; }
 .wave .track { stroke: color-mix(in srgb, var(--on-pc) 18%, transparent); }
 .wave .done { stroke: var(--primary); }
 /* Arrival: the badge bounces and a ripple rings out while the wave flattens into a full line. */
@@ -179,17 +179,16 @@ document.querySelectorAll(".screen").forEach((s) => {
 // Demo countdown. The wave fills as the bus gets closer (here: minutes left out of 5),
 // and on arrival it fills, flattens and the badge bounces.
 const steps = [3, 2, 1, 0, 0, 5, 4], W = 330;
-let k = 0, m = steps[0], cur = 1 - m / 5, amp = 5, phase = 0;
+let k = 0, m = steps[0], cur = 1 - m / 5, amp = 8, phase = 0;
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 function draw() {
   cur += (1 - m / 5 - cur) * (still ? 1 : .06);
-  amp += ((m ? 5 : 0) - amp) * (still ? 1 : .08);
+  amp += ((m ? 8 : 0) - amp) * (still ? 1 : .08);
   phase += still ? 0 : .08;
   const end = cur * W, pts = [];
-  // The wiggle tapers to flat over its last stretch, so it runs straight into the track line.
-  const taper = Math.min(end, 110);
+  // Big waves on the left shrink steadily to flat at the tip, so it runs straight into the track line.
   for (let x = 0; x <= end; x += 2.5) {
-    const e = Math.min(1, (end - x) / taper), env = e * e * (3 - 2 * e);
+    const env = end ? Math.pow(1 - x / end, .85) : 0;
     pts.push((x ? "L" : "M") + x.toFixed(1) + " " + (11 + amp * env * Math.sin(x / 9 - phase)).toFixed(2));
   }
   pts.push(`L${end.toFixed(1)} 11`);
