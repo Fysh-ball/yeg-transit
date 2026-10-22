@@ -200,6 +200,7 @@ async function renderStop(s, el) {
     const xf = await x;
     body = alertBox(s, d.alerts || []) + (xf ? xferLine(s, xf, d.now) : "") +
       (grouped(s, d.departures, d.now) || `<p class="note">No ${s.only ? "buses on your routes" : "departures"} in the next 3 hours.</p>`);
+    el.dataset.live = now;
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
   } catch (e) {
     if (e.message.startsWith("404")) { // dropped from the ETS schedule: old saved times would send people to a dead stop
@@ -611,7 +612,26 @@ async function wake() {
   if (!isBoard() || !navigator.wakeLock || document.hidden) return;
   try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { console.warn("wake lock:", e.message); }
 }
-function tick() { $("#clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+function tick() { $("#clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); checkStale(); }
+// A tab left open can fall behind (a sleeping laptop, a frozen tab, a stop's settings left open, a new release):
+// say so where it shows, the wall board included, instead of passing old times off as live.
+let newVersion = false, firstSha = null;
+function checkStale() {
+  const at = [...$("#stops").children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live);
+  const old = at.length && $("#offline").hidden && Date.now() / 1000 - Math.min(...at) > 90;
+  $("#stale").hidden = !old && !newVersion;
+  $("#stale span").textContent = newVersion ? "YEG Bus has been updated." : old ? `Times may be out of date (last live ${clock(Math.min(...at))}).` : "";
+}
+async function checkVersion() {
+  try {
+    const { sha } = await api("version");
+    firstSha ??= sha;
+    if (sha === firstSha) return;
+    if (isBoard()) return location.reload(); // nobody is there to tap Refresh on a wall board
+    newVersion = true; checkStale();
+  } catch (e) { console.warn("version:", e.message); }
+}
+$("#stale-reload").onclick = () => location.reload();
 function applyBoard() {
   const on = isBoard();
   document.body.classList.toggle("board", on);
@@ -652,5 +672,7 @@ loadWeather().then(() => wx.extra && renderAll());
 nearestGroup();
 setInterval(() => { if (!document.hidden) renderAll(); }, 30000);
 setInterval(loadWeather, 15 * 60000);
+checkVersion(); setInterval(checkVersion, 10 * 60000);
+window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=47").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=48").catch((e) => console.warn("sw:", e.message));

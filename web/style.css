@@ -49,11 +49,12 @@ button:active { transform: scale(.98); }
 .primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
 .icon-btn { min-width: 44px; padding: 0; display: inline-grid; place-items: center; color: var(--muted); }
 
-#offline {
+#offline, #stale {
   display: flex; gap: 10px; align-items: flex-start; background: var(--warn-bg); color: var(--warn-text);
   border: 1px solid var(--warn-line); border-radius: 12px; padding: 10px 12px; margin: 4px 0 8px; font-size: .95rem;
 }
-#offline[hidden] { display: none; }
+#offline[hidden], #stale[hidden] { display: none; }
+#stale { align-items: center; justify-content: space-between; }
 
 #add {
   background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px;
@@ -235,7 +236,7 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
   body:not(.board):has(main > .stop:not([hidden]) ~ .stop:not([hidden])) { max-width: 1000px; }
   body:not(.board):has(main > .stop:not([hidden]) ~ .stop:not([hidden]) ~ .stop:not([hidden])) { max-width: 1320px; }
   body:not(.board) main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 16px; align-items: start; }
-  body:not(.board) :is(#add, #prefs, #tips, #offline, #empty) { width: min(640px, 100%); margin-inline: auto; }
+  body:not(.board) :is(#add, #prefs, #tips, #offline, #stale, #empty) { width: min(640px, 100%); margin-inline: auto; }
   body:not(.board) footer { text-align: center; max-width: 720px; margin-inline: auto; }
   #map-sheet { width: min(720px, 90vw); margin: auto; border-radius: 16px; }
   #map-box { height: min(65dvh, 560px); }

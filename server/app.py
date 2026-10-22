@@ -107,6 +107,7 @@ class Live:
     def __init__(self):
         self.trips, self.ts, self.error = {}, 0, None
         self.vehicles, self.vp_error = {}, None
+        self.assigned, self.on_trip = {}, {}  # trip_id -> vehicle id ETS has put on it; vehicle id -> trip it is driving now
         self.alerts, self.alerts_at = {}, 0
 
     def poll(self):
@@ -114,7 +115,7 @@ class Live:
             with fetch(RT_URL, 20) as r:
                 feed = gtfs_realtime_pb2.FeedMessage()
                 feed.ParseFromString(r.read())
-            trips = {}
+            trips, assigned = {}, {}
             for e in feed.entity:
                 tu = e.trip_update
                 stops, delay = {}, 0
@@ -123,7 +124,9 @@ class Live:
                     stops[s.stop_id] = None if s.schedule_relationship == SKIPPED else (ev.time or None)
                     delay = ev.delay or delay
                 trips[tu.trip.trip_id] = (stops, delay)
-            self.trips, self.ts, self.error = trips, feed.header.timestamp, None
+                if tu.vehicle.id:
+                    assigned[tu.trip.trip_id] = tu.vehicle.id
+            self.trips, self.assigned, self.ts, self.error = trips, assigned, feed.header.timestamp, None
         except Exception as e:
             self.error = f"{type(e).__name__}: {e}"
             print("live poll failed:", self.error, file=sys.stderr)
@@ -131,10 +134,11 @@ class Live:
             with fetch(VP_URL, 20) as r:
                 feed = gtfs_realtime_pb2.FeedMessage()
                 feed.ParseFromString(r.read())
+            vps = [e.vehicle for e in feed.entity if e.HasField("vehicle") and e.vehicle.trip.trip_id]
             self.vehicles = {v.trip.trip_id: (v.position.latitude, v.position.longitude, v.position.bearing,
                                               v.timestamp or feed.header.timestamp, v.current_stop_sequence,
-                                              v.trip.route_id, v.trip.direction_id)
-                             for v in (e.vehicle for e in feed.entity if e.HasField("vehicle")) if v.trip.trip_id}
+                                              v.trip.route_id, v.trip.direction_id) for v in vps}
+            self.on_trip = {v.vehicle.id: v.trip.trip_id for v in vps if v.vehicle.id}
             self.vp_error = None
         except Exception as e:
             self.vp_error = f"{type(e).__name__}: {e}"
@@ -544,7 +548,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self.json(pts, cache=86400)
         if len(parts) == 2 and parts[0] == "trips":
             v, before = LIVE.vehicles.get(parts[1]), False
-            if not v:  # not started yet: the bus is usually still on the trip before it in its block
+            if not v:  # not started yet: ETS names the bus it assigned, which is still driving an earlier trip
+                v = LIVE.vehicles.get(LIVE.on_trip.get(LIVE.assigned.get(parts[1]), ""))
+                before = bool(v)
+            if not v:  # no assignment given: the bus is usually still on the trip before it in its block
                 try:
                     prev = db.execute("""SELECT o.trip_id FROM trips t JOIN trips o ON o.service_id=t.service_id AND o.block_id=t.block_id
                         WHERE t.trip_id=? AND o.trip_id<>t.trip_id

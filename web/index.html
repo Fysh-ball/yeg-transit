@@ -30,7 +30,7 @@ if (location.hostname === "bus.fysh.site" && !window.YegApp) {
 }
 </script>
 <script>try { const t = localStorage.getItem("yeg.theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
-<link rel="stylesheet" href="style.css?v=47">
+<link rel="stylesheet" href="style.css?v=48">
 </head>
 <body>
 <header>
@@ -59,6 +59,7 @@ if (location.hostname === "bus.fysh.site" && !window.YegApp) {
 </section>
 
 <div id="offline" role="status" hidden></div>
+<div id="stale" role="status" hidden><span></span> <button type="button" id="stale-reload">Refresh</button></div>
 
 <section id="add" hidden>
   <form id="search-form">
@@ -111,6 +112,6 @@ if (location.hostname === "bus.fysh.site" && !window.YegApp) {
   Open Government Licence &ndash; City of Edmonton. Not an official ETS app. <a href="privacy.html">Privacy</a><br>
   Free to use. If it helps you, <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">buy me a coffee on Ko-fi</a>.
 </footer>
-<script src="app.js?v=47"></script>
+<script src="app.js?v=48"></script>
 </body>
 </html>
