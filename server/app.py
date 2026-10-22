@@ -569,6 +569,8 @@ class Handler(SimpleHTTPRequestHandler):
                               if t != parts[1] and o[5] == v[5] and o[6] == v[6] and now - o[3] < 300]}
             if before:
                 out["before"] = True  # finishing an earlier trip; counting stops to yours means nothing yet
+            elif v[4] and v[4] <= (db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=?", (parts[1],)).fetchone()[0] or 0):
+                out["waiting"] = True  # ETS seq 1: at layover or driving to the start, so a stop count means nothing yet
             elif "stop" in q and v[4]:
                 mine = db.execute("SELECT seq FROM stop_times WHERE trip_id=? AND stop_id=? ORDER BY seq<? , seq",  # a loop route passes twice
                                   (parts[1], q["stop"], v[4])).fetchone()

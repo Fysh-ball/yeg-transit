@@ -558,7 +558,7 @@ async function placeBus() {
     for (const o of v.others) L.marker(o, { interactive: false, icon: L.divIcon({ className: "", iconSize: [22, 22],
       html: `<span class="bus-pin other" style="${esc(m.style)}">${esc(m.label)}</span>` }) }).addTo(m.others);
     if (!m.fitted) { m.map.setView([v.lat, v.lon], 16); m.fitted = true; } // open zoomed in on the bus; the stop view is only the wait
-    const away = v.before ? "Finishing its run before yours, then it comes to you. " : v.stops_away === undefined ? "" : v.stops_away === null ? "Already past your stop. "
+    const away = v.before ? "Finishing its run before yours, then it comes to you. " : v.waiting ? "Hasn't started its trip yet. " : v.stops_away === undefined ? "" : v.stops_away === null ? "Already past your stop. "
       : v.stops_away === 0 ? "Your stop is next. " : `${v.stops_away} stop${v.stops_away > 1 ? "s" : ""} away. `;
     $("#map-note").textContent = `${away}Position ${v.age < 90 ? `${v.age} s` : `${Math.round(v.age / 60)} min`} old, updates every 15 s.`;
   } catch (e) {
@@ -675,4 +675,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=48").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=49").catch((e) => console.warn("sw:", e.message));
