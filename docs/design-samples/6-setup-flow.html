@@ -1,0 +1,174 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YEG Bus setup sample</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wdth,wght@8..144,25..151,100..1000&display=swap" rel="stylesheet">
+<style>
+/* Setup a grandparent can finish: one plain question per screen, big targets (64px+), nothing to type unless you want to.
+   Same Material 3 Expressive tokens as sample 5. */
+* { box-sizing: border-box; }
+button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+body { margin: 0; background: #6f757d; font: 17px/1.4 "Roboto Flex", Roboto, system-ui, sans-serif; display: grid; grid-template-columns: repeat(3, 390px); gap: 24px; padding: 24px; justify-content: center; }
+.phone { width: 390px; height: 844px; overflow: hidden; border-radius: 44px; position: relative; background: #f4fbf5; color: #161d19;
+  --primary: #17694a; --on-primary: #fff; --pc: #9ff5c6; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15; --tc: #b8eafb; --on-tc: #001f27;
+  --s1: #eef5ef; --s3: #e2e9e3; --muted: #3f4943; --outline: #bfc9c1; }
+.screen { height: 100%; padding: 50px 20px 24px; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; gap: 12px; min-height: 48px; margin-bottom: 18px; }
+.back { width: 48px; height: 48px; border-radius: 50%; background: var(--s3); display: grid; place-items: center; font-size: 22px; }
+.dots { flex: 1; display: flex; gap: 6px; justify-content: center; margin-right: 60px; }
+.dots i { width: 10px; height: 10px; border-radius: 5px; background: var(--outline); }
+.dots i.on { width: 28px; background: var(--primary); }
+.dots i.done { background: var(--primary); opacity: .45; }
+h1 { font-size: 34px; line-height: 1.12; font-weight: 780; font-variation-settings: "wdth" 115; margin: 0 0 8px; letter-spacing: -.01em; }
+.lead { font-size: 18px; color: var(--muted); margin: 0 0 22px; }
+.big { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 76px; padding: 14px 18px; border-radius: 28px; background: var(--s3); font-size: 19px; font-weight: 600; margin-bottom: 10px; text-align: left; }
+.big.main { background: var(--primary); color: var(--on-primary); min-height: 96px; font-size: 22px; }
+.big .ic { width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; background: color-mix(in srgb, currentColor 14%, transparent); font-size: 24px; flex: none; }
+.big small { display: block; font-size: 15px; font-weight: 450; opacity: .8; }
+.spacer { flex: 1; }
+.cta { height: 64px; border-radius: 32px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font-size: 20px; font-weight: 650; }
+.cta.soft { background: var(--s3); color: var(--primary); margin-top: 10px; }
+.map { height: 210px; border-radius: 28px; margin-bottom: 14px; position: relative; overflow: hidden;
+  background: linear-gradient(90deg, transparent 47%, #fff 47% 53%, transparent 53%), linear-gradient(0deg, transparent 46%, #fff 46% 54%, transparent 54%), linear-gradient(90deg, transparent 18%, #fff 18% 21%, transparent 21%), #dfe9df; }
+.pin { position: absolute; width: 36px; height: 36px; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); background: var(--primary); display: grid; place-items: center; }
+.pin b { transform: rotate(45deg); color: #fff; font-size: 15px; }
+.pin.dim { background: #8a958e; }
+.you { position: absolute; left: 47%; top: 62%; width: 22px; height: 22px; border-radius: 50%; background: #1a73e8; border: 4px solid #fff; box-shadow: 0 0 0 10px rgb(26 115 232 / .2); }
+.stopcard { background: var(--pc); color: var(--on-pc); border-radius: 28px; padding: 16px 18px; margin-bottom: 10px; }
+.stopcard b { font-size: 20px; display: block; }
+.stopcard p { margin: 4px 0 12px; font-size: 16px; }
+.stopcard .cta { height: 56px; }
+.other { background: var(--s1); border-radius: 22px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; font-size: 17px; }
+.other small { display: block; color: var(--muted); font-size: 14px; }
+.bus { display: flex; align-items: center; gap: 14px; min-height: 76px; padding: 12px 16px; border-radius: 24px; background: var(--s3); margin-bottom: 8px; }
+.bus.on { background: var(--sc); }
+.bus .n { min-width: 56px; height: 48px; border-radius: 16px; background: var(--primary); color: #fff; font-weight: 800; font-size: 20px; display: grid; place-items: center; }
+.bus.off .n { background: #8a958e; }
+.bus span:not(.n):not(.check) { flex: 1; font-size: 18px; font-weight: 550; }
+.bus span:not(.n):not(.check) small { display: block; font-size: 14px; font-weight: 400; color: var(--muted); }
+.check { flex: none; width: 32px; height: 32px; border-radius: 10px; border: 2.5px solid var(--outline); display: grid; place-items: center; }
+.on .check { background: var(--primary); border-color: var(--primary); color: #fff; }
+.walk { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.walk div { height: 96px; border-radius: 28px; background: var(--s3); display: grid; place-items: center; text-align: center; font-size: 30px; font-weight: 800; font-variation-settings: "wdth" 118; line-height: 1; }
+.walk div small { display: block; font-size: 15px; font-weight: 500; margin-top: 4px; }
+.walk div.on { background: var(--primary); color: #fff; border-radius: 48px; }
+.walk div.wide { grid-column: span 2; height: 64px; font-size: 18px; font-weight: 600; }
+.hint { background: var(--tc); color: var(--on-tc); border-radius: 22px; padding: 14px 16px; font-size: 16px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { height: 150px; border-radius: 32px; background: var(--s3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 20px; font-weight: 650; }
+.tile .e { font-size: 44px; }
+.tile.on { background: var(--pc); color: var(--on-pc); outline: 3px solid var(--primary); }
+.tile.wide { grid-column: span 2; height: 72px; flex-direction: row; }
+.done-badge { width: 120px; height: 120px; margin: 30px auto 18px; display: grid; place-items: center; position: relative; }
+.done-badge svg { position: absolute; inset: 0; }
+.done-badge b { position: relative; color: #fff; font-size: 52px; }
+.center { text-align: center; }
+.preview { background: var(--pc); color: var(--on-pc); border-radius: 28px; padding: 14px 18px; display: flex; align-items: center; gap: 14px; margin: 6px 0 14px; }
+.preview .n { min-width: 52px; height: 44px; border-radius: 14px; background: var(--primary); color: #fff; font-weight: 800; display: grid; place-items: center; }
+.preview span { flex: 1; font-weight: 600; }
+.preview big { font-size: 30px; font-weight: 800; }
+.sheet-h { font-size: 28px; font-weight: 750; margin: 0 4px 14px; }
+.label { font-size: 14px; font-weight: 650; color: var(--primary); margin: 6px 6px 8px; }
+.seg { display: flex; gap: 3px; margin-bottom: 14px; }
+.seg span { flex: 1; height: 52px; display: grid; place-items: center; background: var(--s3); font-size: 15px; font-weight: 600; border-radius: 8px; text-align: center; line-height: 1.1; }
+.seg span:first-child { border-radius: 26px 8px 8px 26px; }
+.seg span:last-child { border-radius: 8px 26px 26px 8px; }
+.seg span.on { background: var(--primary); color: #fff; border-radius: 26px; }
+.seg small { display: block; font-size: 11px; font-weight: 450; opacity: .8; }
+.size { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 22px; padding: 14px 16px; margin-bottom: 14px; }
+.size .a1 { font-size: 15px; } .size .a2 { font-size: 26px; font-weight: 700; }
+.size .track { flex: 1; height: 16px; border-radius: 8px; background: var(--s3); position: relative; }
+.size .track::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 55%; border-radius: 8px; background: var(--primary); }
+.size .track::after { content: ""; position: absolute; left: calc(55% - 4px); top: -10px; width: 8px; height: 36px; border-radius: 4px; background: var(--primary); }
+</style></head>
+<body>
+
+<!-- 1. Where -->
+<div class="phone"><div class="screen">
+  <div class="top"><span></span><div class="dots" style="margin-right:0"><i class="on"></i><i></i><i></i><i></i><i></i></div></div>
+  <h1>Where do you catch the bus?</h1>
+  <p class="lead">We'll find your stop. No account, nothing to sign up for.</p>
+  <button class="big main"><span class="ic">&#9673;</span><span>Near me now<small>Uses your location once</small></span></button>
+  <button class="big"><span class="ic">&#8962;</span><span>Near an address<small>Like your home or work</small></span></button>
+  <button class="big"><span class="ic">#</span><span>I know the stop number<small>It's on the bus stop sign</small></span></button>
+  <div class="spacer"></div>
+  <p class="lead center" style="margin:0">You can change everything later.</p>
+</div></div>
+
+<!-- 2. Which stop -->
+<div class="phone"><div class="screen">
+  <div class="top"><span class="back">&larr;</span><div class="dots"><i class="done"></i><i class="on"></i><i></i><i></i><i></i></div></div>
+  <h1>Is this your stop?</h1>
+  <div class="map"><span class="you"></span><span class="pin" style="left:50%;top:22%"><b>1</b></span><span class="pin dim" style="left:12%;top:40%"><b>2</b></span><span class="pin dim" style="left:76%;top:68%"><b>3</b></span></div>
+  <div class="stopcard"><b>104 St &amp; 82 Ave</b><p>2 min walk &middot; buses go to <b style="display:inline;font-size:16px">Downtown</b> and <b style="display:inline;font-size:16px">NAIT</b></p><div class="cta">Yes, this one</div></div>
+  <div class="other"><span>Across the street<small>Buses go to Southgate, Mill Woods</small></span><span>&rsaquo;</span></div>
+  <div class="spacer"></div>
+  <p class="lead center" style="margin:0">Tap a number on the map to see another stop.</p>
+</div></div>
+
+<!-- 3. Which buses -->
+<div class="phone"><div class="screen">
+  <div class="top"><span class="back">&larr;</span><div class="dots"><i class="done"></i><i class="done"></i><i class="on"></i><i></i><i></i></div></div>
+  <h1>Which buses do you take?</h1>
+  <p class="lead">Leave them all ticked if you're not sure.</p>
+  <div class="bus on"><span class="n">4</span><span>Downtown<small>Every 10 min</small></span><span class="check">&#10003;</span></div>
+  <div class="bus on"><span class="n">902</span><span>NAIT<small>Every 15 min</small></span><span class="check">&#10003;</span></div>
+  <div class="bus off"><span class="n">51</span><span>Castle Downs<small>Every 30 min</small></span><span class="check"></span></div>
+  <div class="spacer"></div>
+  <div class="cta">Next</div>
+</div></div>
+
+<!-- 4. Walk -->
+<div class="phone"><div class="screen">
+  <div class="top"><span class="back">&larr;</span><div class="dots"><i class="done"></i><i class="done"></i><i class="done"></i><i class="on"></i><i></i></div></div>
+  <h1>How long is your walk to the stop?</h1>
+  <p class="lead">Then we tell you when to leave the house, not just when the bus comes.</p>
+  <div class="walk"><div class="on">2<small>min &middot; our guess</small></div><div>5<small>min</small></div><div>10<small>min</small></div><div>15<small>min</small></div><div class="wide">I don't need this</div></div>
+  <div class="hint">On snowy or very cold days we add a little extra time for you.</div>
+  <div class="spacer"></div>
+  <div class="cta">Next</div>
+</div></div>
+
+<!-- 5. Home / work -->
+<div class="phone"><div class="screen">
+  <div class="top"><span class="back">&larr;</span><div class="dots"><i class="done"></i><i class="done"></i><i class="done"></i><i class="done"></i><i class="on"></i></div></div>
+  <h1>What's this stop for?</h1>
+  <p class="lead">Your stops get sorted into these.</p>
+  <div class="tiles"><div class="tile on"><span class="e">&#127968;</span>Home</div><div class="tile"><span class="e">&#128188;</span>Work</div><div class="tile"><span class="e">&#127979;</span>School</div><div class="tile"><span class="e">&#128722;</span>Shopping</div><div class="tile wide">Something else</div></div>
+  <div class="spacer"></div>
+  <div class="cta">Finish</div>
+</div></div>
+
+<!-- 6. Done -->
+<div class="phone"><div class="screen">
+  <div class="done-badge"><svg viewBox="0 0 100 100"><path id="ck" fill="#17694a"/></svg><b>&#10003;</b></div>
+  <h1 class="center">You're all set</h1>
+  <p class="lead center">Here's your stop. It opens first every time.</p>
+  <div class="preview"><span class="n">4</span><span>Downtown</span><big>Leave in 3</big></div>
+  <button class="big"><span class="ic">&#8862;</span><span>Put it on my home screen<small>See your bus without opening the app</small></span></button>
+  <div class="spacer"></div>
+  <div class="cta">Show my bus</div>
+  <div class="cta soft">Add another stop</div>
+</div></div>
+
+<!-- 7. Settings: look and text size -->
+<div class="phone" style="background:#c9cfca"><div class="screen" style="justify-content:flex-end;padding:0 6px 6px">
+  <div style="background:var(--s1);border-radius:38px;padding:12px 16px 22px">
+    <div style="width:36px;height:4px;border-radius:2px;background:#3f4943;opacity:.45;margin:4px auto 16px"></div>
+    <p class="sheet-h">Settings</p>
+    <p class="label">Look</p>
+    <div class="seg"><span class="on">Match phone<small>Android: Material</small></span><span>Material</span><span>Glass</span></div>
+    <p class="label">Colours</p>
+    <div class="seg"><span class="on">Match phone</span><span>Light</span><span>Dark</span></div>
+    <p class="label">Text size</p>
+    <div class="size"><span class="a1">A</span><span class="track"></span><span class="a2">A</span></div>
+    <button class="big" style="background:#fff"><span class="ic">?</span><span>How to use YEG Bus</span></button>
+    <button class="big" style="background:#fff"><span class="ic">&#9993;</span><span>No data? Text 31100</span></button>
+  </div>
+</div></div>
+
+<script>
+const d = Array.from({ length: 181 }, (_, i) => { const a = i / 180 * 2 * Math.PI, r = 44 + 4 * Math.cos(9 * a);
+  return (i ? "L" : "M") + (50 + r * Math.cos(a)).toFixed(2) + " " + (50 + r * Math.sin(a)).toFixed(2); }).join("") + "Z";
+document.getElementById("ck").setAttribute("d", d);
+</script>
+</body></html>
