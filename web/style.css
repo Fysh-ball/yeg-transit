@@ -91,6 +91,10 @@ input {
 .when { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; line-height: 1.15; }
 .when small { display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-weight: 500; font-size: .72rem; color: var(--muted); }
 .when .lbl:first-child { margin-bottom: 1px; } /* "Leave in" over the number; "Bus in" under it */
+/* What the number counts to, in the number's own colour: muted grey read as a footnote and was missed. */
+.when .lbl:first-child { color: inherit; font-weight: 650; font-size: .8rem; }
+/* A bus already waiting is the news on the card, so it gets a filled badge, not a grey line. */
+.when .here { width: fit-content; margin: 3px 0 0 auto; padding: 2px 9px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-weight: 700; }
 .when .live { color: var(--live); }
 .when .live::before {
   content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
@@ -322,6 +326,8 @@ main > .stop { animation: rise .5s var(--spring) both; }
 }
 :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .lead .when small { font-size: .85rem; letter-spacing: 0; }
 :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .lead .when .lbl { flex-basis: 100%; justify-content: flex-start; }
+:is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .lead .when .lbl:first-child { font-size: 1.15rem; }
+:is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .lead .when .here { flex-basis: auto; margin: 6px 0 0; font-size: 1rem; padding: 4px 12px; }
 :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .lead .head { grid-area: h; align-self: start; font-weight: 600; white-space: normal; }
 :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .lead .wave { display: block; grid-area: v; width: 100%; height: 24px; margin: 18px 0 2px; overflow: visible; }
 .when .u { font-size: .6em; font-weight: 650; letter-spacing: 0; }

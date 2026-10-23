@@ -84,7 +84,7 @@ function row(d, now, walk = 0, stopId = "") {
   // With a walk time the big number is when to leave, so the small line says when the bus itself comes.
   const busIn = walk && `Bus in ${Math.max(0, Math.round((d.time - now) / 60))} min`;
   const early = d.at && !atNow; // here already, waiting to leave: the number is when it pulls out, so say that
-  const tag = early ? `<small class="live lbl">Bus is here</small>` : d.live ? `<small class="live${busIn ? " lbl" : ""}">${busIn || "live"}</small>` : busIn ? `<small class="lbl">${busIn}</small>` : `<small>scheduled</small>`;
+  const tag = early ? `<small class="lbl here">Bus is here</small>` : d.live ? `<small class="live${busIn ? " lbl" : ""}">${busIn || "live"}</small>` : busIn ? `<small class="lbl">${busIn}</small>` : `<small>scheduled</small>`;
   const go = walk && d.time - walk * 60 - now < 30;
   // Every countdown says what it counts to; "at" when an hour or more out, where mins() shows a clock time.
   const lbl = (word, t) => `<small class="lbl">${word} ${t - now >= 3570 ? "at" : "in"}</small>${mins(t, now)}`;
@@ -927,4 +927,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=89").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=90").catch((e) => console.warn("sw:", e.message));
