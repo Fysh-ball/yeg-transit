@@ -29,14 +29,17 @@ def get(url):
 def main():
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(get(RT_URL))
-    ets, delay, firsts = {}, {}, {}  # (trip, stop) -> first-pass time; trip -> delay now; stop -> trips starting there
+    ets, delay, firsts = {}, {}, {}  # (trip, stop) -> first-pass time; trip and (trip, stop) -> delay; stop -> trips starting there
     for e in feed.entity:
         tu = e.trip_update
         for i, s in enumerate(tu.stop_time_update):
             ev = s.departure if s.HasField("departure") else s.arrival
             if ev.time:
                 ets.setdefault((tu.trip.trip_id, s.stop_id), ev.time)
-            delay.setdefault(tu.trip.trip_id, ev.delay)
+            # This stop's own delay: a bus that left its first stop early waits at a timing stop, back to delay 0
+            # (a 902 at University TC, 18 min early at its start, 2026-10-23).
+            delay.setdefault((tu.trip.trip_id, s.stop_id), ev.delay)
+            delay.setdefault(tu.trip.trip_id, ev.delay)  # for a stop it has passed, which ETS no longer lists
             if i == 0 and s.stop_sequence == 1:
                 firsts.setdefault(s.stop_id, set()).add(tu.trip.trip_id)
     vp = gtfs_realtime_pb2.FeedMessage()
@@ -59,7 +62,7 @@ def main():
                 continue
             checked += 1
             mine, theirs = x["time"], ets.get((x["trip"], stop))
-            expect = x["sched"] + delay[x["trip"]]
+            expect = x["sched"] + delay.get((x["trip"], stop), delay[x["trip"]])
             bus = f"stop {stop} route {x['route']} trip {x['trip']}: shows {round((mine - d['now']) / 60)} min"
             if theirs and abs(mine - theirs) > OFF:
                 wrong.append(f"{bus}, ETS says {round((theirs - d['now']) / 60)} min")
