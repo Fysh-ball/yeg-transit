@@ -94,13 +94,13 @@ public class BusWidget extends AppWidgetProvider {
 
     private static RemoteViews build(Context c, int w, int h) {
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        // Dressed like the app (Settings > Look and Colours). Material: its lead card, white on green in dark.
+        // Dressed like the app (Settings > Look and Colours). Material: its lead card, cream on green in dark.
         // Glass: see-through with shadowed white text, as Android can't blur the wallpaper behind a widget.
         String look = p.getString("look", "");
         boolean night = (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         boolean glass = look.startsWith("glass"), dark = look.isEmpty() ? night : look.endsWith("dark");
-        int fg = glass || dark ? 0xFFFFFFFF : 0xFF002114;
-        int chip = glass ? 0xFFF2F2F2 : fg, chipText = glass ? 0xFF17694A : dark ? 0xFF005237 : 0xFF9FF5C6;
+        int fg = glass ? 0xFFFFFFFF : dark ? 0xFFF3EEE2 : 0xFF002114; // dark: cream on green, softer than white
+        int chip = glass ? 0xFFF2F2F2 : dark ? 0xFF9FF5C6 : 0xFF17694A, chipText = glass ? 0xFF17694A : dark ? 0xFF00391F : 0xFFFFFFFF;
         RemoteViews v = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_glass : R.layout.widget);
         if (!glass) v.setInt(R.id.root, "setBackgroundResource", dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light);
         for (int id : new int[]{R.id.stop, R.id.clock, R.id.big, R.id.dest}) v.setTextColor(id, fg);
@@ -126,12 +126,18 @@ public class BusWidget extends AppWidgetProvider {
         }
 
         String group = nearestGroup(c, stops, p.getString("group", ""));
-        int extra = 0; // weather minutes on top of each walk time, as on the page
+        JSONObject wx = new JSONObject(); // extra: weather minutes on top of each walk time, as on the page
         try {
-            extra = new JSONObject(get(MainActivity.SITE + "api/weather")).optInt("extra");
+            wx = new JSONObject(get(MainActivity.SITE + "api/weather"));
         } catch (Exception e) {
             android.util.Log.w("yeg", "weather: " + e);
         }
+        int extra = wx.optInt("extra");
+        // One word by the clock when the weather matters: what it's doing now ("Snowy sidewalks"), else "Rain soon".
+        String why = wx.optString("why"), word = why.isEmpty() ? wx.optString("soon") : why.substring(0, 1).toUpperCase() + why.substring(1);
+        v.setTextViewText(R.id.wx, word);
+        v.setTextColor(R.id.wx, fg);
+        v.setViewVisibility(R.id.wx, word.isEmpty() ? View.GONE : View.VISIBLE);
         // Like the ETR board: one list of the next buses at all your stops, soonest first.
         List<long[]> order = new ArrayList<>(); // {leave time, index into deps}
         List<JSONObject> deps = new ArrayList<>();
@@ -185,7 +191,7 @@ public class BusWidget extends AppWidgetProvider {
         if (later.size() > 1) dest.append(" min");
         v.setTextViewText(R.id.dest, dest);
         v.setTextViewText(R.id.stop, d.optString("stop"));
-        if (tall) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, Math.min(1f, Math.max(0.04f, 1 - leave / 900f)), fg));
+        if (tall) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, Math.min(1f, Math.max(0.04f, 1 - leave / 900f)), glass ? fg : chip));
         for (long[] o : order.subList(1, Math.max(1, Math.min(1 + budget, order.size())))) {
             JSONObject r = deps.get((int) o[1]);
             RemoteViews row = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_row : R.layout.widget_row_m);

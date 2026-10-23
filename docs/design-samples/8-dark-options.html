@@ -1,0 +1,22 @@
+<!doctype html><meta charset=utf-8><style>
+body{margin:0;padding:20px;background:#0e1511;font:16px Roboto,system-ui,sans-serif;display:flex;gap:18px}
+.o{width:300px}.lbl{color:#bfc9c1;font-weight:700;margin:0 0 8px}
+.c{border-radius:28px;padding:16px;background:var(--pc);color:var(--on)}
+h2{margin:0;font-size:17px}.sub{font-size:12px;opacity:.75;margin-bottom:10px}
+.hero{display:flex;gap:14px;align-items:center}.ck{width:70px;height:70px;background:var(--on);color:var(--pc);display:grid;place-items:center;font-weight:800;font-size:24px;-webkit-mask:url(/web/cookie.svg) center/contain no-repeat}
+.big{font-size:46px;font-weight:820;line-height:1}.big small{font-size:18px}.dest{font-weight:650}
+svg{width:100%;height:22px;margin:8px 0}
+.row{display:flex;align-items:center;gap:10px;background:var(--tint);border-radius:14px;padding:9px 10px;margin-top:3px}
+.b{background:var(--on);color:var(--pc);border-radius:10px;padding:5px 10px;font-weight:800}.row span:nth-child(2){flex:1}.row b{font-size:18px}
+.wx{font-size:12px;opacity:.8}
+</style>
+<div class=o style="--pc:#005237;--on:#ffffff;--tint:rgb(255 255 255/.12)"><p class=lbl>Now: white</p><div class=c></div></div>
+<div class=o style="--pc:#005237;--on:#cdeedb;--tint:rgb(205 238 219/.12)"><p class=lbl>A: soft mint white</p><div class=c></div></div>
+<div class=o style="--pc:#17694a;--on:#f3eee2;--tint:rgb(243 238 226/.14)"><p class=lbl>B: brighter green, warm cream</p><div class=c></div></div>
+<div class=o style="--pc:#1f2b25;--on:#b9e8cc;--tint:rgb(185 232 204/.09)"><p class=lbl>C: charcoal card, soft mint</p><div class=c></div></div>
+<script>
+const h=`<h2>University Transit Centre</h2><div class=sub>Stop #2002 · Southbound</div><div class=hero><div class=ck>4</div><div><div class=big>3 <small>min</small></div><div class=dest>Capilano</div><div class=wx>then 13, 25 min</div></div></div>
+<svg viewBox="0 0 300 22" preserveAspectRatio=none><path d="M0 11 ${Array.from({length:110},(_,i)=>`L${i*2} ${11+6*Math.pow(1-i/110,.85)*Math.sin(i*2/8)}`).join(' ')}" stroke="currentColor" stroke-width=5 fill=none stroke-linecap=round /><path d="M224 11H296" stroke="currentColor" stroke-opacity=.2 stroke-width=4 stroke-linecap=round /></svg>
+<div class=row><span class=b>902</span><span>NAIT</span><b>5 min</b></div><div class=row><span class=b>8</span><span>Abbottsfield</span><b>11 min</b></div>`;
+document.querySelectorAll('.c').forEach(c=>c.innerHTML=h);
+</script>

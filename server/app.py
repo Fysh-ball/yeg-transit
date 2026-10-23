@@ -403,7 +403,7 @@ def stop_where(db, stop):
     return out
 
 
-WEATHER = {"at": 0, "value": {"extra": 0, "why": ""}}
+WEATHER = {"at": 0, "value": {"extra": 0, "why": "", "soon": ""}}
 PHOTON, PHOTON_LOCK = {"at": 0, "cache": {}}, threading.Lock()  # cache: Photon URL -> answer, newest 500
 
 
@@ -413,9 +413,11 @@ def walk_weather():
     if time.time() - WEATHER["at"] < 900:
         return WEATHER["value"]
     url = "https://api.open-meteo.com/v1/forecast?" + urlencode({"latitude": 53.54, "longitude": -113.49, "current":
-          "apparent_temperature,rain,showers,snowfall,snow_depth", "timezone": "America/Edmonton"})
+          "apparent_temperature,rain,showers,snowfall,snow_depth", "hourly": "precipitation_probability,snowfall",
+          "forecast_hours": 3, "timezone": "America/Edmonton"})
     try:
-        c = json.load(fetch(url, 5))["current"]
+        r = json.load(fetch(url, 5))
+        c, hr = r["current"], r.get("hourly") or {}
     except Exception as e:
         print("weather lookup failed:", repr(e), file=sys.stderr)
         WEATHER["at"] = time.time() - 600  # retry in 5 min, keep the last answer meanwhile
@@ -429,7 +431,11 @@ def walk_weather():
         extra, why = extra + 1, why + ["rain"]
     if (c.get("apparent_temperature") or 0) <= -20:
         extra, why = extra + 1, why + ["extreme cold"]
-    WEATHER.update(at=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why)})
+    # The next 3 hours, for the widget's one word by the clock: "Snow soon" or "Rain soon" at 50% or more.
+    soon = ""
+    if max((p or 0 for p in hr.get("precipitation_probability") or []), default=0) >= 50:
+        soon = "Snow soon" if any((x or 0) > 0 for x in hr.get("snowfall") or []) else "Rain soon"
+    WEATHER.update(at=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why), "soon": soon})
     return WEATHER["value"]
 
 
