@@ -10,11 +10,18 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Typeface;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
 import android.text.format.DateFormat;
 import android.util.TypedValue;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import org.json.JSONArray;
@@ -70,10 +77,10 @@ public class BusWidget extends AppWidgetProvider {
                 AppWidgetManager m = AppWidgetManager.getInstance(c);
                 int[] ids = m.getAppWidgetIds(new ComponentName(c, BusWidget.class));
                 for (int id : ids) {
-                    // Height in portrait is MAX_HEIGHT. Like Samsung's weather widget the text never grows:
-                    // the next bus is big (~40 dp line), the rest small (~26 dp each); a taller widget fits more buses.
-                    int h = m.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 110) - 16;
-                    m.updateAppWidget(id, build(c, 1 + Math.max(0, h - 40) / 26));
+                    // In portrait the size is MIN_WIDTH x MAX_HEIGHT. The text never grows: a bigger widget shows more.
+                    android.os.Bundle o = m.getAppWidgetOptions(id);
+                    m.updateAppWidget(id, build(c, o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250),
+                        o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 110)));
                 }
                 if (ids.length > 0) c.getSystemService(AlarmManager.class)
                     .set(AlarmManager.RTC, (System.currentTimeMillis() / 60000 + 1) * 60000, tick(c));
@@ -85,13 +92,27 @@ public class BusWidget extends AppWidgetProvider {
         }).start();
     }
 
-    private static RemoteViews build(Context c, int budget) {
-        RemoteViews v = new RemoteViews(c.getPackageName(), R.layout.widget);
+    private static RemoteViews build(Context c, int w, int h) {
+        SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        // Dressed like the app (Settings > Look and Colours). Material: its lead card, white on green in dark.
+        // Glass: see-through with shadowed white text, as Android can't blur the wallpaper behind a widget.
+        String look = p.getString("look", "");
+        boolean night = (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        boolean glass = look.startsWith("glass"), dark = look.isEmpty() ? night : look.endsWith("dark");
+        int fg = glass || dark ? 0xFFFFFFFF : 0xFF002114;
+        int chip = glass ? 0xFFF2F2F2 : fg, chipText = glass ? 0xFF17694A : dark ? 0xFF005237 : 0xFF9FF5C6;
+        RemoteViews v = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_glass : R.layout.widget);
+        if (!glass) v.setInt(R.id.root, "setBackgroundResource", dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light);
+        for (int id : new int[]{R.id.stop, R.id.clock, R.id.big, R.id.dest}) v.setTextColor(id, fg);
         v.removeAllViews(R.id.rows);
         v.setOnClickPendingIntent(R.id.root, PendingIntent.getActivity(c, 0,
             new Intent(c, MainActivity.class), PendingIntent.FLAG_IMMUTABLE));
+        // Small (2x1): badge and time. Medium (4x1): plus where it goes. Tall: stop, clock, wave and a row per ~34 dp.
+        boolean tall = h >= 100, wide = w >= 200;
+        int budget = tall ? Math.max(0, (h - 140) / 34) : 0;
+        for (int id : new int[]{R.id.bar, R.id.hero, R.id.wave}) v.setViewVisibility(id, View.GONE); // until there's a bus
+        v.setViewVisibility(R.id.dest, wide || tall ? View.VISIBLE : View.GONE);
 
-        SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         List<JSONObject> stops = new ArrayList<>();
         try {
             JSONArray a = new JSONArray(p.getString("stops", "[]"));
@@ -100,7 +121,7 @@ public class BusWidget extends AppWidgetProvider {
             android.util.Log.w("yeg", "saved stops unreadable: " + e);
         }
         if (stops.isEmpty()) {
-            v.addView(R.id.rows, note(c, "Open the app and save a stop to see it here."));
+            v.addView(R.id.rows, alone(note(c, "Open the app and save a stop to see it here.", fg)));
             return v;
         }
 
@@ -111,7 +132,7 @@ public class BusWidget extends AppWidgetProvider {
         } catch (Exception e) {
             android.util.Log.w("yeg", "weather: " + e);
         }
-        // Like the ETR board: one list of the next buses at all your stops, soonest first, no stop names.
+        // Like the ETR board: one list of the next buses at all your stops, soonest first.
         List<long[]> order = new ArrayList<>(); // {leave time, index into deps}
         List<JSONObject> deps = new ArrayList<>();
         boolean offline = false;
@@ -121,50 +142,131 @@ public class BusWidget extends AppWidgetProvider {
             try {
                 offline |= departures(p, s, extra, deps, order, alerts);
             } catch (Exception e) {
-                v.addView(R.id.rows, note(c, s.optString("name") + ": couldn't load (" + e.getMessage() + ")"));
+                v.addView(R.id.rows, note(c, s.optString("name") + ": couldn't load (" + e.getMessage() + ")", fg));
                 budget--;
             }
         }
         order.sort((x, y) -> Long.compare(x[0], y[0]));
         // One line per route and direction, its next bus: routes 1 and 2 both show, a second 1 doesn't
-        // (nor the same bus at two of your stops; the stop you'd leave for first wins).
-        java.util.Set<String> seen = new java.util.HashSet<>();
-        order.removeIf(o -> { JSONObject d = deps.get((int) o[1]); return !seen.add(d.optString("route") + "|" + d.optString("headsign")); });
+        // (nor the same bus at two of your stops; the stop you'd leave for first wins). The later ones are "then".
+        java.util.Map<String, List<Long>> then = new java.util.HashMap<>();
+        order.removeIf(o -> { JSONObject d = deps.get((int) o[1]);
+            List<Long> t = then.computeIfAbsent(d.optString("route") + "|" + d.optString("headsign"), k -> new ArrayList<>());
+            t.add(o[0]); return t.size() > 1; });
         for (String a : alerts) {
-            if (budget <= 1) break;
-            RemoteViews n = note(c, a);
-            n.setTextColor(R.id.text, 0xFFF1D892); // the page's warning yellow
+            if (budget <= 0) break;
+            RemoteViews n = note(c, a, fg);
+            n.setTextColor(R.id.text, glass || dark ? 0xFFF1D892 : 0xFF6B4F00); // the page's warning yellow
             v.addView(R.id.rows, n);
             budget--;
         }
-        if (offline && budget > 1) {
-            v.addView(R.id.rows, note(c, "No connection: scheduled times."));
+        if (offline && budget > 0) {
+            v.addView(R.id.rows, note(c, "No connection: scheduled times.", fg));
             budget--;
         }
-        if (order.isEmpty() && budget > 0) v.addView(R.id.rows, note(c, "No buses in the next 3 hours."));
-        java.text.DateFormat clock = DateFormat.getTimeFormat(c);
+        if (order.isEmpty()) {
+            v.addView(R.id.rows, alone(note(c, "No buses in the next 3 hours.", fg)));
+            return v;
+        }
         long now = System.currentTimeMillis() / 1000;
-        boolean first = true;
-        for (long[] o : order.subList(0, Math.max(0, Math.min(budget, order.size())))) {
-            JSONObject d = deps.get((int) o[1]);
-            long leave = o[0] - now, m = Math.round(leave / 60.0);
-            boolean walking = d.optBoolean("walking");
-            String when = walking && leave < 30 ? "Go" : m <= 0 ? "Due" : m < 60 ? m + "m" : clock.format(o[0] * 1000);
-            String route = d.optString("route").replaceFirst("^0+(?=\\w)", ""), head = d.optString("headsign");
-            if (head.startsWith(route + " ")) head = head.substring(route.length() + 1);
-            RemoteViews row = new RemoteViews(c.getPackageName(), R.layout.widget_row);
-            row.setTextViewText(R.id.route, route);
-            row.setTextViewText(R.id.head, head);
-            row.setTextViewText(R.id.times, when);
-            float text = first ? 22 : 14; // the next bus big, the rest small
-            first = false;
-            row.setTextViewTextSize(R.id.route, TypedValue.COMPLEX_UNIT_DIP, text * 0.9f);
-            row.setTextViewTextSize(R.id.head, TypedValue.COMPLEX_UNIT_DIP, text);
-            row.setTextViewTextSize(R.id.times, TypedValue.COMPLEX_UNIT_DIP, text * 1.25f);
-            row.setTextColor(R.id.times, d.optBoolean("live") ? 0xFF8EE06A : 0xFFDDDDDD); // green = live, as on the board
+        // The next bus, big, with the wave that fills over its last 15 minutes (a still picture: widgets can't animate).
+        JSONObject d = deps.get((int) order.get(0)[1]);
+        long leave = order.get(0)[0] - now;
+        v.setViewVisibility(R.id.hero, View.VISIBLE);
+        v.setViewVisibility(R.id.bar, tall ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.wave, tall ? View.VISIBLE : View.GONE);
+        v.setImageViewBitmap(R.id.cookie, badge(c, route(d), glass ? 2 : 1, tall ? 56 : 44, chip, chipText));
+        v.setTextViewText(R.id.big, when(c, d, leave, true));
+        v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, tall ? 34 : 28);
+        StringBuilder dest = new StringBuilder(head(d));
+        List<Long> later = then.get(d.optString("route") + "|" + d.optString("headsign"));
+        for (int i = 1; i < Math.min(3, later.size()); i++)
+            dest.append(i == 1 ? " \u00b7 then " : ", ").append(Math.max(0, Math.round((later.get(i) - now) / 60.0)));
+        if (later.size() > 1) dest.append(" min");
+        v.setTextViewText(R.id.dest, dest);
+        v.setTextViewText(R.id.stop, d.optString("stop"));
+        if (tall) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, Math.min(1f, Math.max(0.04f, 1 - leave / 900f)), fg));
+        for (long[] o : order.subList(1, Math.max(1, Math.min(1 + budget, order.size())))) {
+            JSONObject r = deps.get((int) o[1]);
+            RemoteViews row = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_row : R.layout.widget_row_m);
+            if (!glass) row.setInt(R.id.row, "setBackgroundResource", dark ? R.drawable.widget_row_dark : R.drawable.widget_row_light);
+            row.setImageViewBitmap(R.id.badge, badge(c, route(r), 0, 26, chip, chipText));
+            row.setTextViewText(R.id.head, head(r));
+            row.setTextViewText(R.id.times, when(c, r, o[0] - now, false));
+            row.setTextColor(R.id.head, fg);
+            row.setTextColor(R.id.times, r.optBoolean("live") ? fg : fg & 0xB3FFFFFF); // faded = scheduled, not live
             v.addView(R.id.rows, row);
         }
         return v;
+    }
+
+    private static String route(JSONObject d) {
+        return d.optString("route").replaceFirst("^0+(?=\\w)", "");
+    }
+
+    private static String head(JSONObject d) {
+        String route = route(d), head = d.optString("headsign");
+        return head.startsWith(route + " ") ? head.substring(route.length() + 1) : head;
+    }
+
+    /** "3 min", "Due", "Go now" (or "Go" on a row), or the clock time past an hour; the "min" small. */
+    private static CharSequence when(Context c, JSONObject d, long leave, boolean big) {
+        long m = Math.round(leave / 60.0);
+        if (d.optBoolean("walking") && leave < 30) return big ? "Go now" : "Go";
+        if (m <= 0) return "Due";
+        if (m >= 60) return DateFormat.getTimeFormat(c).format(new java.util.Date((System.currentTimeMillis() / 1000 + leave) * 1000));
+        android.text.SpannableString s = new android.text.SpannableString(m + " min");
+        s.setSpan(new android.text.style.RelativeSizeSpan(.55f), s.length() - 4, s.length(), 0);
+        return s;
+    }
+
+    /** A route badge as a picture: shape 0 = row pill, 1 = Material cookie, 2 = Glass rounded square. */
+    private static Bitmap badge(Context c, String text, int shape, int sizeDp, int bg, int fg) {
+        float dp = c.getResources().getDisplayMetrics().density;
+        Paint t = new Paint(Paint.ANTI_ALIAS_FLAG);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setColor(fg);
+        t.setTextAlign(Paint.Align.CENTER);
+        t.setTextSize(sizeDp * dp * (shape == 0 ? .5f : text.length() > 3 ? .3f : .36f));
+        int H = Math.round(sizeDp * dp), W = shape == 0 ? Math.max(Math.round(H * 1.4f), Math.round(t.measureText(text) + 14 * dp)) : H;
+        Bitmap b = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+        Canvas k = new Canvas(b);
+        Paint f = new Paint(Paint.ANTI_ALIAS_FLAG);
+        f.setColor(bg);
+        if (shape == 1) { // nine soft bumps, like the app's cookie.svg
+            Path path = new Path();
+            float r = H / 2f;
+            for (int i = 0; i <= 180; i++) {
+                double a = i * Math.PI / 90, rr = r * (.9 + .1 * Math.cos(9 * a));
+                if (i == 0) path.moveTo((float) (r + rr), r); else path.lineTo((float) (r + rr * Math.cos(a)), (float) (r + rr * Math.sin(a)));
+            }
+            k.drawPath(path, f);
+        } else k.drawRoundRect(0, 0, W, H, H * .32f, H * .32f, f);
+        k.drawText(text, W / 2f, H / 2f - (t.descent() + t.ascent()) / 2, t);
+        return b;
+    }
+
+    /** The app's wave as a picture: filled to f with waves that flatten toward the tip, then the track line. */
+    private static Bitmap wave(Context c, int wDp, float f, int color) {
+        float dp = c.getResources().getDisplayMetrics().density;
+        int W = Math.max(1, Math.round(wDp * dp)), H = Math.round(14 * dp);
+        Bitmap b = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
+        Canvas k = new Canvas(b);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        float mid = H / 2f, x0 = 3 * dp, end = x0 + f * (W - 6 * dp), amp = f >= 1 ? 0 : 4 * dp;
+        p.setStrokeWidth(3.5f * dp);
+        p.setColor(color & 0x40FFFFFF);
+        if (end < W - x0) k.drawLine(end, mid, W - x0, mid, p);
+        p.setStrokeWidth(4.5f * dp);
+        p.setColor(color);
+        Path path = new Path();
+        path.moveTo(x0, mid);
+        for (float x = x0; x <= end; x += dp)
+            path.lineTo(x, mid + amp * (float) (Math.pow(1 - (x - x0) / (end - x0 + 1), .85) * Math.sin((x - x0) / (5 * dp))));
+        k.drawPath(path, p);
+        return b;
     }
 
     /** The group of the saved stop nearest the phone; the app's current tab when the phone can't say where it is. */
@@ -240,7 +342,7 @@ public class BusWidget extends AppWidgetProvider {
             JSONObject d = all.getJSONObject(i);
             if (only != null && !only.toString().contains("\"" + d.optString("route") + "\"")) continue;
             if (walk > 0 && d.getLong("time") - walk < now) continue;
-            d.put("walking", walk > 0);
+            d.put("walking", walk > 0).put("stop", s.optString("name"));
             order.add(new long[]{d.getLong("time") - walk + skew, deps.size()});
             deps.add(d);
             left--;
@@ -248,9 +350,15 @@ public class BusWidget extends AppWidgetProvider {
         return offline;
     }
 
-    private static RemoteViews note(Context c, String text) {
+    private static RemoteViews alone(RemoteViews note) { // the only thing on the widget: in the middle
+        note.setInt(R.id.text, "setGravity", android.view.Gravity.CENTER);
+        return note;
+    }
+
+    private static RemoteViews note(Context c, String text, int color) {
         RemoteViews t = new RemoteViews(c.getPackageName(), R.layout.widget_stop);
         t.setTextViewText(R.id.text, text);
+        t.setTextColor(R.id.text, color);
         return t;
     }
 

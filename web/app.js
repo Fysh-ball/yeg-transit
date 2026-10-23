@@ -30,6 +30,9 @@ function sync() {
   try {
     const slim = stops.map(({ id, code, name, group, lat, lon, only, walk, n }) => ({ id, code, name, group, lat, lon, only, walk, n }));
     window.YegApp.sync(JSON.stringify(slim), group || "");
+    // The widget dresses like the app: "material-dark", "glass-light"... (apps before v54's widget lack look())
+    const de = document.documentElement, t = de.dataset.theme;
+    window.YegApp.look?.(de.dataset.look + (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches) ? "-dark" : "-light"));
   } catch (e) { console.warn("widget sync:", e.message); }
 }
 
@@ -661,12 +664,14 @@ $("#theme").onchange = (e) => {
   const t = e.target.value;
   if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
   try { t ? localStorage.setItem("yeg.theme", t) : localStorage.removeItem("yeg.theme"); } catch (err) { console.warn("theme:", err.message); }
+  sync(); // the widget follows
 };
 // Look: "" follows the phone (glass on iPhone, Material elsewhere; setLook is in index.html so it applies before paint).
 try { $("#look").value = localStorage.getItem("yeg.look") || ""; } catch { /* storage blocked: Match phone */ }
 $("#look").onchange = (e) => {
   setLook(e.target.value);
   try { e.target.value ? localStorage.setItem("yeg.look", e.target.value) : localStorage.removeItem("yeg.look"); } catch (err) { console.warn("look:", err.message); }
+  sync(); // the widget follows
 };
 
 // Wall board: big type, clock, screen kept awake. On with #board, or when a touch device is turned
@@ -744,4 +749,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=54").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=55").catch((e) => console.warn("sw:", e.message));

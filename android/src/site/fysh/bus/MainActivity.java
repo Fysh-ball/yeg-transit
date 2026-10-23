@@ -94,6 +94,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void look(String look) { // "material-dark", "glass-light"...: the widget dresses like the app
+            getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).edit().putString("look", look).apply();
+        }
+
+        @JavascriptInterface
         public String stops() {
             return getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).getString("stops", "[]");
         }
