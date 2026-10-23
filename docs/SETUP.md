@@ -75,7 +75,7 @@ Run the tests:
    DEPLOY_CONF=scripts/deploy-hermes.conf scripts/deploy.sh   # the Pi
    ```
 
-3. Publish the site: `git push origin main:release`. Cloudflare Pages builds it in about a minute.
+3. Publish the site: `git push origin main:release`. The Cloudflare Pages build can take several minutes.
 4. Check that it is live: `curl -s https://yegbus.com/sw.js | grep -o 'yeg-v[0-9]*'` must print the new
    version.
 
