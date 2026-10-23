@@ -121,8 +121,11 @@ class Live:
                 stops, delay = {}, 0
                 for s in tu.stop_time_update:
                     ev = s.departure if s.HasField("departure") else s.arrival
-                    stops[s.stop_id] = None if s.schedule_relationship == SKIPPED else (ev.time or None)
                     delay = ev.delay or delay
+                    # A loop starts and ends at the same stop (918B at WEM): keep the first pass, when it leaves,
+                    # not the arrival back 30 min later. Passes ETS has already dropped leave the next one first.
+                    if s.stop_id not in stops:
+                        stops[s.stop_id] = None if s.schedule_relationship == SKIPPED else (ev.time or None)
                 trips[tu.trip.trip_id] = (stops, delay)
                 if tu.vehicle.id:
                     assigned[tu.trip.trip_id] = tu.vehicle.id
@@ -334,7 +337,7 @@ def transfer(db, stop_id, route, off, at, to, walk_m):
         sched_arr = d["sched"] + hop[0]
         live = LIVE.trips.get(d["trip"])
         arr = sched_arr + (d["time"] - d["sched"])  # running late or early here: assume the same there
-        if live and live[0].get(off):
+        if live and (live[0].get(off) or 0) > d["time"]:  # not a loop's first pass, before you even board
             arr = live[0][off]
         plan = next((n for n in nexts if n["sched"] >= sched_arr + change), None)
         catch = next((n for n in nexts if n["time"] >= arr + change), None)

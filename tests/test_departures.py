@@ -1,5 +1,5 @@
 """Where the bus is beats a stale ETS prediction. Stops from test_next_stop (a real 201); the stop is 1797, seq 11."""
-import time, unittest
+import io, time, unittest
 from unittest import mock
 
 from test_next_stop import app, fixture
@@ -33,3 +33,21 @@ class Departures(unittest.TestCase):
 
     def test_trains_keep_ets_times(self):
         self.assertEqual(run(KM_SOUTH, route="Capital")["in"], 0)
+
+
+class LoopTrip(unittest.TestCase):
+    def test_a_loop_keeps_its_departure_not_its_return(self):  # 918B leaves WEM, then ends back at WEM
+        from google.transit import gtfs_realtime_pb2 as g
+        now, feed = int(time.time()), g.FeedMessage()
+        feed.header.gtfs_realtime_version, feed.header.timestamp = "2.0", now
+        tu = feed.entity.add(id="t").trip_update
+        tu.trip.trip_id = "t"
+        first = tu.stop_time_update.add(stop_sequence=1, stop_id="5212")
+        first.departure.time = now + 480
+        last = tu.stop_time_update.add(stop_sequence=34, stop_id="5212")
+        last.arrival.time = now + 1980
+        live = app.Live()
+        with mock.patch.object(app, "fetch", lambda *a: io.BytesIO(feed.SerializeToString())), \
+                mock.patch("sys.stderr", io.StringIO()):
+            live.poll()
+        self.assertEqual(live.trips["t"][0]["5212"], now + 480)
