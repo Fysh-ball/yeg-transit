@@ -109,7 +109,8 @@ function grouped(s, list, now) {
     return `<div class="grp">${lead(head)}<div class="grp-body"${open ? "" : " hidden"}>${ds[0].live && ds[0].trip ? `<button class="dep map-link" data-trip="${esc(ds[0].trip)}" data-stop="${esc(s.id)}">Next bus on map \u203A</button>` : ""}${ds.slice(1).map((d) => row(d, now, walkOf(s), s.id)
       .replace(/<span class="head">[^<]*<\/span>/, `<span class="head">${d.live && d.trip ? "Show on map \u203A" : "Scheduled, no map"}</span>`)).join("")}</div></div>`;
   }).join("");
-  return html && `<div class="deps">${html}</div>`;
+  const more = groups.size - (s.n || 3); // past the card's route count: say so, or a route just looks like it stopped running
+  return html && `<div class="deps">${html}</div>` + (more > 0 ? `<button class="more-routes" data-more="${esc(s.id)}">Show ${more} more route${more > 1 ? "s" : ""}</button>` : "");
 }
 
 // Wave under the lead bus: full when it's time to go, filling over the last 15 minutes. Drawn by drawWaves().
@@ -270,7 +271,7 @@ async function renderStop(s, el) {
     const xf = await x;
     body = alertBox(s, d.alerts || []) + (xf ? xferLine(s, xf, d.now) : "") +
       (grouped(s, d.departures, d.now) || `<p class="note">No ${s.only ? "buses on your routes" : "departures"} in the next 3 hours.</p>`);
-    el.dataset.live = now;
+    el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
   } catch (e) {
     if (e.message.startsWith("404")) { // dropped from the ETS schedule: old saved times would send people to a dead stop
@@ -316,6 +317,7 @@ async function renderAll() {
   $("#offline").hidden = !off;
   $("#offline").textContent = !off ? "" : navigator.onLine ? "Live times are down right now. Showing saved scheduled times instead." : "No connection. Showing saved scheduled times instead of live times.";
   $("#updated").textContent = stops.length && !off ? `Live times, updated ${clock(Date.now() / 1000)}` : "";
+  checkStale();
 }
 
 // Walk minutes from straight-line metres: streets add about a third, people walk about 80 m a minute,
@@ -494,7 +496,19 @@ document.addEventListener("click", (e) => {
     save(); rerender(s.id);
   }
   const rm = e.target.closest("[data-remove]");
-  if (rm) { stops = stops.filter((x) => x.id !== rm.dataset.remove); save(); renderAll(); }
+  if (rm) {
+    const i = stops.findIndex((x) => x.id === rm.dataset.remove), gone = stops[i];
+    stops.splice(i, 1); save(); renderAll();
+    $("#undo span").textContent = `Removed ${gone.name}`;
+    $("#undo").hidden = false;
+    clearTimeout(undoTimer); undoTimer = setTimeout(() => { $("#undo").hidden = true; }, 8000);
+    $("#undo button").onclick = () => { stops.splice(Math.min(i, stops.length), 0, gone); save(); renderAll(); $("#undo").hidden = true;
+      const main = $("#stops"), el = main.querySelector(`[data-id="${CSS.escape(gone.id)}"]`); // renderAll adds it last
+      main.insertBefore(el, main.children[i]);
+    };
+  }
+  const more = e.target.closest("[data-more]");
+  if (more) { const s = stops.find((x) => x.id === more.dataset.more); s.n = 10; save(); rerender(s.id); }
 });
 
 document.addEventListener("change", (e) => {
@@ -731,7 +745,7 @@ async function wake() {
 function tick() { $("#clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); checkStale(); }
 // A tab left open can fall behind (a sleeping laptop, a frozen tab, a stop's settings left open, a new release):
 // say so where it shows, the wall board included, instead of passing old times off as live.
-let newVersion = false, firstSha = null;
+let newVersion = false, firstSha = null, undoTimer;
 function checkStale() {
   const at = [...$("#stops").children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live);
   const old = at.length && $("#offline").hidden && Date.now() / 1000 - Math.min(...at) > 90;
@@ -801,4 +815,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=69").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=70").catch((e) => console.warn("sw:", e.message));

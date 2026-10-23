@@ -49,12 +49,12 @@ button:active { transform: scale(.98); }
 .primary { background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 600; }
 .icon-btn { min-width: 44px; padding: 0; display: inline-grid; place-items: center; color: var(--muted); }
 
-#offline, #stale {
+#offline, #stale, #undo {
   display: flex; gap: 10px; align-items: flex-start; background: var(--warn-bg); color: var(--warn-text);
   border: 1px solid var(--warn-line); border-radius: 12px; padding: 10px 12px; margin: 4px 0 8px; font-size: .95rem;
 }
-#offline[hidden], #stale[hidden] { display: none; }
-#stale { align-items: center; justify-content: space-between; }
+#offline[hidden], #stale[hidden], #undo[hidden] { display: none; }
+#stale, #undo { align-items: center; justify-content: space-between; }
 
 #add {
   background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px;
@@ -443,12 +443,12 @@ body.in-prefs #prefs:not([hidden]) { background: none; border: 0; box-shadow: no
 }
 .app footer .legal { display: none; } /* the app keeps it in Settings */
 /* Update and out-of-date notes: a small pill floating at the bottom, not a box in the page. */
-#stale:not([hidden]) { position: fixed; z-index: 6; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
+#stale:not([hidden]), #undo:not([hidden]) { position: fixed; z-index: 6; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
   margin: 0; padding: 4px 4px 4px 16px; gap: 6px; border: 0; border-radius: 999px; font-size: .85rem; background: var(--text); color: var(--bg);
   box-shadow: 0 6px 20px rgb(0 0 0 / .25); animation: pill-up .5s var(--spring) both; }
-#stale span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#stale button { flex: none; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: inherit; font-weight: 700; font-size: .85rem; text-decoration: underline; text-underline-offset: 3px; }
-.native body:not(.board) #stale:not([hidden]) { bottom: calc(100px + env(safe-area-inset-bottom)); } /* above the floating add button */
+#stale span, #undo span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#stale button, #undo button { flex: none; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: inherit; font-weight: 700; font-size: .85rem; text-decoration: underline; text-underline-offset: 3px; }
+.native body:not(.board) :is(#stale, #undo):not([hidden]) { bottom: calc(100px + env(safe-area-inset-bottom)); } /* above the floating add button */
 @keyframes pill-up { from { opacity: 0; translate: 0 20px; } }
 
 /* A stop's settings page: only that stop's form shows, on the plain page background, rows as tiles. */
@@ -475,3 +475,6 @@ body.in-edit main > .stop.editing { background: none !important; color: var(--te
 }
 /* Wall board: one column of hero cards, read from across the room. */
 .board main { display: flex; flex-direction: column; gap: 14px; width: min(100%, 760px); margin-inline: auto; }
+.more-routes { display: block; margin: 6px auto 0; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+#stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(66px + env(safe-area-inset-bottom)); } /* both up: stack, don't overlap */
+.native body:not(.board) #stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(150px + env(safe-area-inset-bottom)); }
