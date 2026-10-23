@@ -79,9 +79,10 @@ function headLabel(h, r) {
 function row(d, now, walk = 0, stopId = "") {
   const bg = "var(--accent)"; // one brand green, not ETS route colours, so nobody takes this for the official app
   const fg = "var(--accent-text)";
+  const atNow = d.at && d.time - now < 60;
   // A bus waiting early at the stop keeps its countdown (that is when it leaves) but says it is already there.
-  const tag = d.at ? `<small class="live">at stop</small>` : d.live ? `<small class="live">live</small>` : `<small>scheduled</small>`;
-  const when = d.at && d.time - now < 60 ? `<span class="due">At stop</span>` : walk && d.time - walk * 60 - now < 30 ? `<span class="due">Go now</span>` : mins(d.time - walk * 60, now);
+  const tag = d.at && !atNow ? `<small class="live">at stop</small>` : d.live ? `<small class="live">live</small>` : `<small>scheduled</small>`;
+  const when = atNow ? `<span class="due">At stop</span>` : walk && d.time - walk * 60 - now < 30 ? `<span class="due">Go now</span>` : mins(d.time - walk * 60, now);
   const map = d.live && d.trip ? ` data-trip="${esc(d.trip)}" data-stop="${esc(stopId)}" title="Show this bus on a map"` : "";
   return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)}">${esc(routeLabel(d.route))}</span>
     <span class="head">${esc(headLabel(d.headsign, d.route))}</span><span class="when">${when}${tag}</span></div>`;
@@ -796,6 +797,10 @@ $("#widget").onchange = (e) => {
 // Wall board: big type, clock, screen kept awake. On with #board, or when a touch device is turned
 // sideways (laptops are landscape too, so pointer:coarse keeps them in the normal view).
 const sideways = matchMedia("(orientation: landscape) and (pointer: coarse)");
+// Side by side on a wide screen, every stop gets the big lead look, not just the first (style.css, "The lead bus").
+const wide = matchMedia("(min-width: 1000px)");
+const setWide = () => document.body.classList.toggle("wide", wide.matches);
+wide.addEventListener("change", setWide); setWide();
 let wakeLock = null;
 // Wall board setting: "auto" (sideways), "on", "off". Exit turns it off until the phone is upright again.
 let boardMode = "auto", boardExited = false;
@@ -908,4 +913,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=77").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=78").catch((e) => console.warn("sw:", e.message));
