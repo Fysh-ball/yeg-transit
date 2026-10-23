@@ -206,8 +206,13 @@ def scheduled(db, stop_id, start, end):
     return out
 
 
+BUS_SPEED = 8  # m/s, straight line: buses at WEM TC made 6.5 to 13 on 2026-10-22, stops and lights included
+TRAINS = {"Capital", "Metro", "Valley"}
+
+
 def departures(db, stop_id, n):
     now = int(time.time())
+    here = db.execute("SELECT lat, lon FROM stops WHERE stop_id=?", (stop_id,)).fetchone()
     out = []
     for d in scheduled(db, stop_id, now - 1800, now + 3 * 3600):
         live = LIVE.trips.get(d["trip"])
@@ -221,6 +226,22 @@ def departures(db, stop_id, n):
             else:
                 t += delay
         d["time"], d["live"] = t, bool(live)
+        # ETS holds a late bus's prediction at its old time, so "Due" sat on screens with the bus 1 km out (WEM TC,
+        # 2026-10-22). Where the bus is beats what ETS predicts: at the stop, gone past it, or no sooner than it can drive here.
+        v = LIVE.vehicles.get(d["trip"])
+        if v and v[4] and here and now - v[3] < 120 and d["route"] not in TRAINS:
+            mine = db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=? AND stop_id=? AND seq>=?",
+                              (d["trip"], stop_id, next_stop(db, d["trip"], v))).fetchone()[0]
+            m = math.hypot(v[0] - here[0], (v[1] - here[1]) * math.cos(math.radians(here[0]))) * 111000
+            if mine is None:
+                if t < now + 120:
+                    continue  # it has left this stop
+            elif m <= 40:
+                d["at"] = True  # pulled in, or waiting here for its time
+                out.append(d)
+                continue
+            else:
+                d["time"] = t = max(t, v[3] + int(m / BUS_SPEED))
         if t >= now - 30:
             out.append(d)
     out.sort(key=lambda d: d["time"])

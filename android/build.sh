@@ -17,7 +17,13 @@ javac --release 11 -classpath "$JAR" -d build/classes $(find src build/gen -name
 "$BT/d8" --lib "$JAR" --min-api 26 --output build $(find build/classes -name '*.class')
 (cd build && jar -u -M -f unsigned.apk classes.dex)
 "$BT/zipalign" -f 4 build/unsigned.apk build/aligned.apk
-# The SDK's stock debug key (its password is the public default "android"); fine for sideloading.
-"$BT/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-pass pass:android --out build/yeg-arrivals.apk build/aligned.apk
+# Release key, made for YEG Bus on 2026-10-22 and kept outside the repo. Losing it means no more updates
+# over the installed app, so it needs a backup. Its password is read from a file, never typed or printed.
+KS=${YEG_KEYSTORE:-$HOME/.config/yegbus/release.jks}
+PASS=${KS%.jks}.pass
+[ -r "$KS" ] && [ -r "$PASS" ] || { echo "no release key at $KS: refusing to build" >&2; exit 1; }
+"$BT/apksigner" sign --ks "$KS" --ks-key-alias yegbus --ks-pass "file:$PASS" --v2-signing-enabled true --v3-signing-enabled true \
+  --out build/yeg-arrivals.apk build/aligned.apk
+"$BT/apksigner" verify --print-certs build/yeg-arrivals.apk | grep -q 'CN=YEG Bus' || { echo "signed with the wrong key" >&2; exit 1; }
 echo "built android/build/yeg-arrivals.apk"
 if [ "${1:-}" = install ]; then adb install -r build/yeg-arrivals.apk; fi

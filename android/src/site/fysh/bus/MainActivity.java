@@ -30,6 +30,8 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setGeolocationEnabled(true);
+        s.setAllowFileAccess(false); // the page never needs the phone's files or other apps' content
+        s.setAllowContentAccess(false);
         web.addJavascriptInterface(new Bridge(), "YegApp");
         web.setWebViewClient(new WebViewClient() {
             @Override
