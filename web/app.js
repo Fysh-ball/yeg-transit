@@ -117,10 +117,13 @@ function wave(s, d, now) {
   const m = (d.time - walkOf(s) * 60 - now) / 60;
   const f = m < 0.5 ? 1 : Math.min(1, Math.max(0.04, 1 - m / 15)); // "Due" (rounds to 0 min) means full, same as mins()
   return `<svg class="wave" data-stop="${esc(s.id)}" data-f="${f.toFixed(3)}" viewBox="0 0 330 24" aria-hidden="true"><path class="track"/><path class="fill"/>`
-    + `<g class="bus" opacity="0"><g class="bus-body"><path d="M3-10H32Q40-10 40-2V6Q40 9 37 9H3Q0 9 0 6V-7Q0-10 3-10Z"/>`
-    + `<g class="win"><rect x="3" y="-7" width="6" height="6" rx="1.2"/><rect x="11" y="-7" width="6" height="6" rx="1.2"/><rect x="19" y="-7" width="6" height="6" rx="1.2"/><path d="M28-7H34Q37.5-7 37.5-3.5V-1H28Z"/></g>`
-    + `<rect class="stripe" x="0" y="2" width="40" height="1.6"/><circle class="lamp" cx="38" cy="5" r="1.3"/>`
-    + `<circle class="tyre" cx="9" cy="10" r="4"/><circle class="tyre" cx="31" cy="10" r="4"/><circle cx="9" cy="10" r="1.5"/><circle cx="31" cy="10" r="1.5"/></g></g></svg>`;
+    // An ETS New Flyer from the side: white body, blue roof and nose, dark glass, amber destination sign.
+    + `<g class="bus" opacity="0"><g class="bus-body"><path class="blue" d="M2-10H34Q37.5-10 39-6.5L40.5 4V7Q40.5 9 38.5 9H2Q0 9 0 7V-8Q0-10 2-10Z"/>`
+    + `<path class="white" d="M0-1H40.2L40.5 4V7Q40.5 9 38.5 9H2Q0 9 0 7Z"/>`
+    + `<g class="glass"><rect x="2" y="-7.2" width="29.5" height="5.4" rx=".8"/><path d="M33-7.2H37.8L39.6-1.8H33Z"/></g>`
+    + `<rect class="door" x="27.3" y="-1" width="4" height="8.6" rx=".5"/><path class="pillar" d="M9.6-7.2v5.4M17.2-7.2v5.4M24.8-7.2v5.4M27.3-7.2v5.4"/><rect class="sign" x="33.4" y="-9.4" width="4.6" height="1.5" rx=".4"/>`
+    + `<circle class="lamp" cx="39.6" cy="5.2" r="1"/><circle class="tyre" cx="8" cy="9.5" r="4"/><circle class="tyre" cx="32" cy="9.5" r="4"/>`
+    + `<circle class="hub" cx="8" cy="9.5" r="1.7"/><circle class="hub" cx="32" cy="9.5" r="1.7"/></g></g></svg>`;
 }
 // Big waves on the left shrink to flat at the tip, which runs into the track line. On arrival it fills, flattens,
 // the route badge bounces once and a bus pulls in to the end of the line. State per stop survives the 30 s re-render so the wave glides, not jumps.
@@ -772,4 +775,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=64").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=65").catch((e) => console.warn("sw:", e.message));

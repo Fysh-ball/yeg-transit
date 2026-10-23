@@ -315,10 +315,16 @@ main > .stop { animation: rise .5s var(--spring) both; }
 .wave > path { fill: none; stroke-linecap: round; }
 .wave .track { stroke: color-mix(in srgb, currentColor 18%, transparent); stroke-width: 4; }
 .wave .fill { stroke: var(--accent); stroke-width: 5; }
-.wave .bus { fill: var(--accent); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent)) drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
-.wave .bus :is(.win, .tyre) { fill: color-mix(in srgb, var(--accent) 30%, #000); }
-.wave .bus .stripe { fill: color-mix(in srgb, var(--accent) 55%, #000); }
+.wave .bus { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent)) drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
+.wave .bus .blue { fill: #1f5fbf; }
+.wave .bus .white { fill: #f3f5f8; }
+.wave .bus .glass { fill: #1b2532; }
+.wave .bus .door { fill: #2c3a4c; }
+.wave .bus .pillar { stroke: #3d4a5c; stroke-width: .6; }
+.wave .bus .sign { fill: #ffb21a; }
 .wave .bus .lamp { fill: #fff6c2; }
+.wave .bus .tyre { fill: #15181c; }
+.wave .bus .hub { fill: #c3c9d1; }
 .wave .bus-body { animation: idle 1.6s ease-in-out infinite; }
 @keyframes idle { 50% { transform: translateY(-1px); } }
 @media (prefers-reduced-motion: reduce) { .wave .bus-body { animation: none; } }
