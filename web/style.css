@@ -134,7 +134,7 @@ input {
 #empty[hidden] { display: none; }
 #empty img { width: 72px; height: 72px; border-radius: 18px; opacity: .9; }
 #empty p { margin: 8px auto 20px; max-width: 26em; }
-#empty h2 { color: var(--text); font-size: 1.2rem; margin: 16px 0 0; }
+#empty h2 { color: var(--text); font-size: 1rem; margin: 16px 0 0; }
 .big { display: block; width: 100%; max-width: 22em; margin: 10px auto 0; min-height: 48px; font-weight: 600; }
 .tips-head { display: flex; align-items: center; justify-content: space-between; }
 #tips h2 { font-size: 1.05rem; margin: 10px 0 4px; }
@@ -144,14 +144,15 @@ input {
 #tips li { margin: 6px 0; }
 #tips[hidden] { display: none; }
 
-footer { color: var(--muted); font-size: .8rem; margin-top: auto; padding-top: 28px; line-height: 1.5; }
+footer { color: var(--muted); font-size: .82rem; margin-top: auto; padding-top: 28px; line-height: 1.5; }
 footer a { color: var(--accent); }
 #intro { text-align: left; max-width: 40rem; margin: 0 auto 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
-#intro h2 { color: var(--text); font-size: .95rem; margin: 0 0 6px; }
+/* The page uses the app's three sizes only: card title (headings), body (paragraphs), card subtitle (footer). */
+#intro h2 { color: var(--text); font-size: 1rem; margin: 0 0 6px; }
 #intro p { margin: 0 0 8px; }
 .app #intro { display: none; }
 [data-look="material"] #intro { background: var(--s3); border: 0; border-radius: 28px; padding: 20px 22px; margin-bottom: 8px; } /* a tonal card, like Settings */
-[data-look="material"] #intro h2 { font-size: 1.05rem; margin-bottom: 10px; }
+[data-look="material"] #intro h2 { margin-bottom: 10px; }
 .policy { line-height: 1.55; max-width: 40rem; }
 .policy h2 { font-size: 1.05rem; margin: 22px 0 6px; }
 .policy a { color: var(--accent); }
@@ -331,7 +332,7 @@ main > .stop { animation: rise .5s var(--spring) both; }
 [data-look="material"] #groups .chip:last-child { border-radius: 8px 24px 24px 8px; }
 [data-look="material"] #groups .chip[aria-pressed="true"] { border-radius: 24px; color: var(--accent-text); }
 [data-look="material"] .stop, [data-look="material"] #add, [data-look="material"] #prefs { background: var(--card); border: 0; border-radius: 30px; padding: 8px 14px 12px; box-shadow: none; }
-[data-look="material"] .stop-head h2 { font-size: 1.12rem; }
+[data-look="material"] :is(.stop-head h2, #empty h2, #intro h2) { font-size: 1.12rem; }
 [data-look="material"] .deps { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
 [data-look="material"] .deps .dep, [data-look="material"] .deps .grp-head { border: 0; background: var(--card-2); border-radius: 6px; padding: 10px 12px; }
 [data-look="material"] .deps > .grp:first-child > .dep { border-radius: 22px 22px 6px 6px; }
@@ -376,7 +377,7 @@ main > .stop { animation: rise .5s var(--spring) both; }
 [data-look="glass"] #groups .chip { flex: 1; border: 0; background: none; color: var(--muted); font-weight: 600; min-height: 40px; }
 [data-look="glass"] #groups .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
 [data-look="glass"] .stop, [data-look="glass"] #add, [data-look="glass"] #prefs { border: 0; border-radius: 26px; padding: 6px 16px 10px; }
-[data-look="glass"] .stop-head h2 { font-size: 1.1rem; letter-spacing: -.01em; }
+[data-look="glass"] :is(.stop-head h2, #empty h2, #intro h2) { font-size: 1.1rem; letter-spacing: -.01em; }
 [data-look="glass"] .route { border-radius: 10px; padding: 6px 4px; }
 [data-look="glass"] .when { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
 [data-look="glass"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body.board main > .stop) .lead { border-top: 0; padding-top: 4px; }
