@@ -178,7 +178,7 @@ class Live:
     def run(self):
         while True:
             self.poll()
-            time.sleep(30)
+            time.sleep(10)  # ETS publishes every 30 s; 10 s catches each one within 10 s, not 30
 
 
 LIVE = Live()
@@ -621,7 +621,7 @@ class Handler(SimpleHTTPRequestHandler):
         if parts == ["version"]:
             return self.json({"sha": SHA})
         if parts == ["vehicles"]:
-            return self.json({"now": int(time.time()), "buses": fleet(db)}, cache=10)
+            return self.json({"now": int(time.time()), "buses": fleet(db)}, cache=5)
         if parts == ["weather"]:
             return self.json(walk_weather(), cache=600)
         if len(parts) == 3 and parts[0] == "trips" and parts[2] == "shape":

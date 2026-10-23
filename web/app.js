@@ -593,7 +593,7 @@ $("#groups").onclick = (e) => {
   if (b) { group = b.dataset.group || null; groupPicked = Date.now(); showGroup(); }
 };
 
-// Bus map: tap a live bus. Leaflet loads on first use; the position refreshes every 15 s while open.
+// Bus map: tap a live bus. Leaflet loads on first use; the position is checked every 5 s while open (ETS moves it every 30 s).
 let mapState = null;
 function loadFile(src, integrity) {
   const css = src.endsWith(".css"), el = document.createElement(css ? "link" : "script");
@@ -649,7 +649,7 @@ async function openMap(dep) {
     .bindTooltip("Your stop").addTo(m.layer);
   await placeBus();
   clearInterval(m.timer);
-  m.timer = setInterval(placeBus, 15000);
+  m.timer = setInterval(placeBus, 5000);
 }
 async function sheetMap() {
   try { await loadLeaflet(); } catch (e) { $("#map-note").textContent = `Map unavailable: ${e.message}`; return false; }
@@ -673,7 +673,7 @@ async function openLiveMap() {
   m.map.invalidateSize();
   m.map.setView(home ? [home.lat, home.lon] : [53.5461, -113.4938], 14); // your first stop, or downtown
   await placeFleet();
-  m.timer = setInterval(placeFleet, 15000);
+  m.timer = setInterval(placeFleet, 5000);
 }
 async function placeFleet() {
   try {
@@ -690,7 +690,7 @@ function drawFleet() { // only the buses in view: a city of pins at once makes a
   for (const [lat, lon, , route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [40, 40],
     html: `<span class="bus-pin fleet${far ? " far" : ""}">${far ? "" : esc(routeLabel(route))}</span>` }) })
     .bindTooltip(`Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}`).addTo(m.fleet);
-  $("#map-note").textContent = `${m.buses.length} buses running, ${seen.length} here. Updates every 15 s.`;
+  $("#map-note").textContent = `${m.buses.length} buses running, ${seen.length} here. ETS updates every 30 s.`;
 }
 // Slide the bus to its new spot over 2 s instead of jumping, like the big apps do.
 function glide(marker, to) {
@@ -739,7 +739,7 @@ async function placeBus() {
     const km = s && s.lat ? ` It's ${(metres(v, s) / 1000).toFixed(1)} km from your stop.` : "";
     const away = v.before ? `Finishing its run before yours, then it comes to you.${km} ` : v.waiting ? "Hasn't started its trip yet. " : v.stops_away === undefined ? "" : v.stops_away === null ? "Already past your stop. "
       : v.stops_away === 0 ? "Your stop is next. " : `${v.stops_away} stop${v.stops_away > 1 ? "s" : ""} away. `;
-    $("#map-note").textContent = `${away}Position ${v.age < 90 ? `${v.age} s` : `${Math.round(v.age / 60)} min`} old, updates every 15 s.`;
+    $("#map-note").textContent = `${away}Position ${v.age < 90 ? `${v.age} s` : `${Math.round(v.age / 60)} min`} old, ETS updates every 30 s.`;
   } catch (e) {
     if (m.trip !== trip) return;
     $("#map-note").textContent = e.message.startsWith("404") ? "This bus hasn't sent its position yet. It may not have started its trip." : `Can't get the bus position (${e.message}).`;
@@ -925,4 +925,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=91").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=92").catch((e) => console.warn("sw:", e.message));

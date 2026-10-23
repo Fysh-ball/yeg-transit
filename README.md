@@ -15,7 +15,7 @@ Not an official ETS app.
 
 | Part | What it does |
 |---|---|
-| `server/app.py` | One Python file, standard library plus the GTFS-realtime bindings. Imports the ETS GTFS schedule into SQLite nightly, polls trip updates, vehicle positions and alerts every 30 s, and serves a small JSON API under `/api/` plus the static web app. |
+| `server/app.py` | One Python file, standard library plus the GTFS-realtime bindings. Imports the ETS GTFS schedule into SQLite nightly, polls trip updates, and vehicle positions every 10 s and alerts every 5 min, and serves a small JSON API under `/api/` plus the static web app. |
 | `web/` | The web app: plain HTML, CSS and JavaScript, no build step. `sw.js` caches the app shell for offline starts; each saved stop keeps its own 30-hour timetable in `localStorage`. |
 | `android/` | A WebView around yegbus.com plus a home-screen widget. Built with the bare SDK tools by `android/build.sh` (no Gradle). |
 | `server/places.json` | Named places from OpenStreetMap so place search answers instantly. Rebuild with `scripts/places.sh`. |
