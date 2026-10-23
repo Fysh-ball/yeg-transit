@@ -81,7 +81,9 @@ function row(d, now, walk = 0, stopId = "") {
   const fg = "var(--accent-text)";
   const atNow = d.at && d.time - now < 60;
   // A bus waiting early at the stop keeps its countdown (that is when it leaves) but says it is already there.
-  const tag = d.at && !atNow ? `<small class="live">at stop</small>` : d.live ? `<small class="live">live</small>` : `<small>scheduled</small>`;
+  // With a walk time the big number is when to leave, so the small line says when the bus itself comes.
+  const busIn = walk && `bus ${Math.max(0, Math.round((d.time - now) / 60))} min`;
+  const tag = d.at && !atNow ? `<small class="live">at stop</small>` : d.live ? `<small class="live">${busIn || "live"}</small>` : `<small>${busIn || "scheduled"}</small>`;
   const when = atNow ? `<span class="due">At stop</span>` : walk && d.time - walk * 60 - now < 30 ? `<span class="due">Go now</span>` : mins(d.time - walk * 60, now);
   const map = d.live && d.trip ? ` data-trip="${esc(d.trip)}" data-stop="${esc(stopId)}" title="Show this bus on a map"` : "";
   return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)};--len:${routeLabel(d.route).length}">${esc(routeLabel(d.route))}</span>
@@ -726,8 +728,13 @@ async function placeBus() {
     m.others.clearLayers();
     for (const o of v.others) L.marker(o, { interactive: false, icon: L.divIcon({ className: "", iconSize: [30, 30],
       html: `<span class="bus-pin other" style="${esc(m.style)}">${esc(m.label)}</span>` }) }).addTo(m.others);
-    if (!m.fitted) { m.map.setView([v.lat, v.lon], 16); m.fitted = true; } // open zoomed in on the bus; the stop view is only the wait
-    const away = v.before ? "Finishing its run before yours, then it comes to you. " : v.waiting ? "Hasn't started its trip yet. " : v.stops_away === undefined ? "" : v.stops_away === null ? "Already past your stop. "
+    if (!m.fitted) { // open zoomed in on the bus; one still on another run is off your route, so show it with your stop
+      if ((v.before || v.waiting) && s && s.lat) m.map.fitBounds([[v.lat, v.lon], [s.lat, s.lon]], { padding: [50, 50], maxZoom: 16 });
+      else m.map.setView([v.lat, v.lon], 16);
+      m.fitted = true;
+    }
+    const km = s && s.lat ? ` It's ${(metres(v, s) / 1000).toFixed(1)} km from your stop.` : "";
+    const away = v.before ? `Finishing its run before yours, then it comes to you.${km} ` : v.waiting ? "Hasn't started its trip yet. " : v.stops_away === undefined ? "" : v.stops_away === null ? "Already past your stop. "
       : v.stops_away === 0 ? "Your stop is next. " : `${v.stops_away} stop${v.stops_away > 1 ? "s" : ""} away. `;
     $("#map-note").textContent = `${away}Position ${v.age < 90 ? `${v.age} s` : `${Math.round(v.age / 60)} min`} old, updates every 15 s.`;
   } catch (e) {
@@ -913,4 +920,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=84").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=85").catch((e) => console.warn("sw:", e.message));
