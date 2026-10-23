@@ -113,17 +113,32 @@ function grouped(s, list, now) {
 }
 
 // Wave under the lead bus: full when it's time to go, filling over the last 15 minutes. Drawn by drawWaves().
+// What pulls in when the lead is Due, drawn from the side facing right; w is its width, b how far its wheels reach below 0.
+// The ETS Xcelsior has its front door ahead of the front wheel and the rear door between the wheels.
+const LRT = (stripe) => `<path d="M32.5-11.5l-4-4h10l-4 4" fill="none" class="pole"/><path class="white" d="M7.5-11.5H57.5Q61.5-11.5 63.5-6L65 5V7H0V5L1.5-6Q3.5-11.5 7.5-11.5Z"/>`
+  + `<path class="glass" d="M4.5-8.5H61L62.5 0H2.5Z"/><path d="M14.5-8.5v8.5M50.5-8.5v8.5" class="mullion"/><rect class="door" x="17.5" y="-8.5" width="5" height="15.5"/>`
+  + `<rect class="door" x="42.5" y="-8.5" width="5" height="15.5"/><rect class="${stripe}" x="0" y="3" width="65" height="2"/><rect class="sign" x="59" y="-10.4" width="3.6" height="1.3" rx=".3"/>`
+  + `<rect class="bogie" x="4.5" y="7" width="13" height="3" rx="1"/><rect class="bogie" x="47.5" y="7" width="13" height="3" rx="1"/><circle class="tyre" cx="7.5" cy="9.5" r="2.4"/>`
+  + `<circle class="tyre" cx="14.5" cy="9.5" r="2.4"/><circle class="tyre" cx="50.5" cy="9.5" r="2.4"/><circle class="tyre" cx="57.5" cy="9.5" r="2.4"/>`;
+const VEHICLES = {
+  bus: { w: 50.5, b: 13, svg: `<path class="blue" d="M3-11H44Q48-11 49-7L50.5 4V7Q50.5 9 48.5 9H2Q0 9 0 7V-8Q0-11 3-11Z"/><path class="white" d="M0 0H50.3L50.5 4V7Q50.5 9 48.5 9H2Q0 9 0 7Z"/>`
+    + `<rect class="glass" x="2" y="-8" width="19" height="6.6" rx=".8"/><rect class="glass" x="27" y="-8" width="12" height="6.6" rx=".8"/><path class="glass" d="M45-8H48.2L49.8 2H45Z"/>`
+    + `<rect class="door" x="21.5" y="-8" width="5" height="16" rx=".5"/><rect class="door" x="39.5" y="-8" width="5" height="16" rx=".5"/><path d="M24-8v16M42-8v16M8.5-8v6.6M15-8v6.6M33-8v6.6" class="pillar"/>`
+    + `<rect class="sign" x="44.6" y="-10.2" width="4.4" height="1.6" rx=".4"/><circle class="lamp" cx="49.7" cy="5.5" r=".9"/>`
+    + `<circle class="tyre" cx="10" cy="9" r="4"/><circle class="tyre" cx="34" cy="9" r="4"/><circle class="hub" cx="10" cy="9" r="1.7"/><circle class="hub" cx="34" cy="9" r="1.7"/>` },
+  Capital: { w: 65, b: 10.9, svg: LRT("blue") }, // Capital Line cars carry blue, Metro Line red
+  Metro: { w: 65, b: 10.9, svg: LRT("red") },
+  Valley: { w: 64, b: 9.4, svg: `<path d="M32-11.5l-4-4h10l-4 4" fill="none" class="pole"/><path class="white" d="M5-11.5H58Q63-11.5 64-5V6Q64 8 62 8H2Q0 8 0 6V-5Q1-11.5 5-11.5Z"/>`
+    + `<path class="glass" d="M3-8.5H60.5Q62.5-8.5 63-4V1H1.5V-6Z"/><rect class="door" x="11" y="-8.5" width="4.5" height="16"/><rect class="door" x="29.7" y="-8.5" width="4.5" height="16"/>`
+    + `<rect class="door" x="48.5" y="-8.5" width="4.5" height="16"/><rect class="green" x="0" y="2.5" width="64" height="1.6"/><rect class="sign" x="57.5" y="-10.6" width="4" height="1.3" rx=".3"/>`
+    + `<rect class="tyre" x="3" y="8" width="58" height="2.4" rx="1.2"/>` },
+};
 function wave(s, d, now) {
   const m = (d.time - walkOf(s) * 60 - now) / 60;
   const f = m < 0.5 ? 1 : Math.min(1, Math.max(0.04, 1 - m / 15)); // "Due" (rounds to 0 min) means full, same as mins()
-  return `<svg class="wave" data-stop="${esc(s.id)}" data-f="${f.toFixed(3)}" viewBox="0 0 330 24" aria-hidden="true"><path class="track"/><path class="fill"/>`
-    // An ETS New Flyer from the side: white body, blue roof and nose, dark glass, amber destination sign.
-    + `<g class="bus" opacity="0"><g class="bus-body"><path class="blue" d="M2-10H34Q37.5-10 39-6.5L40.5 4V7Q40.5 9 38.5 9H2Q0 9 0 7V-8Q0-10 2-10Z"/>`
-    + `<path class="white" d="M0-1H40.2L40.5 4V7Q40.5 9 38.5 9H2Q0 9 0 7Z"/>`
-    + `<g class="glass"><rect x="2" y="-7.2" width="29.5" height="5.4" rx=".8"/><path d="M33-7.2H37.8L39.6-1.8H33Z"/></g>`
-    + `<rect class="door" x="27.3" y="-1" width="4" height="8.6" rx=".5"/><path class="pillar" d="M9.6-7.2v5.4M17.2-7.2v5.4M24.8-7.2v5.4M27.3-7.2v5.4"/><rect class="sign" x="33.4" y="-9.4" width="4.6" height="1.5" rx=".4"/>`
-    + `<circle class="lamp" cx="39.6" cy="5.2" r="1"/><circle class="tyre" cx="8" cy="9.5" r="4"/><circle class="tyre" cx="32" cy="9.5" r="4"/>`
-    + `<circle class="hub" cx="8" cy="9.5" r="1.7"/><circle class="hub" cx="32" cy="9.5" r="1.7"/></g></g></svg>`;
+  const v = VEHICLES[d.route] || VEHICLES.bus;
+  return `<svg class="wave" data-stop="${esc(s.id)}" data-f="${f.toFixed(3)}" data-vw="${v.w}" data-vb="${v.b}" viewBox="0 0 330 24" aria-hidden="true"><path class="track"/><path class="fill"/>`
+    + `<g class="bus" opacity="0"><g class="bus-body">${v.svg}</g></g></svg>`;
 }
 // Big waves on the left shrink to flat at the tip, which runs into the track line. On arrival it fills, flattens,
 // the route badge bounces once and a bus pulls in to the end of the line. State per stop survives the 30 s re-render so the wave glides, not jumps.
@@ -149,7 +164,8 @@ function drawWaves() {
     svg.querySelector(".track").setAttribute("d", end < W ? `M${end.toFixed(1)} 12H${W}` : "");
     const bus = svg.querySelector(".bus"), ease = 1 - Math.pow(1 - w.bus, 3);
     bus.setAttribute("opacity", Math.min(1, w.bus * 2).toFixed(2));
-    bus.setAttribute("transform", `translate(${(W - 53 - (1 - ease) * W * 0.4).toFixed(1)} -8.1) scale(1.3)`);
+    const vw = +svg.dataset.vw, vb = +svg.dataset.vb, sc = vw > 60 ? 1 : 1.1; // wheels rest on top of the line
+    bus.setAttribute("transform", `translate(${(W - vw * sc - (1 - ease) * W * 0.4).toFixed(1)} ${(9.5 - vb * sc).toFixed(2)}) scale(${sc})`);
   }
   requestAnimationFrame(drawWaves);
 }
@@ -785,4 +801,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=67").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=68").catch((e) => console.warn("sw:", e.message));

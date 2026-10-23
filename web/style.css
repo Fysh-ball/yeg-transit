@@ -319,7 +319,12 @@ main > .stop { animation: rise .5s var(--spring) both; }
 .wave .bus .white { fill: #f3f5f8; }
 .wave .bus .glass { fill: #1b2532; }
 .wave .bus .door { fill: #2c3a4c; }
-.wave .bus .pillar { stroke: #3d4a5c; stroke-width: .6; }
+.wave .bus .pillar { stroke: #3d4a5c; stroke-width: .5; }
+.wave .bus .mullion { stroke: #f3f5f8; stroke-width: 1; }
+.wave .bus .pole { stroke: #8b96a3; stroke-width: .9; }
+.wave .bus .bogie { fill: #8b96a3; }
+.wave .bus .red { fill: #d23a3a; }
+.wave .bus .green { fill: #16a36a; }
 .wave .bus .sign { fill: #ffb21a; }
 .wave .bus .lamp { fill: #fff6c2; }
 .wave .bus .tyre { fill: #15181c; }
