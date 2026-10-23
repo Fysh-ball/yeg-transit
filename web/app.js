@@ -921,4 +921,6 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=86").catch((e) => console.warn("sw:", e.message));
+// The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
+$("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=87").catch((e) => console.warn("sw:", e.message));
