@@ -32,7 +32,7 @@ python -m venv .venv
 PORT=8787 .venv/bin/python server/app.py   # first start downloads and imports the GTFS (a minute or two)
 ```
 
-Then open http://localhost:8787. Data goes to `data/` (set `DATA_DIR` to move it).
+Then open http://localhost:8787. Step by step, including Docker: [docs/SETUP.md](docs/SETUP.md). Data goes to `data/` (set `DATA_DIR` to move it).
 
 Or with Docker: `docker compose up -d --build` serves it on 127.0.0.1:8792.
 
@@ -44,15 +44,9 @@ Or with Docker: `docker compose up -d --build` serves it on 127.0.0.1:8792.
 
 CI runs the same on every push (`.github/workflows/test.yml`).
 
-## Releasing
+## Releasing and setup
 
-1. Commit your change. For any change under `web/`, bump the version everywhere: `yeg-vNN` in `web/sw.js` and every `?v=NN` in `web/*.html`, `web/app.js` and `web/sw.js`. Phones and Cloudflare keep the old files otherwise; `deploy.sh` refuses a mismatch.
-2. Put `DEPLOY_HOST=user@host` and `DEPLOY_DIR=/path/to/compose/stack` in `scripts/deploy.conf` (gitignored).
-3. Run `scripts/deploy.sh` from the repo root. It copies the code, builds the image, runs the tests inside it, starts it, and only says `landed` once the live site serves the new `sw.js` version and `/api/version` returns the commit you deployed. It keeps the previous image as `yeg-transit:prev` and prints the one-line `rollback:` command either way; nothing rolls back on its own.
-
-## Android
-
-`android/build.sh` builds `android/build/yeg-arrivals.apk` (needs the Android SDK build-tools 35 and platform 35); `android/build.sh install` puts it on a phone over adb. It signs with the SDK debug key, which is fine for sideloading but not for an app store.
+[docs/SETUP.md](docs/SETUP.md) walks through all of it: how the site, the two API servers and Cloudflare Pages fit together, the version bump, shipping a release, rolling back, setting up a server or the Pages project from scratch, and building the signed Android app.
 
 ## Data and licence
 
