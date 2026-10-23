@@ -81,6 +81,7 @@ function row(d, now, walk = 0, stopId = "") {
 // Per-stop settings, like the wall board's: only my routes, walk time, how many routes.
 // One line per route and direction; tap it to list its buses, tap a live bus for the map.
 const expanded = new Set(); // "stop|route|headsign" lines left open across refreshes
+const allRoutes = new Set(); // stop ids showing every route for now; "Buses to show" stays as set
 // Snow, rain or bitter cold add up to 3 min on top of every walk time you set (from /api/weather).
 let wx = { extra: 0, why: "" };
 const walkOf = (s) => (s.walk ? s.walk + wx.extra : 0);
@@ -95,7 +96,7 @@ function grouped(s, list, now) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(d);
   }
-  const html = [...groups].slice(0, s.n || 3).map(([key, ds], i) => {
+  const html = [...groups].slice(0, allRoutes.has(s.id) ? undefined : s.n || 3).map(([key, ds], i) => {
     const open = expanded.has(key);
     // The soonest bus leads: the first card on screen shows it big, with a wave that fills as the bus gets closer.
     const lead = (h) => i ? h : h.replace('class="dep', 'class="dep lead').replace(/<\/(div|button)>$/, wave(s, ds[0], now) + "</$1>");
@@ -111,7 +112,7 @@ function grouped(s, list, now) {
       .replace(/<span class="head">[^<]*<\/span>/, `<span class="head">${d.live && d.trip ? "Show on map \u203A" : "Scheduled, no map"}</span>`)).join("")}</div></div>`;
   }).join("");
   const more = groups.size - (s.n || 3); // past the card's route count: say so, or a route just looks like it stopped running
-  return html && `<div class="deps">${html}</div>` + (more > 0 ? `<button class="more-routes" data-more="${esc(s.id)}">Show ${more} more route${more > 1 ? "s" : ""}</button>` : "");
+  return html && `<div class="deps">${html}</div>` + (more > 0 ? `<button class="more-routes" data-more="${esc(s.id)}" aria-expanded="${allRoutes.has(s.id)}">${allRoutes.has(s.id) ? "Show fewer routes" : `Show ${more} more route${more > 1 ? "s" : ""}`}</button>` : "");
 }
 
 // Wave under the lead bus: full when it's time to go, filling over the last 15 minutes. Drawn by drawWaves().
@@ -510,7 +511,7 @@ document.addEventListener("click", (e) => {
     };
   }
   const more = e.target.closest("[data-more]");
-  if (more) { const s = stops.find((x) => x.id === more.dataset.more); s.n = 10; save(); rerender(s.id); }
+  if (more) { const id = more.dataset.more; allRoutes.has(id) ? allRoutes.delete(id) : allRoutes.add(id); rerender(id); }
 });
 
 document.addEventListener("change", (e) => {
@@ -868,4 +869,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=75").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=76").catch((e) => console.warn("sw:", e.message));
