@@ -78,6 +78,9 @@ Run the tests:
 3. Publish the site: `git push origin main:release`. The Cloudflare Pages build can take several minutes.
 4. Check that it is live: `curl -s https://yegbus.com/sw.js | grep -o 'yeg-v[0-9]*'` must print the new
    version.
+5. Check the times are right: `.venv/bin/python scripts/check_live.py` compares the live times on
+   yegbus.com with ETS's own feed and must end `0 wrong`. It also runs every 15 minutes from a
+   systemd user timer (`yeg-check.timer`) and pops up a desktop notification when it fails.
 
 Rolling back: every `deploy.sh` run prints a `rollback:` line, which restarts the previous image
 (`yeg-transit:prev`) on that server. For the site, push the previous commit to `release`:
