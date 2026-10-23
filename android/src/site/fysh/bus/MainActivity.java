@@ -99,6 +99,11 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void widget(String style) { // "card" (like the app) or "ring" (clear)
+            getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).edit().putString("widget", style).apply();
+        }
+
+        @JavascriptInterface
         public String stops() {
             return getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).getString("stops", "[]");
         }

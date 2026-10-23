@@ -33,6 +33,7 @@ function sync() {
     // The widget dresses like the app: "material-dark", "glass-light"... (apps before v54's widget lack look())
     const de = document.documentElement, t = de.dataset.theme;
     window.YegApp.look?.(de.dataset.look + (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches) ? "-dark" : "-light"));
+    window.YegApp.widget?.(localStorage.getItem("yeg.widget") || "card"); // apps before 1.20 lack widget()
   } catch (e) { console.warn("widget sync:", e.message); }
 }
 
@@ -673,6 +674,13 @@ $("#look").onchange = (e) => {
   try { e.target.value ? localStorage.setItem("yeg.look", e.target.value) : localStorage.removeItem("yeg.look"); } catch (err) { console.warn("look:", err.message); }
   sync(); // the widget follows
 };
+// Widget: the app's card, or clear with a ring (sample 9 D). Only apps from 1.20 have the bridge for it.
+if (window.YegApp?.widget) $("#widget-row").hidden = false;
+try { $("#widget").value = localStorage.getItem("yeg.widget") || "card"; } catch { /* storage blocked: card */ }
+$("#widget").onchange = (e) => {
+  try { localStorage.setItem("yeg.widget", e.target.value); } catch (err) { console.warn("widget:", err.message); }
+  sync();
+};
 
 // Wall board: big type, clock, screen kept awake. On with #board, or when a touch device is turned
 // sideways (laptops are landscape too, so pointer:coarse keeps them in the normal view).
@@ -749,4 +757,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=58").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=59").catch((e) => console.warn("sw:", e.message));

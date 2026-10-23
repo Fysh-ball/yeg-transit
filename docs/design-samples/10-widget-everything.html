@@ -1,0 +1,83 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><style>
+/* Every widget the app has today (1.20), by size, plus the two gaps: a tall widget and many stops. Black wallpaper. */
+body{margin:0;padding:16px;background:#000;color:#f3eee2;font:14px Roboto,system-ui,sans-serif}
+h1{font-size:17px;margin:26px 0 4px;color:#fff}h1:first-child{margin-top:0}
+.note{color:#9fb3a8;font-size:12.5px;margin:0 0 10px;line-height:1.4}
+.lbl{color:#9fb3a8;font-size:12px;font-weight:700;margin:12px 0 6px}
+.grid{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.w{box-sizing:border-box;border-radius:22px;padding:12px;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.card{background:#17694a}.ring{background:none;color:#fff;text-shadow:0 1px 4px rgb(0 0 0/.8);outline:1px dashed #333}
+.s{width:170px;height:80px}.m{width:380px;height:80px}.t2{width:380px;height:190px}.t4{width:380px;height:380px}
+.top{display:flex;font-size:12px;gap:8px}.top span:first-child{flex:1;font-weight:700}.top .c{font-weight:700}
+.hero{display:flex;align-items:center;gap:12px}
+.ck{flex:none;display:grid;place-items:center;font-weight:800;background:#9ff5c6;color:#00391f;width:44px;height:44px;clip-path:polygon(50% 0,63% 9%,79% 6%,84% 21%,97% 31%,91% 50%,97% 69%,84% 79%,79% 94%,63% 91%,50% 100%,37% 91%,21% 94%,16% 79%,3% 69%,9% 50%,3% 31%,16% 21%,21% 6%,37% 9%)}
+.tall .ck{width:56px;height:56px;font-size:18px}
+.d{flex:1;min-width:0}.d b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.d i{font-style:normal;font-size:12px;opacity:.8}
+.big{font-size:28px;font-weight:700;white-space:nowrap}.tall .big{font-size:34px}.big small{font-size:.55em}
+.wave{height:6px;margin:8px 0 2px;border-radius:3px;background:linear-gradient(90deg,#9ff5c6 60%,rgb(159 245 198/.25) 60%)}
+.row{display:flex;align-items:center;gap:10px;border-radius:12px;padding:6px 8px;margin-top:4px;font-size:15px}
+.card .row{background:rgb(243 238 226/.14)}.row .n{flex:1}.row b{font-weight:700}
+.b{display:inline-grid;place-items:center;min-width:34px;height:24px;border-radius:8px;background:#9ff5c6;color:#00391f;font-weight:800;font-size:13px}
+.rg{flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:17px;background:conic-gradient(#9ff5c6 0 70%,rgb(255 255 255/.18) 70%);-webkit-mask:radial-gradient(circle,transparent 21px,#000 22px)}
+.rgw{position:relative;width:52px;height:52px;flex:none}.rgw span{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:17px}
+.tall .rgw,.tall .rg{width:76px;height:76px}.tall .rg{-webkit-mask:radial-gradient(circle,transparent 32px,#000 33px)}.tall .rgw span{font-size:24px}
+.sm{font-size:13px;opacity:.7;margin-top:4px;display:flex;gap:8px}.sm span:first-child{flex:1}
+.gh{font-size:12px;font-weight:700;opacity:.75;margin:8px 2px 0}
+.top-al{justify-content:flex-start}
+.bad{outline:2px solid #f1d892;outline-offset:3px}
+</style>
+
+<h1>1 · Card (Settings › Widget › Card, the default)</h1>
+<p class=note>Same parts the app's lead card has. The text never grows: a bigger widget only shows more lines.</p>
+<div class=grid>
+ <div><p class=lbl>Small 2×1: badge and time</p>
+  <div class="w card s"><div class=hero><div class=ck>8</div><span class=big>5 <small>min</small></span></div></div></div>
+ <div><p class=lbl>Wide 4×1: plus where it goes</p>
+  <div class="w card m"><div class=hero><div class=ck>8</div><div class=d><b>Abbottsfield</b><i>then 7, 27 min</i></div><span class=big>5 <small>min</small></span></div></div></div>
+ <div><p class=lbl>4×2 (the size it's added at): stop, clock, wave, rows</p>
+  <div class="w card t2 tall"><div class=top><span>University Transit Centre</span><span>8° · Rain later</span><span class=c>18:53</span></div>
+  <div class=hero><div class=ck>8</div><div class=d><b>Abbottsfield</b><i>then 7, 27 min</i></div><span class=big>5 <small>min</small></span></div>
+  <div class=wave></div><div class=row><span class=b>4</span><span class=n>Capilano</span><b>6 min</b></div></div></div>
+</div>
+
+<h1>2 · Clear, with a ring (Settings › Widget › Clear)</h1>
+<p class=note>No card, white text with a shadow so it reads on any wallpaper. The dashed line only marks the edge here.</p>
+<div class=grid>
+ <div><p class=lbl>Small 2×1</p>
+  <div class="w ring s"><div class=hero><div class=rgw><div class=rg></div><span>8</span></div><span class=big>5 <small>min</small></span></div></div></div>
+ <div><p class=lbl>Wide 4×1</p>
+  <div class="w ring m"><div class=hero><div class=rgw><div class=rg></div><span>8</span></div><div class=d><span class=big>5 <small>min</small></span><i style="display:block;font-size:15px">Abbottsfield · then 7, 27 min</i></div></div></div></div>
+ <div><p class=lbl>4×2</p>
+  <div class="w ring t2 tall"><div class=hero><div class=rgw><div class=rg></div><span>8</span></div><div class=d><span class=big>5 <small>min</small></span><i style="display:block;font-size:15px">Abbottsfield · then 7, 27 min</i><div class=sm><span>University Transit Centre</span><span>8° · Rain later</span></div></div></div>
+  <div class=row><span class=b>4</span><span class=n>Capilano</span><b>6 min</b></div></div></div>
+</div>
+
+<h1>3 · The problem: stretched tall (your screenshot)</h1>
+<p class=note>A stop with 3 routes fills about a third of a 4×4. Today the rest is empty card above and below.</p>
+<div class=grid>
+ <div><p class=lbl>Today: floats in the middle</p>
+  <div class="w card t4 tall bad"><div class=top><span>University Transit Centre</span><span>8° · Rain later</span><span class=c>18:53</span></div>
+  <div class=hero><div class=ck>8</div><div class=d><b>Abbottsfield</b><i>then 7, 27 min</i></div><span class=big>5 <small>min</small></span></div>
+  <div class=wave></div><div class=row><span class=b>4</span><span class=n>Capilano</span><b>6 min</b></div><div class=row><span class=b>51</span><span class=n>Castle Downs</span><b>14 min</b></div></div></div>
+ <div><p class=lbl>Fix: top-aligned, and spare room shows your other stops</p>
+  <div class="w card t4 tall top-al"><div class=top><span>University Transit Centre</span><span>8° · Rain later</span><span class=c>18:53</span></div>
+  <div class=hero><div class=ck>8</div><div class=d><b>Abbottsfield</b><i>then 7, 27 min</i></div><span class=big>5 <small>min</small></span></div>
+  <div class=wave></div><div class=row><span class=b>4</span><span class=n>Capilano</span><b>6 min</b></div><div class=row><span class=b>51</span><span class=n>Castle Downs</span><b>14 min</b></div>
+  <p class=gh>Home · 104 St &amp; 82 Ave</p><div class=row><span class=b>9</span><span class=n>Eaux Claires</span><b>12 min</b></div><div class=row><span class=b>8</span><span class=n>Coliseum</span><b>21 min</b></div>
+  <p class=gh>Work · Churchill</p><div class=row><span class=b>1</span><span class=n>Lewis Farms</span><b>9 min</b></div></div></div>
+</div>
+
+<h1>4 · Many stops (4 stops saved in one group)</h1>
+<p class=note>Today the widget mixes every stop in your nearest group into one list, soonest first. The top line names only the first bus's stop, so a row doesn't say which stop it leaves from.</p>
+<div class=grid>
+ <div><p class=lbl>Today: one mixed list</p>
+  <div class="w card t4 tall bad top-al"><div class=top><span>University Transit Centre</span><span>8° · Rain later</span><span class=c>18:53</span></div>
+  <div class=hero><div class=ck>8</div><div class=d><b>Abbottsfield</b><i>then 7, 27 min</i></div><span class=big>5 <small>min</small></span></div>
+  <div class=wave></div>
+  <div class=row><span class=b>4</span><span class=n>Capilano</span><b>6 min</b></div><div class=row><span class=b>9</span><span class=n>Eaux Claires</span><b>8 min</b></div><div class=row><span class=b>51</span><span class=n>Castle Downs</span><b>14 min</b></div><div class=row><span class=b>906</span><span class=n>West Edmonton Mall</span><b>17 min</b></div><div class=row><span class=b>30</span><span class=n>Mill Woods</span><b>22 min</b></div></div></div>
+ <div><p class=lbl>Option: each row says its stop</p>
+  <div class="w card t4 tall top-al"><div class=top><span>Near you · 4 stops</span><span>8° · Rain later</span><span class=c>18:53</span></div>
+  <div class=hero><div class=ck>8</div><div class=d><b>Abbottsfield</b><i>University TC · then 7, 27 min</i></div><span class=big>5 <small>min</small></span></div>
+  <div class=wave></div>
+  <div class=row><span class=b>4</span><span class=n>Capilano<br><i style="font-style:normal;font-size:12px;opacity:.7">University TC</i></span><b>6 min</b></div><div class=row><span class=b>9</span><span class=n>Eaux Claires<br><i style="font-style:normal;font-size:12px;opacity:.7">114 St &amp; 87 Ave</i></span><b>8 min</b></div><div class=row><span class=b>51</span><span class=n>Castle Downs<br><i style="font-style:normal;font-size:12px;opacity:.7">University TC</i></span><b>14 min</b></div><div class=row><span class=b>906</span><span class=n>West Edmonton Mall<br><i style="font-style:normal;font-size:12px;opacity:.7">Health Sciences</i></span><b>17 min</b></div></div></div>
+</div>

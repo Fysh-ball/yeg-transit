@@ -1,0 +1,68 @@
+<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><style>
+/* Four widget looks on a black wallpaper, phone width. Each uses at most three text sizes. */
+body{margin:0;padding:16px;background:#000;color:#fff;font:15px Roboto,system-ui,sans-serif}
+.lbl{color:#9fb3a8;font-size:13px;font-weight:700;margin:22px 0 8px}.lbl:first-child{margin-top:0}
+.w{border-radius:26px;padding:16px}
+.b{display:inline-grid;place-items:center;min-width:34px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:10px;background:#f2f2f2;color:#17694a;font-weight:800}
+.row{display:flex;align-items:center;gap:12px}.row .d{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dim{opacity:.65}
+
+/* A: list. Every bus the same row; the next one just bold. Two sizes. */
+.A{background:rgb(255 255 255/.10)}
+.A .top{font-size:13px;display:flex;justify-content:space-between;margin-bottom:10px}
+.A .row{font-size:17px;padding:7px 0}.A .row+.row{border-top:1px solid rgb(255 255 255/.12)}
+.A .row b{font-weight:700}
+
+/* B: time first, like Samsung's clock widget. Big time, then one line about the bus. */
+.B{padding:8px 4px}
+.B .t{font-size:56px;font-weight:300;line-height:1;letter-spacing:-1px}
+.B .l{font-size:15px;margin-top:8px;display:flex;align-items:center;gap:8px}
+.B .l .b{height:24px;min-width:28px;font-size:14px;border-radius:8px}
+.B .f{font-size:13px;margin-top:10px}
+
+/* C: frosted dark card, Material green badge, a thin progress bar under the hero. Three sizes. */
+.C{background:rgb(20 40 30/.72)}
+.C .top{font-size:13px;display:flex;justify-content:space-between;opacity:.8}
+.C .hero{display:flex;align-items:center;gap:14px;margin:12px 0 10px}
+.C .hero .b{width:52px;height:52px;border-radius:16px;font-size:20px;background:#9ff5c6;color:#00391f}
+.C .hero .d{flex:1;font-size:17px;font-weight:600}.C .hero .d div{font-size:13px;font-weight:400;opacity:.75}
+.C .hero .t{font-size:34px;font-weight:700}
+.C .bar{height:4px;border-radius:2px;background:rgb(255 255 255/.15)}.C .bar i{display:block;height:100%;width:85%;border-radius:2px;background:#9ff5c6}
+.C .row{font-size:17px;margin-top:12px}.C .row .b{background:rgb(159 245 198/.18);color:#9ff5c6}
+
+/* D: ring. The badge sits in a ring that fills as the bus gets close; no wave, no header. */
+.D{padding:8px 4px;display:flex;gap:16px;align-items:center}
+.D .ring{width:76px;height:76px;flex:none;position:relative}.D .ring svg{position:absolute;inset:0}
+.D .ring span{position:absolute;inset:0;display:grid;place-items:center;font-size:24px;font-weight:800}
+.D .m{flex:1;min-width:0}.D .m .t{font-size:30px;font-weight:700;line-height:1.1}
+.D .m .d{font-size:15px;margin-top:2px}.D .m .s{font-size:13px;margin-top:6px}
+</style>
+
+<p class=lbl>A · List: every bus the same, the next one bold</p>
+<div class="w A">
+  <div class=top><span>University Transit Centre</span><span class=dim>8° Rain later · 18:42</span></div>
+  <div class=row><span class=b>4</span><b class=d>Capilano</b><b>Due</b></div>
+  <div class=row><span class=b>4</span><span class=d>Capilano</span><span>4 min</span></div>
+  <div class=row><span class=b>8</span><span class=d>Abbottsfield</span><span>6 min</span></div>
+</div>
+
+<p class=lbl>B · Time first, like Samsung's clock widget</p>
+<div class="w B">
+  <div class=t>Due</div>
+  <div class=l><span class=b>4</span>Capilano<span class=dim>· then 4 min</span></div>
+  <div class="f dim">University Transit Centre · 8° Rain later</div>
+</div>
+
+<p class=lbl>C · Frosted card with a progress bar</p>
+<div class="w C">
+  <div class=top><span>University Transit Centre</span><span>8° Rain later · 18:42</span></div>
+  <div class=hero><span class=b>4</span><div class=d>Capilano<div>then 4 min</div></div><span class=t>Due</span></div>
+  <div class=bar><i></i></div>
+  <div class=row><span class=b>8</span><span class=d>Abbottsfield</span><span>6 min</span></div>
+</div>
+
+<p class=lbl>D · Ring that fills as the bus gets close</p>
+<div class="w D">
+  <div class=ring><svg viewBox="0 0 76 76"><circle cx=38 cy=38 r=34 fill=none stroke="rgb(255 255 255/.18)" stroke-width=6 /><circle cx=38 cy=38 r=34 fill=none stroke="#9ff5c6" stroke-width=6 stroke-linecap=round stroke-dasharray="181 214" transform="rotate(-90 38 38)"/></svg><span>4</span></div>
+  <div class=m><div class=t>Due</div><div class=d>Capilano · then 4 min</div><div class="s dim">8 Abbottsfield 6 min · 8° Rain later</div></div>
+</div>

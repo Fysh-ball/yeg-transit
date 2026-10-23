@@ -94,11 +94,11 @@ public class BusWidget extends AppWidgetProvider {
 
     private static RemoteViews build(Context c, int w, int h) {
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        // Dressed like the app (Settings > Look and Colours). Material: its lead card, cream on green in dark.
-        // Glass: see-through with shadowed white text, as Android can't blur the wallpaper behind a widget.
+        // Settings > Widget. Card: the app's lead card, cream on green in dark, colours as the app's Look and Colours.
+        // Ring (glass): see-through with shadowed white text and the badge in a ring, as Android can't blur the wallpaper.
         String look = p.getString("look", "");
         boolean night = (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
-        boolean glass = look.startsWith("glass"), dark = look.isEmpty() ? night : look.endsWith("dark");
+        boolean glass = p.getString("widget", "card").equals("ring"), dark = look.isEmpty() ? night : look.endsWith("dark");
         int fg = glass ? 0xFFFFFFFF : dark ? 0xFFF3EEE2 : 0xFF002114; // dark: cream on green, softer than white
         int chip = glass ? 0xFFF2F2F2 : dark ? 0xFF9FF5C6 : fg, chipText = glass ? 0xFF17694A : dark ? 0xFF00391F : 0xFF9FF5C6;
         RemoteViews v = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_glass : R.layout.widget);
@@ -107,10 +107,14 @@ public class BusWidget extends AppWidgetProvider {
         v.removeAllViews(R.id.rows);
         v.setOnClickPendingIntent(R.id.root, PendingIntent.getActivity(c, 0,
             new Intent(c, MainActivity.class), PendingIntent.FLAG_IMMUTABLE));
-        // Small (2x1): badge and time. Medium (4x1): plus where it goes. Tall: stop, clock, wave and a row per ~34 dp.
+        // Small (2x1): badge and time. Medium (4x1): plus where it goes. Tall: stop, clock, wave and rows to fill it,
+        // from the top (stretched, the rest used to float in the middle), then your other groups if there's room.
         boolean tall = h >= 100, wide = w >= 200;
-        int budget = tall ? Math.max(0, (h - 140) / 34) : 0;
-        for (int id : new int[]{R.id.bar, R.id.hero, R.id.wave}) v.setViewVisibility(id, View.GONE); // until there's a bus
+        int room = tall ? h - 140 : 0; // dp under the hero: a row takes 34, 50 with its stop's name, a group heading 26
+        v.setInt(R.id.root, "setGravity", tall ? android.view.Gravity.TOP : android.view.Gravity.CENTER_VERTICAL);
+        v.setViewVisibility(R.id.bar, View.GONE); // until there's a bus
+        v.setViewVisibility(R.id.hero, View.GONE);
+        if (!glass) v.setViewVisibility(R.id.wave, View.GONE); // the ring widget has no wave
         v.setViewVisibility(R.id.dest, wide || tall ? View.VISIBLE : View.GONE);
         v.setViewVisibility(R.id.then, wide || tall ? View.VISIBLE : View.GONE);
 
@@ -145,32 +149,28 @@ public class BusWidget extends AppWidgetProvider {
         List<JSONObject> deps = new ArrayList<>();
         boolean offline = false;
         java.util.Set<String> alerts = new java.util.LinkedHashSet<>(); // ETS: stop closed or moved, use #1457
+        int here = 0; // stops in this group: more than one, and each row says its stop
         for (JSONObject s : stops) {
             if (!group.isEmpty() && !group.equals(s.optString("group"))) continue;
+            here++;
             try {
-                offline |= departures(p, s, extra, deps, order, alerts);
+                offline |= departures(p, s, extra, deps, order, alerts, 0);
             } catch (Exception e) {
                 v.addView(R.id.rows, note(c, s.optString("name") + ": couldn't load (" + e.getMessage() + ")", fg));
-                budget--;
+                room -= 34;
             }
         }
-        order.sort((x, y) -> Long.compare(x[0], y[0]));
-        // One line per route and direction, its next bus: routes 1 and 2 both show, a second 1 doesn't
-        // (nor the same bus at two of your stops; the stop you'd leave for first wins). The later ones are "then".
-        java.util.Map<String, List<Long>> then = new java.util.HashMap<>();
-        order.removeIf(o -> { JSONObject d = deps.get((int) o[1]);
-            List<Long> t = then.computeIfAbsent(d.optString("route") + "|" + d.optString("headsign"), k -> new ArrayList<>());
-            t.add(o[0]); return t.size() > 1; });
+        java.util.Map<String, List<Long>> then = collapse(deps, order);
         for (String a : alerts) {
-            if (budget <= 0) break;
+            if (room < 34) break;
             RemoteViews n = note(c, a, fg);
             n.setTextColor(R.id.text, glass || dark ? 0xFFF1D892 : 0xFF6B4F00); // the page's warning yellow
             v.addView(R.id.rows, n);
-            budget--;
+            room -= 34;
         }
-        if (offline && budget > 0) {
+        if (offline && room >= 34) {
             v.addView(R.id.rows, note(c, "No connection: scheduled times.", fg));
-            budget--;
+            room -= 34;
         }
         if (order.isEmpty()) {
             v.addView(R.id.rows, alone(note(c, "No buses in the next 3 hours.", fg)));
@@ -182,30 +182,89 @@ public class BusWidget extends AppWidgetProvider {
         long leave = order.get(0)[0] - now;
         v.setViewVisibility(R.id.hero, View.VISIBLE);
         v.setViewVisibility(R.id.bar, tall ? View.VISIBLE : View.GONE);
-        v.setViewVisibility(R.id.wave, tall ? View.VISIBLE : View.GONE);
-        v.setImageViewBitmap(R.id.cookie, badge(c, route(d), glass ? 2 : 1, tall ? 56 : 44, chip, chipText));
+        float fill = Math.min(1f, Math.max(0.04f, 1 - leave / 900f)); // over its last 15 minutes
+        if (glass) v.setImageViewBitmap(R.id.cookie, ring(c, route(d), tall ? 76 : 52, fill, fg));
+        else {
+            v.setViewVisibility(R.id.wave, tall ? View.VISIBLE : View.GONE);
+            v.setImageViewBitmap(R.id.cookie, badge(c, route(d), 1, tall ? 56 : 44, chip, chipText));
+        }
         v.setTextViewText(R.id.big, when(c, d, leave, true));
-        v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, tall ? 34 : 28);
+        v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, glass ? 30 : tall ? 34 : 28);
         v.setTextViewText(R.id.dest, head(d));
         StringBuilder next = new StringBuilder(); // "then 13, 25 min", or the stop when there's no later bus
         List<Long> later = then.get(d.optString("route") + "|" + d.optString("headsign"));
         for (int i = 1; i < Math.min(3, later.size()); i++)
             next.append(i == 1 ? "then " : ", ").append(Math.max(0, Math.round((later.get(i) - now) / 60.0)));
-        v.setTextViewText(R.id.then, later.size() > 1 ? next + " min" : tall ? "" : d.optString("stop"));
-        v.setTextViewText(R.id.stop, d.optString("stop"));
-        if (tall) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, Math.min(1f, Math.max(0.04f, 1 - leave / 900f)), glass ? fg : chip));
-        for (long[] o : order.subList(1, Math.max(1, Math.min(1 + budget, order.size())))) {
-            JSONObject r = deps.get((int) o[1]);
-            RemoteViews row = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_row : R.layout.widget_row_m);
-            if (!glass) row.setInt(R.id.row, "setBackgroundResource", dark ? R.drawable.widget_row_dark : R.drawable.widget_row_light);
-            row.setImageViewBitmap(R.id.badge, badge(c, route(r), 0, 26, chip, chipText));
-            row.setTextViewText(R.id.head, head(r));
-            row.setTextViewText(R.id.times, when(c, r, o[0] - now, false));
-            row.setTextColor(R.id.head, fg);
-            row.setTextColor(R.id.times, r.optBoolean("live") ? fg : fg & 0xB3FFFFFF); // faded = scheduled, not live
-            v.addView(R.id.rows, row);
+        String stop = d.optString("stop"), more = later.size() > 1 ? next + " min" : tall ? "" : stop;
+        if (here > 1 && !more.equals(stop)) more = more.isEmpty() ? stop : stop + " \u00b7 " + more;
+        v.setTextViewText(R.id.then, glass && !more.isEmpty() ? "\u00b7 " + more : more);
+        v.setTextViewText(R.id.stop, here > 1 ? (group.isEmpty() ? here + " stops" : group) : stop);
+        if (tall && !glass) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, fill, chip));
+        int rowH = here > 1 ? 50 : 34;
+        for (long[] o : order.subList(1, order.size())) {
+            if (room < rowH) break;
+            v.addView(R.id.rows, row(c, deps.get((int) o[1]), o[0] - now, here > 1, glass, dark, fg, chip, chipText));
+            room -= rowH;
+        }
+        // Room left: your other groups (Home, Work...), each under its name, the same way.
+        java.util.Set<String> others = new java.util.LinkedHashSet<>();
+        for (JSONObject s : stops) if (!s.optString("group").isEmpty() && !s.optString("group").equals(group)) others.add(s.optString("group"));
+        for (String g : others) {
+            if (group.isEmpty() || room < 26 + 34) break;
+            List<JSONObject> gd = new ArrayList<>();
+            List<long[]> go = new ArrayList<>();
+            int n = 0;
+            for (JSONObject s : stops) {
+                if (!g.equals(s.optString("group"))) continue;
+                n++;
+                try {
+                    departures(p, s, extra, gd, go, new java.util.HashSet<>(), 300);
+                } catch (Exception e) {
+                    android.util.Log.w("yeg", g + " " + s.optString("name") + ": " + e);
+                }
+            }
+            collapse(gd, go);
+            if (go.isEmpty()) continue;
+            RemoteViews head = note(c, g, fg);
+            v.addView(R.id.rows, head);
+            room -= 26;
+            for (long[] o : go) {
+                if (room < (n > 1 ? 50 : 34)) break;
+                v.addView(R.id.rows, row(c, gd.get((int) o[1]), o[0] - now, n > 1, glass, dark, fg, chip, chipText));
+                room -= n > 1 ? 50 : 34;
+            }
         }
         return v;
+    }
+
+    /** Soonest first, one line per route and direction: routes 1 and 2 both show, a second 1 doesn't (nor the same
+     *  bus at two of your stops; the stop you'd leave for first wins). Returns each line's times, for "then". */
+    private static java.util.Map<String, List<Long>> collapse(List<JSONObject> deps, List<long[]> order) {
+        order.sort((x, y) -> Long.compare(x[0], y[0]));
+        java.util.Map<String, List<Long>> then = new java.util.HashMap<>();
+        order.removeIf(o -> { JSONObject d = deps.get((int) o[1]);
+            List<Long> t = then.computeIfAbsent(d.optString("route") + "|" + d.optString("headsign"), k -> new ArrayList<>());
+            t.add(o[0]); return t.size() > 1; });
+        return then;
+    }
+
+    /** One bus under the hero; with its stop's name small underneath when the group has several stops. */
+    private static RemoteViews row(Context c, JSONObject r, long leave, boolean stop, boolean glass, boolean dark, int fg, int chip, int chipText) {
+        RemoteViews row = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_row : R.layout.widget_row_m);
+        if (!glass) row.setInt(R.id.row, "setBackgroundResource", dark ? R.drawable.widget_row_dark : R.drawable.widget_row_light);
+        row.setImageViewBitmap(R.id.badge, badge(c, route(r), 0, 26, chip, chipText));
+        CharSequence head = head(r);
+        if (stop) {
+            android.text.SpannableString s = new android.text.SpannableString(head + "\n" + r.optString("stop"));
+            s.setSpan(new android.text.style.RelativeSizeSpan(.8f), head.length() + 1, s.length(), 0);
+            s.setSpan(new android.text.style.ForegroundColorSpan(fg & 0xB3FFFFFF), head.length() + 1, s.length(), 0);
+            head = s;
+        }
+        row.setTextViewText(R.id.head, head);
+        row.setTextViewText(R.id.times, when(c, r, leave, false));
+        row.setTextColor(R.id.head, fg);
+        row.setTextColor(R.id.times, r.optBoolean("live") ? fg : fg & 0xB3FFFFFF); // faded = scheduled, not live
+        return row;
     }
 
     private static String route(JSONObject d) {
@@ -224,7 +283,7 @@ public class BusWidget extends AppWidgetProvider {
         if (m <= 0) return "Due";
         if (m >= 60) return DateFormat.getTimeFormat(c).format(new java.util.Date((System.currentTimeMillis() / 1000 + leave) * 1000));
         android.text.SpannableString s = new android.text.SpannableString(m + " min");
-        s.setSpan(new android.text.style.RelativeSizeSpan(.55f), s.length() - 4, s.length(), 0);
+        if (big) s.setSpan(new android.text.style.RelativeSizeSpan(.5f), s.length() - 4, s.length(), 0); // rows: one size
         return s;
     }
 
@@ -251,6 +310,30 @@ public class BusWidget extends AppWidgetProvider {
             k.drawPath(path, f);
         } else k.drawRoundRect(0, 0, W, H, H * .32f, H * .32f, f);
         k.drawText(text, W / 2f, H / 2f - (t.descent() + t.ascent()) / 2, t);
+        return b;
+    }
+
+    /** The ring widget's badge: the route inside a ring filled to f, like the wave. */
+    private static Bitmap ring(Context c, String text, int sizeDp, float f, int fg) {
+        float dp = c.getResources().getDisplayMetrics().density, S = sizeDp * dp, sw = (sizeDp > 60 ? 6 : 5) * dp;
+        Bitmap b = Bitmap.createBitmap(Math.round(S), Math.round(S), Bitmap.Config.ARGB_8888);
+        Canvas k = new Canvas(b);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(sw);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        android.graphics.RectF o = new android.graphics.RectF(sw / 2, sw / 2, S - sw / 2, S - sw / 2);
+        p.setColor(0x2EFFFFFF);
+        k.drawOval(o, p);
+        p.setColor(0xFF9FF5C6); // the app's mint
+        k.drawArc(o, -90, 360 * f, false, p);
+        Paint t = new Paint(Paint.ANTI_ALIAS_FLAG);
+        t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        t.setColor(fg);
+        t.setTextAlign(Paint.Align.CENTER);
+        t.setTextSize(S * (text.length() > 3 ? .24f : .32f));
+        t.setShadowLayer(4 * dp, 0, dp, 0xCC000000);
+        k.drawText(text, S / 2, S / 2 - (t.descent() + t.ascent()) / 2, t);
         return b;
     }
 
@@ -306,15 +389,22 @@ public class BusWidget extends AppWidgetProvider {
      * Offline it falls back to the stop's saved 30 h timetable, as the page does, and returns true.
      */
     private static boolean departures(SharedPreferences p, JSONObject s, int extra, List<JSONObject> deps, List<long[]> order,
-                                      java.util.Set<String> alerts) throws Exception {
+                                      java.util.Set<String> alerts, int maxAge) throws Exception {
         String id = Uri.encode(s.optString("id")), key = "tt:" + s.optString("id");
         JSONObject tt = new JSONObject(p.getString(key, "{}"));
         JSONArray all;
         long now;
         boolean offline = false;
         try {
-            JSONObject r = new JSONObject(get(MainActivity.SITE + "api/stops/" + id + "/departures?n=30"));
-            now = r.getLong("now");
+            // maxAge > 0 (your other groups): reuse the last answer that young, so they cost a call per 5 min, not per minute
+            JSONObject r = new JSONObject(p.getString("live:" + s.optString("id"), "{\"phone\":0}"));
+            if (maxAge <= 0 || System.currentTimeMillis() / 1000 - r.getLong("phone") > maxAge) {
+                r = new JSONObject(get(MainActivity.SITE + "api/stops/" + id + "/departures?n=30"));
+                r.put("phone", System.currentTimeMillis() / 1000); // when it came, for the clock skew below
+                if (maxAge > 0) p.edit().putString("live:" + s.optString("id"), r.toString()).apply();
+            }
+            // a reused answer: the server's "now" moved on by as long as the phone's has since it came
+            now = r.getLong("now") + System.currentTimeMillis() / 1000 - r.getLong("phone");
             all = r.getJSONArray("departures");
             JSONArray al = r.optJSONArray("alerts");
             for (int i = 0; al != null && i < al.length(); i++) {

@@ -94,6 +94,7 @@ input {
   animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse { 50% { opacity: .25; } }
+[data-look="material"] .when .live::before { background: var(--led); } /* a bright green LED, even on a coloured card */
 @media (prefers-reduced-motion: reduce) { .when .live::before { animation: none; } }
 .due { color: var(--live); }
 .note { color: var(--muted); font-size: .88rem; margin: 8px 0 2px; }
@@ -149,6 +150,8 @@ footer a { color: var(--accent); }
 #intro h2 { color: var(--text); font-size: .95rem; margin: 0 0 6px; }
 #intro p { margin: 0 0 8px; }
 .app #intro { display: none; }
+[data-look="material"] #intro { background: var(--s3); border: 0; border-radius: 28px; padding: 20px 22px; margin-bottom: 8px; } /* a tonal card, like Settings */
+[data-look="material"] #intro h2 { font-size: 1.05rem; margin-bottom: 10px; }
 .policy { line-height: 1.55; max-width: 40rem; }
 .policy h2 { font-size: 1.05rem; margin: 22px 0 6px; }
 .policy a { color: var(--accent); }
@@ -254,20 +257,20 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
 /* Material: colours from the YEG Bus green as the seed. */
 :root[data-look="material"] {
   --bg: #f4fbf5; --card: #e9efe9; --card-2: #f4fbf5; --text: #161d19; --muted: #3f4943; --line: #bfc9c1;
-  --accent: #17694a; --accent-text: #fff; --live: #17694a; --shadow: none;
+  --accent: #17694a; --accent-text: #fff; --live: #17694a; --led: #0f9d58; --shadow: none;
   --pc: #9ff5c6; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15; --tc: #b8eafb; --on-tc: #001f27; --s3: #e2e9e3; --tint: rgb(255 255 255 / .55);
 }
 @media (prefers-color-scheme: dark) {
   :root[data-look="material"]:not([data-theme="light"]) {
     --bg: #0e1511; --card: #1a211d; --card-2: #0e1511; --text: #dde4de; --muted: #bfc9c1; --line: #3f4943;
-    --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac;
+    --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac; --led: #5dff9b;
     --pc: #17694a; --on-pc: #f3eee2; --sc: #33493d; --on-sc: #cfe9d9; --tc: #1d5f80; --on-tc: #f3eee2; --s3: #252c27; --tint: rgb(243 238 226 / .14);
     --pc-chip: #9ff5c6; --pc-chip-text: #00391f; --tc-chip: #b8eafb; --tc-chip-text: #00303f; /* colour like light mode, not just cream */
   }
 }
 :root[data-look="material"][data-theme="dark"] {
   --bg: #0e1511; --card: #1a211d; --card-2: #0e1511; --text: #dde4de; --muted: #bfc9c1; --line: #3f4943;
-  --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac;
+  --accent: #84d8ac; --accent-text: #003824; --live: #84d8ac; --led: #5dff9b;
   --pc: #17694a; --on-pc: #f3eee2; --sc: #33493d; --on-sc: #cfe9d9; --tc: #1d5f80; --on-tc: #f3eee2; --s3: #252c27; --tint: rgb(243 238 226 / .14);
     --pc-chip: #9ff5c6; --pc-chip-text: #00391f; --tc-chip: #b8eafb; --tc-chip-text: #00303f; /* colour like light mode, not just cream */
 }
