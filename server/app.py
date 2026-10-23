@@ -512,15 +512,31 @@ STOPS = "(SELECT stops.*, routes FROM stops LEFT JOIN stop_routes USING(stop_id)
 
 def next_stop(db, trip, v):
     """The bus's next stop sequence. ETS sends its next timepoint instead (a 201 at 107 Ave said 13 with stops 11 and 12
-    still ahead, 2026-10-22), so put the bus on the leg between two stops, up to that timepoint, that it is least off."""
-    rows = db.execute("SELECT st.seq, s.lat, s.lon FROM stop_times st JOIN stops s USING(stop_id) WHERE trip_id=? AND seq<=? "
-                      "ORDER BY seq", (trip, v[4])).fetchall()
+    still ahead, 2026-10-22), so put the bus on the leg between two stops, up to that timepoint, that it is least off.
+    ETS can also keep a bus at its first stop long after it left (a 902 1.2 km west of University TC, still at seq 1,
+    2026-10-23): then a bus on the route, past its second stop and heading along it, is where it is."""
+    rows = db.execute("SELECT st.seq, s.lat, s.lon FROM stop_times st JOIN stops s USING(stop_id) WHERE trip_id=? "
+                      "ORDER BY seq", (trip,)).fetchall()
+    start = bool(rows) and v[4] <= rows[0][0]
+    if not start:
+        rows = [r for r in rows if r[0] <= v[4]]
     if len(rows) < 2:
         return v[4]
     k = math.cos(math.radians(v[0]))
     d = lambda a, b: math.hypot(a[0] - b[0], (a[1] - b[1]) * k)
     bus = (v[0], v[1])
-    a, b = min(zip(rows, rows[1:]), key=lambda ab: d(ab[0][1:], bus) + d(bus, ab[1][1:]) - d(ab[0][1:], ab[1][1:]))
+    off = lambda ab: d(ab[0][1:], bus) + d(bus, ab[1][1:]) - d(ab[0][1:], ab[1][1:])
+    if start:
+        # Only its first half: a loop's last legs lead back into its first stop, where a bus may be driving in to start.
+        # 150 m slack, as stops are straight lines and roads are not (87 Ave runs on past 120 St before Groat Rd).
+        heading = lambda a, b: math.degrees(math.atan2((b[2] - a[2]) * k, b[1] - a[1]))
+        early = rows[:len(rows) // 2 + 1]
+        legs = [ab for ab in zip(early[1:], early[2:]) if v[2] and abs((heading(*ab) - v[2] + 180) % 360 - 180) < 60]
+        if not legs or min(map(off, legs)) * 111000 >= 150:  # bearing 0 is ETS for "unknown"
+            return v[4]  # at layover, or driving in to start: it hasn't left yet
+        a, b = min(legs, key=off)
+    else:
+        a, b = min(zip(rows, rows[1:]), key=off)
     return a[0] if d(bus, b[1:]) > d(a[1:], b[1:]) else b[0]  # not at the leg's first stop yet
 
 
@@ -625,7 +641,7 @@ class Handler(SimpleHTTPRequestHandler):
                               if t != parts[1] and o[5] == v[5] and o[6] == v[6] and now - o[3] < 300]}
             if before:
                 out["before"] = True  # finishing an earlier trip; counting stops to yours means nothing yet
-            elif v[4] and v[4] <= (db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=?", (parts[1],)).fetchone()[0] or 0):
+            elif v[4] and next_stop(db, parts[1], v) <= (db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=?", (parts[1],)).fetchone()[0] or 0):
                 out["waiting"] = True  # ETS seq 1: at layover or driving to the start, so a stop count means nothing yet
             elif "stop" in q and v[4]:
                 mine = db.execute("SELECT seq FROM stop_times WHERE trip_id=? AND stop_id=? ORDER BY seq<? , seq",  # a loop route passes twice

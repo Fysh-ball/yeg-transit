@@ -30,3 +30,13 @@ class NextStop(unittest.TestCase):
 
     def test_ets_sequence_is_the_upper_bound(self):  # near stop 12 but ETS says 11 is next: trust the smaller
         self.assertEqual(app.next_stop(fixture(), "t", (53.5655, -113.5195, 0, 0, 11)), 11)
+
+    def test_left_the_first_stop_while_ets_still_says_it(self):  # 902 at University TC, 2026-10-23: heading along the route
+        self.assertEqual(app.next_stop(fixture(), "t", (53.552639, -113.508339, 355, 0, 9)), 11)
+
+    def test_at_the_first_stop_it_has_not_left(self):
+        self.assertEqual(app.next_stop(fixture(), "t", (53.544996, -113.508267, 0, 0, 9)), 9)
+        self.assertEqual(app.next_stop(fixture(), "t", (53.5460, -113.50825, 0, 0, 9)), 9)  # between 9 and 10
+
+    def test_driving_in_to_the_start_the_other_way_has_not_left(self):  # on the route, heading back to its first stop
+        self.assertEqual(app.next_stop(fixture(), "t", (53.552639, -113.508339, 175, 0, 9)), 9)
