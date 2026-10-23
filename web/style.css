@@ -90,11 +90,12 @@ input {
 .head { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .when { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; line-height: 1.15; }
 .when small { display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-weight: 500; font-size: .72rem; color: var(--muted); }
-.when .lbl:first-child { margin-bottom: 1px; } /* "Leave in" over the number; "Bus in" under it */
+.when .lbl:first-child { margin-bottom: 1px; } /* "Bus in" over the number */
 /* What the number counts to, in the number's own colour: muted grey read as a footnote and was missed. */
 .when .lbl:first-child { color: inherit; font-weight: 650; font-size: .8rem; }
-/* A bus already waiting is the news on the card, so it gets a filled badge, not a grey line. */
+/* The news on the card (bus waiting, when to leave) gets a filled badge, not a grey line. */
 .when .here { width: fit-content; margin: 3px 0 0 auto; padding: 2px 9px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-weight: 700; }
+.when .go { background: var(--text); color: var(--bg); } /* time to walk out the door */
 .when .live { color: var(--live); }
 .when .live::before {
   content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;

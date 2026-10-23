@@ -75,21 +75,19 @@ function headLabel(h, r) {
   return h.startsWith(n + " ") ? h.slice(n.length + 1) : h;
 }
 
-// With a walk time set, the big number is when to leave, not when the bus comes.
+// One timer, the bus. With a walk time set, a badge under it says when to leave for it (two timers read as one, 2026-10-23).
 function row(d, now, walk = 0, stopId = "") {
   const bg = "var(--accent)"; // one brand green, not ETS route colours, so nobody takes this for the official app
   const fg = "var(--accent-text)";
   const atNow = d.at && d.time - now < 60;
-  // A bus waiting early at the stop keeps its countdown (that is when it leaves) but says it is already there.
-  // With a walk time the big number is when to leave, so the small line says when the bus itself comes.
-  const busIn = walk && `Bus in ${Math.max(0, Math.round((d.time - now) / 60))} min`;
   const early = d.at && !atNow; // here already, waiting to leave: the number is when it pulls out, so say that
-  const tag = early ? `<small class="lbl here">Bus is here</small>` : d.live ? `<small class="live${busIn ? " lbl" : ""}">${busIn || "live"}</small>` : busIn ? `<small class="lbl">${busIn}</small>` : `<small>scheduled</small>`;
-  const go = walk && d.time - walk * 60 - now < 30;
+  const out = d.time - walk * 60; // when to leave home; buses you can't reach anymore are already off the list
+  const leave = walk && !atNow && (out - now < 30 ? `<small class="lbl here go">Leave now</small>`
+    : `<small class="lbl here">Leave ${out - now >= 3570 ? `at ${clock(out)}` : `in ${Math.round((out - now) / 60)} min`}</small>`);
+  const tag = leave || (early ? `<small class="lbl here">Bus is here</small>` : d.live ? `<small class="live">live</small>` : `<small>scheduled</small>`);
   // Every countdown says what it counts to; "at" when an hour or more out, where mins() shows a clock time.
   const lbl = (word, t) => `<small class="lbl">${word} ${t - now >= 3570 ? "at" : "in"}</small>${mins(t, now)}`;
-  const when = atNow ? `<span class="due">At stop</span>` : go ? `<span class="due">Go now</span>` : walk ? lbl("Leave", d.time - walk * 60)
-    : d.time - now < 30 ? mins(d.time, now) : lbl(early ? "Leaves" : "Bus", d.time);
+  const when = atNow ? `<span class="due">At stop</span>` : d.time - now < 30 ? mins(d.time, now) : lbl(early ? "Leaves" : "Bus", d.time);
   const map = d.live && d.trip ? ` data-trip="${esc(d.trip)}" data-stop="${esc(stopId)}" title="Show this bus on a map"` : "";
   return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)};--len:${routeLabel(d.route).length}">${esc(routeLabel(d.route))}</span>
     <span class="head">${esc(headLabel(d.headsign, d.route))}</span><span class="when">${when}${tag}</span></div>`;
@@ -266,7 +264,7 @@ function alertBox(s, alerts) {
 }
 
 function stopHead(s) {
-  const walk = s.walk ? ` &middot; times show when to leave (${s.walk} min walk${wx.extra ? ` + ${wx.extra} for ${esc(wx.why)}` : ""})` : "";
+  const walk = s.walk ? ` &middot; ${s.walk} min walk${wx.extra ? ` + ${wx.extra} for ${esc(wx.why)}` : ""}` : "";
   return `<div class="stop-head"><h2>${esc(s.name)}<span class="sub">Stop #${esc(s.code)}${s.where ? ` &middot; ${esc(s.where)}` : ""}${walk}</span></h2>
     <button class="icon-btn" data-settings="${esc(s.id)}" aria-label="Settings for ${esc(s.name)}" title="Settings" aria-expanded="${editing.has(s.id)}">
       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
@@ -330,7 +328,7 @@ async function renderAll() {
       main.append(el);
     }
     el.hidden = !!group && s.group !== group;
-    el.classList.toggle("walk", !!s.walk); // walk time set: the card leads with when to leave
+    el.classList.toggle("walk", !!s.walk); // walk time set: the card says when to leave
     return renderStop(s, el);
   }));
   const off = results.some(Boolean);
@@ -927,4 +925,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=90").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=91").catch((e) => console.warn("sw:", e.message));
