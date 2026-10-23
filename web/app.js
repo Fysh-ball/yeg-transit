@@ -86,7 +86,10 @@ function row(d, now, walk = 0, stopId = "") {
   const early = d.at && !atNow; // here already, waiting to leave: the number is when it pulls out, so say that
   const tag = early ? `<small class="live lbl">Bus is here</small>` : d.live ? `<small class="live${busIn ? " lbl" : ""}">${busIn || "live"}</small>` : busIn ? `<small class="lbl">${busIn}</small>` : `<small>scheduled</small>`;
   const go = walk && d.time - walk * 60 - now < 30;
-  const when = atNow ? `<span class="due">At stop</span>` : go ? `<span class="due">Go now</span>` : walk ? `<small class="lbl">Leave in</small>${mins(d.time - walk * 60, now)}` : early ? `<small class="lbl">Leaves in</small>${mins(d.time, now)}` : mins(d.time, now);
+  // Every countdown says what it counts to; "at" when an hour or more out, where mins() shows a clock time.
+  const lbl = (word, t) => `<small class="lbl">${word} ${t - now >= 3570 ? "at" : "in"}</small>${mins(t, now)}`;
+  const when = atNow ? `<span class="due">At stop</span>` : go ? `<span class="due">Go now</span>` : walk ? lbl("Leave", d.time - walk * 60)
+    : d.time - now < 30 ? mins(d.time, now) : lbl(early ? "Leaves" : "Bus", d.time);
   const map = d.live && d.trip ? ` data-trip="${esc(d.trip)}" data-stop="${esc(stopId)}" title="Show this bus on a map"` : "";
   return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)};--len:${routeLabel(d.route).length}">${esc(routeLabel(d.route))}</span>
     <span class="head">${esc(headLabel(d.headsign, d.route))}</span><span class="when">${when}${tag}</span></div>`;
@@ -924,4 +927,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=88").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=89").catch((e) => console.warn("sw:", e.message));
