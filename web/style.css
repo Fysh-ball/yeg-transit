@@ -478,6 +478,6 @@ body.in-edit main > .stop.editing { background: none !important; color: var(--te
 }
 /* Wall board: one column of hero cards, read from across the room. */
 .board main { display: flex; flex-direction: column; gap: 14px; width: min(100%, 760px); margin-inline: auto; }
-.more-routes { display: block; margin: 6px auto 0; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: none; color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+#stops .more-routes { display: block; margin: 6px auto 0; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: none; box-shadow: none; opacity: .85; color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 #stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(66px + env(safe-area-inset-bottom)); } /* both up: stack, don't overlap */
 .native body:not(.board) #stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(150px + env(safe-area-inset-bottom)); }

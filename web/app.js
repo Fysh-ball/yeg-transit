@@ -299,6 +299,7 @@ async function renderAll() {
   const main = $("#stops");
   renderTabs();
   $("#empty").hidden = stops.length > 0;
+  $("#intro").hidden = stops.length > 0; // the pitch is for newcomers and search engines; once stops are saved, leave the space open
   if (!stops.length) $("#tips").hidden = true;
   [...main.children].forEach((c) => { if (!stops.some((s) => s.id === c.dataset.id)) c.remove(); });
   const results = await Promise.all(stops.map((s) => {
@@ -829,4 +830,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=72").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=73").catch((e) => console.warn("sw:", e.message));
