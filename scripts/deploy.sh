@@ -26,7 +26,7 @@ echo "$SHA" | ssh "$H" "cat > $D/server/VERSION && chmod 644 $D/server/VERSION"
 rsync -a web/ "$H:$D/web/"
 rsync -a --exclude __pycache__ tests/ "$H:/tmp/yeg-tests/"
 # Keep the running image as :prev so a bad release rolls back in one command (no auto-rollback).
-${DEPLOY_WRAP:-} ssh -n "$H" "cd $D && { $DK tag yeg-transit:latest yeg-transit:prev 2>/dev/null || true; } && $DK compose build -q && \
+${DEPLOY_WRAP:-} ssh -n "$H" "cd $D && { $DK tag yeg-transit:latest yeg-transit:prev 2>/dev/null || true; } && $DK build -q -t yeg-transit:latest . >/dev/null && \
   $DK run --rm --network none -v /tmp/yeg-tests:/app/tests:ro yeg-transit:latest python -m unittest discover -s /app/tests && \
   $DK compose up -d; s=\$?; rm -f /tmp/yeg-tests/*.py; rmdir /tmp/yeg-tests; exit \$s"
 for i in 1 2 3 4 5 6 7 8 9 10; do
