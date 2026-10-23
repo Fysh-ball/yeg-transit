@@ -4,7 +4,7 @@ services:
     image: yeg-transit:latest
     container_name: yeg-transit
     restart: unless-stopped
-    # Loopback only: the host-network cloudflared publishes it as yegbus.com (and the old bus.fysh.site).
+    # Loopback only: the host-network cloudflared publishes it (bus-pi.fysh.site on the Pi, bus.fysh.site on TrueNAS); yegbus.com is Cloudflare Pages.
     ports: ["127.0.0.1:8792:8792"]
     volumes: ["yeg-data:/data"]
     mem_limit: 512m

@@ -3,5 +3,5 @@ data/
 __pycache__/
 android/build/
 server/VERSION
-scripts/deploy.conf
+scripts/deploy*.conf
 docs/etr-email-draft.md
