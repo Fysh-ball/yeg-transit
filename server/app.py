@@ -621,7 +621,7 @@ class Handler(SimpleHTTPRequestHandler):
             # A flood starves Photon search for everyone (our own places still answer); repeats come from the cache.
             # ponytail: one global cap, not per client; per-IP needs CF-Connecting-IP, or self-host Photon with the Alberta extract.
             url = "https://photon.komoot.io/api/?" + urlencode(
-                {"q": (ALIASES.get(q["q"].strip().lower(), (0, 0))[1] or q["q"])[:80], "limit": 8, "lat": float(q.get("lat", 53.54)), "lon": float(q.get("lon", -113.49)), "bbox": "-113.9,53.35,-113.15,53.75",
+                {"q": (ALIASES.get(q["q"].strip().lower(), (0, 0))[1] or q["q"])[:80], "limit": 8, "lat": round(float(q.get("lat", 53.54)), 2), "lon": round(float(q.get("lon", -113.49)), 2), "bbox": "-113.9,53.35,-113.15,53.75",
                  **({"zoom": 14, "location_bias_scale": 0.1} if "lat" in q else {})})
             with PHOTON_LOCK:
                 if url in PHOTON["cache"]:

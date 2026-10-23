@@ -341,7 +341,7 @@ function showMixed(list, places, q = "") {
 let seq = 0, timer = 0;
 async function suggest(q) {
   const n = ++seq;
-  const at = here ? `&lat=${here.lat}&lon=${here.lon}` : "";
+  const at = here ? `&lat=${here.lat.toFixed(2)}&lon=${here.lon.toFixed(2)}` : ""; // about 1 km: enough to rank, not where you stand
   const stopsP = api(`stops/search?q=${encodeURIComponent(q)}${at}`);
   // Places twice: our own list of shops, schools and landmarks answers at once; Photon (streets, areas) adds more after.
   const placesP = (path) => q.length < 3 ? Promise.resolve([])
@@ -759,7 +759,17 @@ applyBoard();
 
 // Google auto ads: side rails on computers, a bottom banner on phones (formats are set in the AdSense dashboard).
 // Never in the Android app (AdSense in a plain WebView breaks Google's rules) or on the wall board.
+// Interest-based ads only after a yes in Settings (Alberta PIPA, PIPEDA): until then Google is asked for
+// non-personalized ads. Changing it reloads, because AdSense reads the flag once when it starts.
 if (!window.YegApp && !isBoard()) {
+  let adsMode = "off";
+  try { adsMode = localStorage.getItem("yeg.ads") === "on" ? "on" : "off"; } catch (err) { console.warn("ads:", err.message); }
+  (window.adsbygoogle = window.adsbygoogle || []).requestNonPersonalizedAds = adsMode === "on" ? 0 : 1;
+  $("#ads-row").hidden = false; $("#ads-mode").value = adsMode;
+  $("#ads-mode").onchange = (e) => {
+    try { localStorage.setItem("yeg.ads", e.target.value); } catch (err) { console.warn("ads:", err.message); }
+    location.reload();
+  };
   const ad = document.createElement("script");
   ad.async = true; ad.crossOrigin = "anonymous";
   ad.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7605167409778469";
@@ -775,4 +785,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=66").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=67").catch((e) => console.warn("sw:", e.message));
