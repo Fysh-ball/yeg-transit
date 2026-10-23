@@ -286,7 +286,7 @@ async function renderAll() {
   }));
   const off = results.some(Boolean);
   $("#offline").hidden = !off;
-  $("#offline").textContent = off ? "No connection. Showing saved scheduled times instead of live times." : "";
+  $("#offline").textContent = !off ? "" : navigator.onLine ? "Live times are down right now. Showing saved scheduled times instead." : "No connection. Showing saved scheduled times instead of live times.";
   $("#updated").textContent = stops.length && !off ? `Live times, updated ${clock(Date.now() / 1000)}` : "";
 }
 
@@ -763,4 +763,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=60").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=61").catch((e) => console.warn("sw:", e.message));

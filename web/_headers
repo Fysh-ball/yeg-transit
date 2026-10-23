@@ -1,0 +1,6 @@
+# Cloudflare Pages: the same headers server/app.py sends when it serves these files.
+/*
+  Cache-Control: no-cache
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'none'
