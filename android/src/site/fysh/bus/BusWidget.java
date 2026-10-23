@@ -100,7 +100,7 @@ public class BusWidget extends AppWidgetProvider {
         boolean night = (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         boolean glass = look.startsWith("glass"), dark = look.isEmpty() ? night : look.endsWith("dark");
         int fg = glass ? 0xFFFFFFFF : dark ? 0xFFF3EEE2 : 0xFF002114; // dark: cream on green, softer than white
-        int chip = glass ? 0xFFF2F2F2 : dark ? 0xFF9FF5C6 : 0xFF17694A, chipText = glass ? 0xFF17694A : dark ? 0xFF00391F : 0xFFFFFFFF;
+        int chip = glass ? 0xFFF2F2F2 : dark ? 0xFF9FF5C6 : fg, chipText = glass ? 0xFF17694A : dark ? 0xFF00391F : 0xFF9FF5C6;
         RemoteViews v = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_glass : R.layout.widget);
         if (!glass) v.setInt(R.id.root, "setBackgroundResource", dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light);
         for (int id : new int[]{R.id.stop, R.id.clock, R.id.big, R.id.dest}) v.setTextColor(id, fg);

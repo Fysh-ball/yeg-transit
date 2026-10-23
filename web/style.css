@@ -256,7 +256,6 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
   --bg: #f4fbf5; --card: #e9efe9; --card-2: #f4fbf5; --text: #161d19; --muted: #3f4943; --line: #bfc9c1;
   --accent: #17694a; --accent-text: #fff; --live: #17694a; --shadow: none;
   --pc: #9ff5c6; --on-pc: #002114; --sc: #cfe9d9; --on-sc: #0b1f15; --tc: #b8eafb; --on-tc: #001f27; --s3: #e2e9e3; --tint: rgb(255 255 255 / .55);
-  --pc-chip: #17694a; --pc-chip-text: #fff; --tc-chip: #2b6177; --tc-chip-text: #fff;
 }
 @media (prefers-color-scheme: dark) {
   :root[data-look="material"]:not([data-theme="light"]) {
@@ -339,7 +338,7 @@ main > .stop { animation: rise .5s var(--spring) both; }
 [data-look="material"] .route { border-radius: 14px; min-width: 3.1em; padding: 9px 4px; }
 [data-look="material"] .when { font-size: 1.45rem; font-weight: 800; }
 [data-look="material"] .stop.walk { background: var(--tc); color: var(--on-tc); --accent: var(--tc-chip); --accent-text: var(--tc-chip-text); --live: currentColor; }
-/* Badges, wave and "Go now" in the card's chip colour: mint on green in dark, deep green on mint in light, as in sample 5. */
+/* Badges, wave and "Go now" in the card's chip colour: mint on green in dark, dark on mint in light. */
 [data-look="material"] .stop.walk .sub, [data-look="material"] .stop.walk .then { color: inherit; opacity: .78; }
 [data-look="material"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body.board main > .stop:not(.walk)) { background: var(--pc); color: var(--on-pc); --accent: var(--pc-chip); --accent-text: var(--pc-chip-text); --live: currentColor; }
 [data-look="material"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body.board main > .stop) .sub,
