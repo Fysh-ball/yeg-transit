@@ -638,9 +638,9 @@ async function openMap(dep) {
     m.pts = pts;
     drawLine();
   }).catch((e) => console.warn("route line:", e.message));
-  // A pin the bus's size in a 44 px tap area: the old 16 px dot was hard to hit with a thumb.
-  if (s && s.lat) L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "you-pin", iconSize: [44, 44],
-    html: `<span><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h12v10h-5v10h-2V12H6z"/></svg></span>` }) })
+  // A pin the bus's size in a 52 px tap area: the old 16 px dot was hard to hit with a thumb.
+  if (s && s.lat) L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "you-pin", iconSize: [52, 52],
+    html: `<span><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h12v10h-5v10h-2V12H6z"/></svg></span>` }) })
     .bindTooltip("Your stop").addTo(m.layer);
   await placeBus();
   clearInterval(m.timer);
@@ -682,7 +682,7 @@ function drawFleet() { // only the buses in view: a city of pins at once makes a
   const m = mapState, view = m.map.getBounds().pad(0.2), far = m.map.getZoom() < 13;
   const seen = m.buses.filter(([lat, lon]) => view.contains([lat, lon]));
   m.fleet.clearLayers();
-  for (const [lat, lon, , route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [14, 14] : [30, 30],
+  for (const [lat, lon, , route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [40, 40],
     html: `<span class="bus-pin fleet${far ? " far" : ""}">${far ? "" : esc(routeLabel(route))}</span>` }) })
     .bindTooltip(`Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}`).addTo(m.fleet);
   $("#map-note").textContent = `${m.buses.length} buses running, ${seen.length} here. Updates every 15 s.`;
@@ -721,10 +721,10 @@ async function placeBus() {
     m.at = v;
     drawLine();
     if (m.bus) glide(m.bus, [v.lat, v.lon]);
-    else m.bus = L.marker([v.lat, v.lon], { zIndexOffset: 1000, icon: L.divIcon({ className: "", iconSize: [34, 34],
+    else m.bus = L.marker([v.lat, v.lon], { zIndexOffset: 1000, icon: L.divIcon({ className: "", iconSize: [46, 46],
       html: `<span class="bus-pin" style="${esc(m.style)}">${esc(m.label)}</span>` }) }).addTo(m.layer);
     m.others.clearLayers();
-    for (const o of v.others) L.marker(o, { interactive: false, icon: L.divIcon({ className: "", iconSize: [22, 22],
+    for (const o of v.others) L.marker(o, { interactive: false, icon: L.divIcon({ className: "", iconSize: [30, 30],
       html: `<span class="bus-pin other" style="${esc(m.style)}">${esc(m.label)}</span>` }) }).addTo(m.others);
     if (!m.fitted) { m.map.setView([v.lat, v.lon], 16); m.fitted = true; } // open zoomed in on the bus; the stop view is only the wait
     const away = v.before ? "Finishing its run before yours, then it comes to you. " : v.waiting ? "Hasn't started its trip yet. " : v.stops_away === undefined ? "" : v.stops_away === null ? "Already past your stop. "
@@ -913,4 +913,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=81").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=82").catch((e) => console.warn("sw:", e.message));
