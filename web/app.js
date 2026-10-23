@@ -70,7 +70,8 @@ function headLabel(h, r) {
 function row(d, now, walk = 0, stopId = "") {
   const bg = "var(--accent)"; // one brand green, not ETS route colours, so nobody takes this for the official app
   const fg = "var(--accent-text)";
-  const tag = d.live ? `<small class="live">live</small>` : `<small>scheduled</small>`;
+  // A bus waiting early at the stop keeps its countdown (that is when it leaves) but says it is already there.
+  const tag = d.at ? `<small class="live">at stop</small>` : d.live ? `<small class="live">live</small>` : `<small>scheduled</small>`;
   const when = d.at && d.time - now < 60 ? `<span class="due">At stop</span>` : walk && d.time - walk * 60 - now < 30 ? `<span class="due">Go now</span>` : mins(d.time - walk * 60, now);
   const map = d.live && d.trip ? ` data-trip="${esc(d.trip)}" data-stop="${esc(stopId)}" title="Show this bus on a map"` : "";
   return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)}">${esc(routeLabel(d.route))}</span>
@@ -867,4 +868,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=74").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=75").catch((e) => console.warn("sw:", e.message));
