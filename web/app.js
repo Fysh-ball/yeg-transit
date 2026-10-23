@@ -82,9 +82,10 @@ function row(d, now, walk = 0, stopId = "") {
   const atNow = d.at && d.time - now < 60;
   // A bus waiting early at the stop keeps its countdown (that is when it leaves) but says it is already there.
   // With a walk time the big number is when to leave, so the small line says when the bus itself comes.
-  const busIn = walk && `bus ${Math.max(0, Math.round((d.time - now) / 60))} min`;
-  const tag = d.at && !atNow ? `<small class="live">at stop</small>` : d.live ? `<small class="live">${busIn || "live"}</small>` : `<small>${busIn || "scheduled"}</small>`;
-  const when = atNow ? `<span class="due">At stop</span>` : walk && d.time - walk * 60 - now < 30 ? `<span class="due">Go now</span>` : mins(d.time - walk * 60, now);
+  const busIn = walk && `Bus in ${Math.max(0, Math.round((d.time - now) / 60))} min`;
+  const tag = d.at && !atNow ? `<small class="live">at stop</small>` : d.live ? `<small class="live${busIn ? " lbl" : ""}">${busIn || "live"}</small>` : busIn ? `<small class="lbl">${busIn}</small>` : `<small>scheduled</small>`;
+  const go = walk && d.time - walk * 60 - now < 30;
+  const when = atNow ? `<span class="due">At stop</span>` : go ? `<span class="due">Go now</span>` : walk ? `<small class="lbl">Leave in</small>${mins(d.time - walk * 60, now)}` : mins(d.time, now);
   const map = d.live && d.trip ? ` data-trip="${esc(d.trip)}" data-stop="${esc(stopId)}" title="Show this bus on a map"` : "";
   return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)};--len:${routeLabel(d.route).length}">${esc(routeLabel(d.route))}</span>
     <span class="head">${esc(headLabel(d.headsign, d.route))}</span><span class="when">${when}${tag}</span></div>`;
@@ -301,11 +302,11 @@ async function renderStop(s, el) {
     body += `<p class="note">Scheduled times only. Buses may be early or late.</p>`;
   }
   if (offline && smsOk(s)) body += `<a class="sms" href="${smsLink(s)}">Text ${esc(s.code)} to 31100 for live times</a>`;
-  const was = el.querySelector(".lead .when")?.firstChild?.textContent;
+  const was = el.querySelector(".lead .when")?.textContent;
   el.innerHTML = stopHead(s) + (editing.has(s.id) ? settingsPanel(s) : "") + body;
   el.classList.toggle("editing", editing.has(s.id));
   const now2 = el.querySelector(".lead .when");
-  if (was && now2 && now2.firstChild?.textContent !== was) now2.classList.add("tick"); // the new minute rolls in
+  if (was && now2 && now2.textContent !== was) now2.classList.add("tick"); // the new minute rolls in
   return offline;
 }
 
@@ -920,4 +921,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=85").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=86").catch((e) => console.warn("sw:", e.message));
