@@ -8,10 +8,10 @@ AT_1797 = (53.561262, -113.5091)
 KM_SOUTH = (53.552252, -113.5091)  # 1 km south, between stops 10 and 11
 
 
-def run(pos, eta=0, route="201", ets_seq=11):
+def run(pos, eta=0, route="201", ets_seq=11, at_seq=13, bearing=0):
     now = int(time.time())
     sched = [{"trip": "t", "seq": 11, "sched": now + eta, "route": route}]
-    vehicles = {"t": (*pos, 0, now - 10, 13, "r", 0)} if pos else {}
+    vehicles = {"t": (*pos, bearing, now - 10, at_seq, "r", 0)} if pos else {}
     with mock.patch.object(app, "scheduled", lambda *a: [dict(d) for d in sched]), \
             mock.patch.object(app.LIVE, "trips", {"t": ({"1797": now + eta}, 0, {"1797": ets_seq})}), mock.patch.object(app.LIVE, "vehicles", vehicles):
         out = app.departures(fixture(), "1797", 8)
@@ -34,6 +34,10 @@ class Departures(unittest.TestCase):
     def test_only_a_later_pass_left_means_this_one_has_gone(self):  # 918A at WEM, its GPS already on the next trip
         self.assertFalse(run(None, eta=60, ets_seq=31))
         self.assertEqual(run(None, eta=60), {"in": 60, "at": False})
+
+    def test_driving_in_to_start_counts_the_way_round(self):  # 1 km straight, but it starts 2.7 km back at stop 9
+        self.assertTrue(run(KM_SOUTH, at_seq=9, bearing=180)["in"] >= 300)
+        self.assertTrue(110 <= run(KM_SOUTH)["in"] <= 125)  # under way, straight across as before
 
     def test_a_bus_ahead_of_its_prediction_keeps_it(self):
         self.assertEqual(run(KM_SOUTH, eta=600), {"in": 600, "at": False})
@@ -58,3 +62,17 @@ class LoopTrip(unittest.TestCase):
                 mock.patch("sys.stderr", io.StringIO()):
             live.poll()
         self.assertEqual(live.trips["t"][0]["5212"], now + 480)
+
+    def test_the_buss_prediction_beats_the_timetable_copy(self):  # ETS sends both, the bus's first, 77-667 s apart
+        from google.transit import gtfs_realtime_pb2 as g
+        now, feed = int(time.time()), g.FeedMessage()
+        feed.header.gtfs_realtime_version, feed.header.timestamp = "2.0", now
+        for vehicle, at in (("2197", now + 600), ("", now + 300)):
+            tu = feed.entity.add(id="t").trip_update
+            tu.trip.trip_id, tu.vehicle.id = "t", vehicle
+            tu.stop_time_update.add(stop_sequence=1, stop_id="5212").departure.time = at
+        live = app.Live()
+        with mock.patch.object(app, "fetch", lambda *a: io.BytesIO(feed.SerializeToString())), \
+                mock.patch("sys.stderr", io.StringIO()):
+            live.poll()
+        self.assertEqual(live.trips["t"][0]["5212"], now + 600)

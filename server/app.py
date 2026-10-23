@@ -118,6 +118,9 @@ class Live:
             trips, assigned = {}, {}
             for e in feed.entity:
                 tu = e.trip_update
+                # ETS lists some trips twice: its prediction for the bus, then the bare timetable (delay 0), up to 11 min apart
+                if tu.trip.trip_id in assigned and not tu.vehicle.id:
+                    continue
                 stops, delay, seqs = {}, 0, {}
                 for s in tu.stop_time_update:
                     ev = s.departure if s.HasField("departure") else s.arrival
@@ -237,17 +240,24 @@ def departures(db, stop_id, n):
         # 2026-10-22). Where the bus is beats what ETS predicts: at the stop, gone past it, or no sooner than it can drive here.
         v = LIVE.vehicles.get(d["trip"])
         if v and v[4] and here and now - v[3] < 120 and d["route"] not in TRAINS:
+            nxt = next_stop(db, d["trip"], v)
             mine = db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=? AND stop_id=? AND seq>=?",
-                              (d["trip"], stop_id, next_stop(db, d["trip"], v))).fetchone()[0]
-            m = math.hypot(v[0] - here[0], (v[1] - here[1]) * math.cos(math.radians(here[0]))) * 111000
+                              (d["trip"], stop_id, nxt)).fetchone()[0]
+            dist = lambda a, b: math.hypot(a[0] - b[0], (a[1] - b[1]) * math.cos(math.radians(here[0]))) * 111000
+            m = dist(v, here)
             if mine is None:  # it has left this stop; a later ETS time is a loop coming back to end its run (918B at WEM)
                 continue
             elif m <= 40:
                 d["at"] = True  # pulled in, or waiting here for its time
                 out.append(d)
                 continue
-            else:
-                d["time"] = t = max(t, v[3] + int(m / BUS_SPEED))
+            if nxt < mine and nxt <= db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=?", (d["trip"],)).fetchone()[0]:
+                # not left its first stop: it goes there first, then stop by stop to you
+                way = db.execute("SELECT s.lat, s.lon FROM stop_times st JOIN stops s USING(stop_id) WHERE trip_id=? "
+                                 "AND seq>=? AND seq<=? ORDER BY seq", (d["trip"], nxt, mine)).fetchall()
+                # 704 driving in to Southgate TC showed Due 4 stops on, straight across (2026-10-23)
+                m = max(m, dist(v, way[0]) + sum(dist(a, b) for a, b in zip(way, way[1:])))
+            d["time"] = t = max(t, v[3] + int(m / BUS_SPEED))
         if t >= now - 30:
             out.append(d)
     out.sort(key=lambda d: d["time"])
