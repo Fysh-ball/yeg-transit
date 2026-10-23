@@ -103,7 +103,7 @@ public class BusWidget extends AppWidgetProvider {
         int chip = glass ? 0xFFF2F2F2 : dark ? 0xFF9FF5C6 : fg, chipText = glass ? 0xFF17694A : dark ? 0xFF00391F : 0xFF9FF5C6;
         RemoteViews v = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_glass : R.layout.widget);
         if (!glass) v.setInt(R.id.root, "setBackgroundResource", dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light);
-        for (int id : new int[]{R.id.stop, R.id.clock, R.id.big, R.id.dest}) v.setTextColor(id, fg);
+        for (int id : new int[]{R.id.stop, R.id.clock, R.id.big, R.id.dest, R.id.then}) v.setTextColor(id, fg);
         v.removeAllViews(R.id.rows);
         v.setOnClickPendingIntent(R.id.root, PendingIntent.getActivity(c, 0,
             new Intent(c, MainActivity.class), PendingIntent.FLAG_IMMUTABLE));
@@ -112,6 +112,7 @@ public class BusWidget extends AppWidgetProvider {
         int budget = tall ? Math.max(0, (h - 140) / 34) : 0;
         for (int id : new int[]{R.id.bar, R.id.hero, R.id.wave}) v.setViewVisibility(id, View.GONE); // until there's a bus
         v.setViewVisibility(R.id.dest, wide || tall ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.then, wide || tall ? View.VISIBLE : View.GONE);
 
         List<JSONObject> stops = new ArrayList<>();
         try {
@@ -133,8 +134,9 @@ public class BusWidget extends AppWidgetProvider {
             android.util.Log.w("yeg", "weather: " + e);
         }
         int extra = wx.optInt("extra");
-        // One word by the clock when the weather matters: what it's doing now ("Snowy sidewalks"), else "Rain soon".
+        // By the clock: the temperature, plus a word when the weather matters: now ("Snowy sidewalks"), else "Rain later".
         String why = wx.optString("why"), word = why.isEmpty() ? wx.optString("soon") : why.substring(0, 1).toUpperCase() + why.substring(1);
+        if (!wx.isNull("temp") && wx.has("temp")) word = wx.optInt("temp") + "\u00b0" + (word.isEmpty() ? "" : " \u00b7 " + word);
         v.setTextViewText(R.id.wx, word);
         v.setTextColor(R.id.wx, fg);
         v.setViewVisibility(R.id.wx, word.isEmpty() ? View.GONE : View.VISIBLE);
@@ -184,12 +186,12 @@ public class BusWidget extends AppWidgetProvider {
         v.setImageViewBitmap(R.id.cookie, badge(c, route(d), glass ? 2 : 1, tall ? 56 : 44, chip, chipText));
         v.setTextViewText(R.id.big, when(c, d, leave, true));
         v.setTextViewTextSize(R.id.big, TypedValue.COMPLEX_UNIT_SP, tall ? 34 : 28);
-        StringBuilder dest = new StringBuilder(head(d));
+        v.setTextViewText(R.id.dest, head(d));
+        StringBuilder next = new StringBuilder(); // "then 13, 25 min", or the stop when there's no later bus
         List<Long> later = then.get(d.optString("route") + "|" + d.optString("headsign"));
         for (int i = 1; i < Math.min(3, later.size()); i++)
-            dest.append(i == 1 ? " \u00b7 then " : ", ").append(Math.max(0, Math.round((later.get(i) - now) / 60.0)));
-        if (later.size() > 1) dest.append(" min");
-        v.setTextViewText(R.id.dest, dest);
+            next.append(i == 1 ? "then " : ", ").append(Math.max(0, Math.round((later.get(i) - now) / 60.0)));
+        v.setTextViewText(R.id.then, later.size() > 1 ? next + " min" : tall ? "" : d.optString("stop"));
         v.setTextViewText(R.id.stop, d.optString("stop"));
         if (tall) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, Math.min(1f, Math.max(0.04f, 1 - leave / 900f)), glass ? fg : chip));
         for (long[] o : order.subList(1, Math.max(1, Math.min(1 + budget, order.size())))) {
@@ -230,7 +232,7 @@ public class BusWidget extends AppWidgetProvider {
     private static Bitmap badge(Context c, String text, int shape, int sizeDp, int bg, int fg) {
         float dp = c.getResources().getDisplayMetrics().density;
         Paint t = new Paint(Paint.ANTI_ALIAS_FLAG);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD)); // DEFAULT_BOLD drew thin with Samsung's font
         t.setColor(fg);
         t.setTextAlign(Paint.Align.CENTER);
         t.setTextSize(sizeDp * dp * (shape == 0 ? .5f : text.length() > 3 ? .3f : .36f));
