@@ -28,6 +28,9 @@ class Departures(unittest.TestCase):
     def test_bus_past_the_stop_is_gone(self):
         self.assertFalse(run((53.565882, -113.520017)))  # at stop 12
 
+    def test_bus_past_the_stop_is_gone_whatever_ets_says(self):  # a loop's return to its first stop, 22 min out
+        self.assertFalse(run((53.565882, -113.520017), eta=1320))
+
     def test_a_bus_ahead_of_its_prediction_keeps_it(self):
         self.assertEqual(run(KM_SOUTH, eta=600), {"in": 600, "at": False})
 

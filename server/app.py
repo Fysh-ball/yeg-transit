@@ -236,9 +236,8 @@ def departures(db, stop_id, n):
             mine = db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=? AND stop_id=? AND seq>=?",
                               (d["trip"], stop_id, next_stop(db, d["trip"], v))).fetchone()[0]
             m = math.hypot(v[0] - here[0], (v[1] - here[1]) * math.cos(math.radians(here[0]))) * 111000
-            if mine is None:
-                if t < now + 120:
-                    continue  # it has left this stop
+            if mine is None:  # it has left this stop; a later ETS time is a loop coming back to end its run (918B at WEM)
+                continue
             elif m <= 40:
                 d["at"] = True  # pulled in, or waiting here for its time
                 out.append(d)
