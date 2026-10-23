@@ -618,7 +618,9 @@ async function openMap(dep) {
     m.pts = pts;
     drawLine();
   }).catch((e) => console.warn("route line:", e.message));
-  if (s && s.lat) L.circleMarker([s.lat, s.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#17694a", fillOpacity: 1 })
+  // A pin the bus's size in a 44 px tap area: the old 16 px dot was hard to hit with a thumb.
+  if (s && s.lat) L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "you-pin", iconSize: [44, 44],
+    html: `<span><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h12v10h-5v10h-2V12H6z"/></svg></span>` }) })
     .bindTooltip("Your stop").addTo(m.layer);
   await placeBus();
   clearInterval(m.timer);
@@ -815,4 +817,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=70").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=71").catch((e) => console.warn("sw:", e.message));

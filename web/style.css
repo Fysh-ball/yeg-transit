@@ -185,6 +185,9 @@ footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1p
 #map-note { margin: 0; padding: 8px 14px calc(10px + env(safe-area-inset-bottom)); color: var(--muted); font-size: .82rem; }
 .bus-pin { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-weight: 800; font-size: 13px;
   border: 3px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+.you-pin { display: grid; place-items: center; }
+.you-pin span { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #17694a; color: #fff;
+  border: 3px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
 .bus-pin.other { width: 22px; height: 22px; font-size: 9px; border-width: 2px; opacity: .55; }
 
 /* Route lines: tap to list that route's buses. */
