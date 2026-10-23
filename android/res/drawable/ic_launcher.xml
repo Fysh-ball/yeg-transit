@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Same bus as web/icon.svg. -->
+<!-- Same logo as web/icon.svg: a bus stop sign on a pole. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp"
   android:viewportWidth="512" android:viewportHeight="512">
   <path android:fillColor="#FF17694A" android:pathData="M96,0h320a96,96 0 0 1 96,96v320a96,96 0 0 1 -96,96h-320a96,96 0 0 1 -96,-96v-320a96,96 0 0 1 96,-96z"/>
-  <path android:fillColor="#FFFFFFFF" android:pathData="M172,112h168a36,36 0 0 1 36,36v176a36,36 0 0 1 -36,36h-168a36,36 0 0 1 -36,-36v-176a36,36 0 0 1 36,-36z"/>
-  <path android:fillColor="#FF17694A" android:pathData="M176,148h160a12,12 0 0 1 12,12v72a12,12 0 0 1 -12,12h-160a12,12 0 0 1 -12,-12v-72a12,12 0 0 1 12,-12z"/>
-  <path android:fillColor="#FF17694A" android:pathData="M174,304a22,22 0 1 0 44,0a22,22 0 1 0 -44,0z"/>
-  <path android:fillColor="#FF17694A" android:pathData="M294,304a22,22 0 1 0 44,0a22,22 0 1 0 -44,0z"/>
-  <path android:fillColor="#FFFFFFFF" android:pathData="M170,360h20a10,10 0 0 1 10,10v24a10,10 0 0 1 -10,10h-20a10,10 0 0 1 -10,-10v-24a10,10 0 0 1 10,-10z"/>
-  <path android:fillColor="#FFFFFFFF" android:pathData="M322,360h20a10,10 0 0 1 10,10v24a10,10 0 0 1 -10,10h-20a10,10 0 0 1 -10,-10v-24a10,10 0 0 1 10,-10z"/>
+  <group android:pivotX="256" android:pivotY="256" android:scaleX="0.88" android:scaleY="0.88">
+    <path android:fillColor="#FFA6F0C6" android:pathData="M252,296h8a10,10 0 0 1 10,10v116a10,10 0 0 1 -10,10h-8a10,10 0 0 1 -10,-10v-116a10,10 0 0 1 10,-10zM216,420h80a12,12 0 0 1 12,12v0a12,12 0 0 1 -12,12h-80a12,12 0 0 1 -12,-12v-0a12,12 0 0 1 12,-12z"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M180,60h152a44,44 0 0 1 44,44v156a44,44 0 0 1 -44,44h-152a44,44 0 0 1 -44,-44v-156a44,44 0 0 1 44,-44z"/>
+    <path android:fillColor="#FF17694A" android:strokeColor="#FF17694A" android:strokeWidth="20" android:strokeLineJoin="round" android:pathData="M230,96H318V266H194V178Z"/>
+    <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="8" android:strokeLineJoin="round" android:pathData="M238,114H302V168H214Z"/>
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="10" android:strokeLineCap="round" android:pathData="M210,214H302"/>
+    <path android:fillColor="#FFFFFFFF" android:pathData="M221,240a11,11 0 1 0 22,0a11,11 0 1 0 -22,0zM269,240a11,11 0 1 0 22,0a11,11 0 1 0 -22,0z"/>
+  </group>
 </vector>
