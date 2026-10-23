@@ -142,14 +142,14 @@ function drawWaves() {
     if (f >= 1 && !w.arrived) { w.arrived = true; svg.closest(".dep").querySelector(".route").classList.add("arrive"); }
     if (f < 1) w.arrived = false;
     waves.set(id, w);
-    const end = w.cur * W - w.bus * 26, pts = []; // the line runs under the bus, not past it
+    const end = w.cur * W, pts = [];
     for (let x = 0; x <= end; x += 2.5) pts.push(`${x ? "L" : "M"}${x.toFixed(1)} ${(12 + w.amp * Math.pow(1 - x / end, 0.85) * Math.sin(x * 330 / W / 9 - w.phase)).toFixed(2)}`);
     pts.push(`L${end.toFixed(1)} 12`);
     svg.querySelector(".fill").setAttribute("d", pts.join(""));
-    svg.querySelector(".track").setAttribute("d", end < W && w.bus < 0.5 ? `M${end.toFixed(1)} 12H${W}` : "");
+    svg.querySelector(".track").setAttribute("d", end < W ? `M${end.toFixed(1)} 12H${W}` : "");
     const bus = svg.querySelector(".bus"), ease = 1 - Math.pow(1 - w.bus, 3);
     bus.setAttribute("opacity", Math.min(1, w.bus * 2).toFixed(2));
-    bus.setAttribute("transform", `translate(${(W - 52 - (1 - ease) * W * 0.4).toFixed(1)} -6.2) scale(1.3)`);
+    bus.setAttribute("transform", `translate(${(W - 53 - (1 - ease) * W * 0.4).toFixed(1)} -8.1) scale(1.3)`);
   }
   requestAnimationFrame(drawWaves);
 }
@@ -775,4 +775,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=65").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=66").catch((e) => console.warn("sw:", e.message));
