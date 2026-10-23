@@ -6,7 +6,8 @@ set -e
 [ -f scripts/deploy.conf ] && . ./scripts/deploy.conf
 H=${DEPLOY_HOST:?set DEPLOY_HOST=user@host in scripts/deploy.conf}
 D=${DEPLOY_DIR:?set DEPLOY_DIR=/path/to/stack in scripts/deploy.conf}
-SITE=${SITE:-https://yegbus.com}
+# The TrueNAS copy itself: yegbus.com is Cloudflare Pages now (built from GitHub on push), so it would not show this deploy.
+SITE=${SITE:-https://bus.fysh.site}
 # A shared box can run the build under a RAM lock (DEPLOY_WRAP="ramlock run yeg-transit-deploy 2 --"); empty runs it directly.
 [ -z "$(git status --porcelain)" ] || { echo "working tree not clean; commit first" >&2; exit 1; }
 V=$(grep -oE 'yeg-v[0-9]+' web/sw.js | head -1)
