@@ -100,7 +100,7 @@ def refresh_gtfs():
 
 
 class Live:
-    """Latest TripUpdates: trip_id -> (list of (stop_id, epoch or None if skipped), last delay).
+    """Latest TripUpdates: trip_id -> ({stop_id: epoch, or None if skipped}, last delay, {stop_id: ETS stop sequence}).
     Latest VehiclePositions: trip_id -> (lat, lon, bearing, epoch, stop sequence it is at or heading to, route_id, direction).
     Active Alerts (stop closed, moved, detoured): stop_id -> [{effect, head, text, routes, until}], every 5 min."""
 
@@ -118,7 +118,7 @@ class Live:
             trips, assigned = {}, {}
             for e in feed.entity:
                 tu = e.trip_update
-                stops, delay = {}, 0
+                stops, delay, seqs = {}, 0, {}
                 for s in tu.stop_time_update:
                     ev = s.departure if s.HasField("departure") else s.arrival
                     delay = ev.delay or delay
@@ -126,7 +126,8 @@ class Live:
                     # not the arrival back 30 min later. Passes ETS has already dropped leave the next one first.
                     if s.stop_id not in stops:
                         stops[s.stop_id] = None if s.schedule_relationship == SKIPPED else (ev.time or None)
-                trips[tu.trip.trip_id] = (stops, delay)
+                        seqs[s.stop_id] = s.stop_sequence
+                trips[tu.trip.trip_id] = (stops, delay, seqs)
                 if tu.vehicle.id:
                     assigned[tu.trip.trip_id] = tu.vehicle.id
             self.trips, self.assigned, self.ts, self.error = trips, assigned, feed.header.timestamp, None
@@ -197,13 +198,13 @@ def scheduled(db, stop_id, start, end):
         lo, hi = start - base, end - base
         if hi < 0 or lo > 30 * 3600:
             continue
-        for trip_id, dep, hs, short, color, text_color, ths in db.execute("""
-            SELECT st.trip_id, st.dep, st.headsign, r.short, r.color, r.text_color, t.headsign
+        for trip_id, seq, dep, hs, short, color, text_color, ths in db.execute("""
+            SELECT st.trip_id, st.seq, st.dep, st.headsign, r.short, r.color, r.text_color, t.headsign
             FROM stop_times st JOIN trips t USING(trip_id) JOIN routes r USING(route_id)
             WHERE st.stop_id=? AND st.dep>=? AND st.dep<?
               AND t.service_id IN (SELECT service_id FROM service_dates WHERE date=?)""",
                 (stop_id, lo, hi, date)):
-            out.append({"trip": trip_id, "sched": base + dep, "route": short, "color": color,
+            out.append({"trip": trip_id, "seq": seq, "sched": base + dep, "route": short, "color": color,
                         "text_color": text_color, "headsign": ths or hs or ""})
     out.sort(key=lambda d: d["sched"])
     return out
@@ -219,10 +220,13 @@ def departures(db, stop_id, n):
     out = []
     for d in scheduled(db, stop_id, now - 1800, now + 3 * 3600):
         live = LIVE.trips.get(d["trip"])
-        t = d["sched"]
+        t, seq = d["sched"], d.pop("seq")
         if live:
-            stops, delay = live
-            if stop_id in stops:
+            stops, delay, seqs = live
+            # ETS numbers stops as GTFS does (5,100 of 5,100 on 2026-10-23), plus an end-of-run stop past the last one.
+            if seqs.get(stop_id, 0) > seq:  # only a later pass is left: this one has gone (918A ending its loop at WEM)
+                continue
+            if stop_id in stops and seqs[stop_id] in (0, seq):
                 if stops[stop_id] is None:
                     continue
                 t = stops[stop_id]

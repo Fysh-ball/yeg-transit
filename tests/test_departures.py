@@ -8,12 +8,12 @@ AT_1797 = (53.561262, -113.5091)
 KM_SOUTH = (53.552252, -113.5091)  # 1 km south, between stops 10 and 11
 
 
-def run(pos, eta=0, route="201"):
+def run(pos, eta=0, route="201", ets_seq=11):
     now = int(time.time())
-    sched = [{"trip": "t", "sched": now + eta, "route": route}]
-    vehicles = {"t": (*pos, 0, now - 10, 13, "r", 0)}
+    sched = [{"trip": "t", "seq": 11, "sched": now + eta, "route": route}]
+    vehicles = {"t": (*pos, 0, now - 10, 13, "r", 0)} if pos else {}
     with mock.patch.object(app, "scheduled", lambda *a: [dict(d) for d in sched]), \
-            mock.patch.object(app.LIVE, "trips", {"t": ({"1797": now + eta}, 0)}), mock.patch.object(app.LIVE, "vehicles", vehicles):
+            mock.patch.object(app.LIVE, "trips", {"t": ({"1797": now + eta}, 0, {"1797": ets_seq})}), mock.patch.object(app.LIVE, "vehicles", vehicles):
         out = app.departures(fixture(), "1797", 8)
     return out and {"in": out[0]["time"] - now, "at": out[0].get("at", False)}
 
@@ -30,6 +30,10 @@ class Departures(unittest.TestCase):
 
     def test_bus_past_the_stop_is_gone_whatever_ets_says(self):  # a loop's return to its first stop, 22 min out
         self.assertFalse(run((53.565882, -113.520017), eta=1320))
+
+    def test_only_a_later_pass_left_means_this_one_has_gone(self):  # 918A at WEM, its GPS already on the next trip
+        self.assertFalse(run(None, eta=60, ets_seq=31))
+        self.assertEqual(run(None, eta=60), {"in": 60, "at": False})
 
     def test_a_bus_ahead_of_its_prediction_keeps_it(self):
         self.assertEqual(run(KM_SOUTH, eta=600), {"in": 600, "at": False})

@@ -59,15 +59,15 @@ class Transfer(unittest.TestCase):
         self.assertEqual((t["status"], t["plan"]["time"]), ("on_track", BASE + hm(12, 25)))
 
     def test_three_min_late_is_tight(self):
-        t = self.first({"t1": ({"B": BASE + hm(12, 23)}, 180)})
+        t = self.first({"t1": ({"B": BASE + hm(12, 23)}, 180, {"B": 2})})
         self.assertEqual(t["status"], "tight")
 
     def test_five_min_late_is_missed_with_the_next_one(self):
-        t = self.first({"t1": ({"B": BASE + hm(12, 25)}, 300)})
+        t = self.first({"t1": ({"B": BASE + hm(12, 25)}, 300, {"B": 2})})
         self.assertEqual((t["status"], t["next"]["time"]), ("missed", BASE + hm(12, 45)))
 
     def test_late_at_the_start_carries_to_the_change(self):
-        t = self.first({"t1": ({"A": BASE + hm(12, 15)}, 300)})  # no prediction for B yet
+        t = self.first({"t1": ({"A": BASE + hm(12, 15)}, 300, {"A": 1})})  # no prediction for B yet
         self.assertEqual((t["arrive"], t["status"]), (BASE + hm(12, 25), "missed"))
 
 
