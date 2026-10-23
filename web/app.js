@@ -674,6 +674,12 @@ $("#look").onchange = (e) => {
   try { e.target.value ? localStorage.setItem("yeg.look", e.target.value) : localStorage.removeItem("yeg.look"); } catch (err) { console.warn("look:", err.message); }
   sync(); // the widget follows
 };
+// A computer has no "phone" and isn't turned sideways: say "system", and the wall board is just on or off.
+if (!window.YegApp && matchMedia("(hover: hover) and (pointer: fine)").matches && !navigator.maxTouchPoints) {
+  for (const o of document.querySelectorAll('#look option[value=""], #theme option[value=""]')) o.textContent = "Match system";
+  $('#board-mode option[value="auto"]').hidden = true;
+}
+
 // Widget: the app's card, or clear with a ring (sample 9 D). Only apps from 1.20 have the bridge for it.
 if (window.YegApp?.widget) $("#widget-row").hidden = false;
 try { $("#widget").value = localStorage.getItem("yeg.widget") || "card"; } catch { /* storage blocked: card */ }
@@ -730,7 +736,7 @@ $("#board-exit").onclick = () => {
   if (location.hash === "#board") history.replaceState(null, "", location.pathname + location.search);
   applyBoard();
 };
-$("#board-mode").value = boardMode;
+$("#board-mode").value = boardMode === "auto" && $('#board-mode option[value="auto"]').hidden ? "off" : boardMode; // a computer: "sideways" is off
 $("#board-mode").onchange = (e) => {
   boardMode = e.target.value; boardExited = false;
   try { localStorage.setItem("yeg.board", boardMode); } catch (err) { console.warn("board:", err.message); }
@@ -757,4 +763,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=59").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=60").catch((e) => console.warn("sw:", e.message));

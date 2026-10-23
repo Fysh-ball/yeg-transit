@@ -409,6 +409,19 @@ body.in-prefs #prefs:not([hidden]) { background: none; border: 0; box-shadow: no
 #prefs .links a::after { content: "\203A"; margin-left: auto; font-size: 1.4rem; color: var(--muted); }
 #prefs .links + .hint { font-size: .75rem; }
 [data-look="glass"] #prefs label, [data-look="glass"] #prefs .links a { background: var(--glass); border: 1px solid var(--glass-line); }
+#prefs label[hidden] { display: none; } /* the Widget row, outside the app */
+[data-look="material"] #prefs label, [data-look="material"] #prefs .links a { background: var(--sc); color: var(--on-sc); } /* green tonal tiles */
+[data-look="material"] #prefs .links a::after { color: inherit; opacity: .7; }
+/* A wide screen: settings on the left, links and licence on the right. */
+@media (min-width: 900px) {
+  body.in-prefs:not(.board) { max-width: 960px; }
+  body.in-prefs:not(.board) #prefs { width: 100%; }
+  body.in-prefs #prefs:not([hidden]) { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; align-content: start; }
+  #prefs .prefs-bar { grid-column: 1 / -1; }
+  #prefs > label, #prefs > .hint:first-of-type { grid-column: 1; }
+  #prefs .links { grid-column: 2; grid-row: 2 / span 6; align-self: start; }
+  #prefs .links + .hint { grid-column: 1; }
+}
 .app footer .legal { display: none; } /* the app keeps it in Settings */
 /* Update and out-of-date notes: a small pill floating at the bottom, not a box in the page. */
 #stale:not([hidden]) { position: fixed; z-index: 6; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px);
