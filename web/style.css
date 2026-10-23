@@ -37,6 +37,8 @@ header {
   padding: calc(12px + env(safe-area-inset-top)) 0 12px; background: var(--bg);
 }
 .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+header h1, #add-btn { white-space: nowrap; }
+@media (max-width: 399px) { header h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
 a.brand { color: inherit; text-decoration: none; }
 .brand img { width: 32px; height: 32px; border-radius: 8px; }
 h1 { font-size: 1.15rem; margin: 0; letter-spacing: -.01em; }
@@ -188,6 +190,8 @@ footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1p
 .you-pin { display: grid; place-items: center; }
 .you-pin span { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #17694a; color: #fff;
   border: 3px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
+.bus-pin.fleet { width: 30px; height: 30px; font-size: 11px; border-width: 2px; background: var(--accent); color: var(--accent-text); box-sizing: border-box; }
+.bus-pin.fleet.far { width: 14px; height: 14px; }
 .bus-pin.other { width: 22px; height: 22px; font-size: 9px; border-width: 2px; opacity: .55; }
 
 /* Route lines: tap to list that route's buses. */
@@ -228,7 +232,7 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
 #prefs .hint { margin: 8px 0 0; }
 #board-exit { display: none; }
 .board #board-exit { display: inline-grid; border-color: transparent; background: none; opacity: .5; }
-.board #prefs-btn { display: none; }
+.board :is(#prefs-btn, #live-map) { display: none; }
 .board .adsbygoogle { display: none !important; } /* board switched on after ads loaded */
 /* Map pin card */
 .stop-pin { width: 30px; height: 30px; font-size: 14px; }

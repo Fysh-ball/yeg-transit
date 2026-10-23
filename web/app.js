@@ -612,12 +612,7 @@ async function openMap(dep) {
   $("#map-title").innerHTML = `Route ${esc(label.textContent)} to ${esc(head)}<span class="sub">${esc(s ? s.name : "")}</span>`;
   $("#map-note").textContent = "Finding the bus...";
   $("#map-sheet").showModal();
-  try { await loadLeaflet(); } catch (e) { $("#map-note").textContent = `Map unavailable: ${e.message}`; return; }
-  if (!mapState) {
-    const map = L.map("map-box", { zoomControl: false, maxZoom: 19 });
-    baseMap(map);
-    mapState = { map, layer: L.layerGroup().addTo(map), timer: 0 };
-  }
+  if (!await sheetMap()) return;
   const m = mapState;
   m.trip = dep.dataset.trip; m.stop = s; m.style = label.getAttribute("style"); m.fitted = false;
   m.label = label.textContent; m.bus = null; m.at = null; m.others = L.layerGroup();
@@ -638,6 +633,47 @@ async function openMap(dep) {
   await placeBus();
   clearInterval(m.timer);
   m.timer = setInterval(placeBus, 15000);
+}
+async function sheetMap() {
+  try { await loadLeaflet(); } catch (e) { $("#map-note").textContent = `Map unavailable: ${e.message}`; return false; }
+  if (!mapState) {
+    const map = L.map("map-box", { zoomControl: false, maxZoom: 19 });
+    baseMap(map);
+    mapState = { map, layer: L.layerGroup().addTo(map), timer: 0 };
+    map.on("moveend", () => { if (mapState.trip === "all") drawFleet(); });
+  }
+  clearInterval(mapState.timer);
+  return true;
+}
+// Every bus in the city, live. The server keeps one copy of ETS's positions for everyone, so watching costs ETS nothing.
+async function openLiveMap() {
+  $("#map-title").innerHTML = `Every bus, live<span class="sub">Tap a bus to see where it's going</span>`;
+  $("#map-note").textContent = "Finding buses...";
+  $("#map-sheet").showModal();
+  if (!await sheetMap()) return;
+  const m = mapState, home = stops.find((s) => s.lat);
+  m.trip = "all"; m.buses = []; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
+  m.map.invalidateSize();
+  m.map.setView(home ? [home.lat, home.lon] : [53.5461, -113.4938], 14); // your first stop, or downtown
+  await placeFleet();
+  m.timer = setInterval(placeFleet, 15000);
+}
+async function placeFleet() {
+  try {
+    const d = await api("vehicles");
+    if (mapState.trip !== "all") return;
+    mapState.buses = d.buses;
+    drawFleet();
+  } catch (e) { if (mapState.trip === "all") $("#map-note").textContent = `Can't get bus positions (${e.message}).`; }
+}
+function drawFleet() { // only the buses in view: a city of pins at once makes a phone crawl
+  const m = mapState, view = m.map.getBounds().pad(0.2), far = m.map.getZoom() < 13;
+  const seen = m.buses.filter(([lat, lon]) => view.contains([lat, lon]));
+  m.fleet.clearLayers();
+  for (const [lat, lon, , route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [14, 14] : [30, 30],
+    html: `<span class="bus-pin fleet${far ? " far" : ""}">${far ? "" : esc(routeLabel(route))}</span>` }) })
+    .bindTooltip(`Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}`).addTo(m.fleet);
+  $("#map-note").textContent = `${m.buses.length} buses running, ${seen.length} here. Updates every 15 s.`;
 }
 // Slide the bus to its new spot over 2 s instead of jumping, like the big apps do.
 function glide(marker, to) {
@@ -689,6 +725,7 @@ async function placeBus() {
 }
 function closeMap() { if (mapState) clearInterval(mapState.timer); $("#map-sheet").close(); }
 $("#map-close").onclick = closeMap;
+$("#live-map").onclick = openLiveMap;
 $("#map-sheet").addEventListener("close", () => mapState && clearInterval(mapState.timer));
 $("#map-sheet").addEventListener("click", (e) => { if (e.target.id === "map-sheet") closeMap(); }); // tap the backdrop
 
@@ -830,4 +867,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=73").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=74").catch((e) => console.warn("sw:", e.message));

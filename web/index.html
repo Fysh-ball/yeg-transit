@@ -45,12 +45,15 @@ if (window.YegApp || navigator.standalone || matchMedia("(display-mode: standalo
 if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add button can float
 // The app's bridge (YegApp) is open to every frame in the page, so in the app no frame may load at all.
 if (window.YegApp) document.head.append(Object.assign(document.createElement("meta"), { httpEquiv: "Content-Security-Policy", content: "frame-src 'none'" }));</script>
-<link rel="stylesheet" href="style.css?v=73">
+<link rel="stylesheet" href="style.css?v=74">
 </head>
 <body>
 <header>
   <div class="brand"><img src="icon.svg" alt=""><h1>YEG Bus</h1></div>
   <span id="clock"></span>
+  <button id="live-map" class="icon-btn" type="button" aria-label="Every bus, live map" title="Every bus, live">
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>
+  </button>
   <button id="prefs-btn" class="icon-btn" aria-expanded="false" aria-controls="prefs" aria-label="Settings" title="Settings">
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
   </button>
@@ -140,6 +143,6 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
   <p class="legal">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
   <a href="guide.html">Help</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
 </footer>
-<script src="app.js?v=73"></script>
+<script src="app.js?v=74"></script>
 </body>
 </html>

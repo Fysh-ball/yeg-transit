@@ -248,6 +248,24 @@ def departures(db, stop_id, n):
     return out[:n]
 
 
+FLEET = [None, []]  # the LIVE.vehicles dict the list was built from, the list
+
+
+def fleet(db):
+    """Every bus with a fresh position, as [lat, lon, bearing, route, headsign, trip]. Built once per feed poll
+    (LIVE.vehicles is a new dict each time), so the live map costs one ETS download per 30 s however many watch it."""
+    vehicles = LIVE.vehicles
+    if FLEET[0] is not vehicles:
+        now, out = int(time.time()), []
+        for trip, v in vehicles.items():
+            r = now - v[3] < 300 and db.execute("SELECT r.short, t.headsign FROM trips t JOIN routes r USING(route_id) "
+                                                "WHERE t.trip_id=?", (trip,)).fetchone()
+            if r:
+                out.append([round(v[0], 5), round(v[1], 5), round(v[2] or 0), r[0], r[1] or "", trip])
+        FLEET[:] = [vehicles, out]
+    return FLEET[1]
+
+
 def stop_alerts(db, stop_id, code):
     """ETS alerts naming this stop, one per message (ETS repeats it per route), with the stops it says to use instead."""
     merged = {}
@@ -570,6 +588,8 @@ class Handler(SimpleHTTPRequestHandler):
                               "vehicles": len(LIVE.vehicles), "vehicle_error": LIVE.vp_error})
         if parts == ["version"]:
             return self.json({"sha": SHA})
+        if parts == ["vehicles"]:
+            return self.json({"now": int(time.time()), "buses": fleet(db)}, cache=10)
         if parts == ["weather"]:
             return self.json(walk_weather(), cache=600)
         if len(parts) == 3 and parts[0] == "trips" and parts[2] == "shape":
