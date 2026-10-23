@@ -387,8 +387,8 @@ async function nearby(from, title, you = false) {
   try { await loadLeaflet(); } catch (e) { $(".near-map").textContent = `Map unavailable: ${e.message}`; return; }
   if (!$("#near-map")) return; // the list changed while the map library loaded
   if (nearMap) nearMap.remove();
-  nearMap = L.map("near-map", { zoomControl: false, attributionControl: false });
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(nearMap);
+  nearMap = L.map("near-map", { zoomControl: false, maxZoom: 19 });
+  baseMap(nearMap);
   L.circleMarker([from.lat, from.lon], { radius: 8, color: "#fff", weight: 3, fillColor: you ? "#17694a" : "#d93025", fillOpacity: 1 })
     .bindTooltip(you ? "You" : esc(from.name || "Here")).addTo(nearMap);
   // Tap a pin: a card naming the stop, with Add (pins sit close together, so no add on the first tap).
@@ -577,19 +577,32 @@ $("#groups").onclick = (e) => {
 
 // Bus map: tap a live bus. Leaflet loads on first use; the position refreshes every 15 s while open.
 let mapState = null;
-function loadLeaflet() {
-  if (window.L) return Promise.resolve();
-  const css = document.createElement("link");
-  css.rel = "stylesheet"; css.crossOrigin = "anonymous"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-  css.integrity = "sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==";
-  document.head.append(css);
-  return new Promise((ok, fail) => {
-    const js = document.createElement("script");
-    js.crossOrigin = "anonymous"; js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
-    js.integrity = "sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==";
-    js.onload = ok; js.onerror = () => fail(new Error("map library did not load"));
-    document.head.append(js);
-  });
+function loadFile(src, integrity) {
+  const css = src.endsWith(".css"), el = document.createElement(css ? "link" : "script");
+  if (css) el.rel = "stylesheet";
+  el.crossOrigin = "anonymous"; el[css ? "href" : "src"] = src; el.integrity = integrity;
+  return new Promise((ok, fail) => { el.onload = ok; el.onerror = () => fail(new Error("map library did not load")); document.head.append(el); });
+}
+let mapLib = null;
+function loadLeaflet() { // Leaflet draws the pins and lines; MapLibre draws OpenFreeMap's plain base map under them
+  return mapLib ??= Promise.all([
+    loadFile("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css", "sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw=="),
+    loadFile("https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css", "sha512-qN/uDg9bS3IAldWq4lswyC+9ZSoShtfyNDp+FaJhdtXJqdgubHA+s4nB8BajW0m90Y0+RBGbqu2anzbxiQYdHA=="),
+    loadFile("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js", "sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g=="),
+    loadFile("https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js", "sha512-dXgoFR02YHJ9Fa29P3D/1umNaZ0EXS2N0w29Lm3b/1BK8UDLMdLWDFwuujIyJJdU27/PLuk3dmS1V9NO8ABX1A=="),
+  ]).then(() => loadFile("https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.min.js",
+    "sha512-baUs1iJo1j5p13bQBdGKGW+C8z5q0+vAi/8B75SSFjaUgvZV5Tl7LAB9aNHgSX7gzbb9FAggLdbloV9KPYRUmw==")).catch((e) => { mapLib = null; throw e; });
+}
+// OpenFreeMap's grey Positron (free, no usage limits, unlike OpenStreetMap's own tile servers), with parks and water
+// tinted like Google's so the city still reads at a glance.
+const TINT = { park: ["fill-color", "#cdebd2"], landcover_wood: ["fill-color", "#d3edd6"], water: ["fill-color", "#aad8ee"], waterway: ["line-color", "#aad8ee"] };
+function baseMap(map) {
+  const gl = L.maplibreGL({ style: "https://tiles.openfreemap.org/styles/positron",
+    attribution: '<a href="https://openfreemap.org">OpenFreeMap</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' });
+  gl.once("add", () => gl.getMaplibreMap().on("load", (e) => { // its MapLibre map exists only once Leaflet has a view
+    for (const [id, [k, v]] of Object.entries(TINT)) if (e.target.getLayer(id)) e.target.setPaintProperty(id, k, v);
+  }));
+  gl.addTo(map);
 }
 async function openMap(dep) {
   const s = stops.find((x) => x.id === dep.dataset.stop);
@@ -600,9 +613,8 @@ async function openMap(dep) {
   $("#map-sheet").showModal();
   try { await loadLeaflet(); } catch (e) { $("#map-note").textContent = `Map unavailable: ${e.message}`; return; }
   if (!mapState) {
-    const map = L.map("map-box", { zoomControl: false });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
+    const map = L.map("map-box", { zoomControl: false, maxZoom: 19 });
+    baseMap(map);
     mapState = { map, layer: L.layerGroup().addTo(map), timer: 0 };
   }
   const m = mapState;
@@ -817,4 +829,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=71").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=72").catch((e) => console.warn("sw:", e.message));
