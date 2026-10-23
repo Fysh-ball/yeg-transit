@@ -162,13 +162,15 @@ footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1p
 #clock { display: none; }
 
 /* Wall board: read from across the room. */
-.board { max-width: none; font-size: clamp(18px, 2.6vw, 34px); }
+.board { max-width: none; height: 100dvh; overflow: hidden; padding-bottom: 16px; font-size: clamp(14px, min(2.6vw, 4.4vh), 34px); }
 .board #add-btn, .board #add, .board footer, .board .stop-head button, .board .settings, .board #tips, .board .updated { display: none; }
 .board header { position: relative; } /* not sticky, but still the box for the Glass blur layer */
 .board .brand img { width: 1.4em; height: 1.4em; }
 .board #clock { display: block; font-size: 1.6em; font-weight: 800; font-variant-numeric: tabular-nums; }
 .board h1 { font-size: 1em; color: var(--muted); }
-.board main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15em), 1fr)); gap: 0 16px; }
+.board main { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15em), 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 16px; pointer-events: none; }
+.board main > .stop { min-height: 0; overflow: hidden; margin: 0; }
+.board #stops .more-routes { display: none; }
 .board .stop-head h2 { font-size: 1em; }
 .board .when { font-size: 1.1em; }
 .board .when small { font-size: .6em; }
@@ -480,8 +482,6 @@ body.in-edit main > .stop.editing { background: none !important; color: var(--te
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: .01s !important; }
 }
-/* Wall board: one column of hero cards, read from across the room. */
-.board main { display: flex; flex-direction: column; gap: 14px; width: min(100%, 760px); margin-inline: auto; }
 #stops .more-routes { display: block; margin: 6px auto 0; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: none; box-shadow: none; opacity: .85; color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 #stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(66px + env(safe-area-inset-bottom)); } /* both up: stack, don't overlap */
 .native body:not(.board) #stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(150px + env(safe-area-inset-bottom)); }

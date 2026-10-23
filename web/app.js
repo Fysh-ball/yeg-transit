@@ -6,6 +6,15 @@ let stops = load();
 if (!stops.length && window.YegApp && YegApp.stops) {
   try { stops = clean(JSON.parse(YegApp.stops())); } catch (e) { console.warn("widget stops:", e.message); }
 }
+// Before v76, "Show more routes" saved "Buses to show" as 10 with no way back. Undo that once (a 10 picked in settings goes too).
+try {
+  if (!localStorage.getItem("yeg.n10")) {
+    const hit = stops.filter((s) => s.n === 10);
+    hit.forEach((s) => delete s.n);
+    if (hit.length) save();
+    localStorage.setItem("yeg.n10", "1");
+  }
+} catch (e) { console.warn("n10:", e.message); }
 
 function load() {
   try { return clean(JSON.parse(localStorage.getItem(KEY))); } catch { return []; }
@@ -816,11 +825,41 @@ async function checkVersion() {
   } catch (e) { console.warn("version:", e.message); }
 }
 $("#stale-reload").onclick = () => location.reload();
+// The board scales each card's contents to fill its box: no row cut in half on a small screen, no empty half of a TV.
+function fitBoard() {
+  const on = document.body.classList.contains("board");
+  for (const card of document.querySelectorAll("#stops > .stop")) {
+    const kids = [...card.children];
+    kids.forEach((k) => { k.style.zoom = ""; });
+    if (!on || card.hidden) continue;
+    const cs = getComputedStyle(card), avail = card.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    let z = 1;
+    for (let i = 0; i < 3; i++) { // zoom changes line wrapping, so let it settle
+      const shown = kids.filter((k) => k.getClientRects().length);
+      if (!shown.length) break;
+      const used = shown.at(-1).getBoundingClientRect().bottom - shown[0].getBoundingClientRect().top;
+      // ponytail: below half size text is unreadable, so 4+ stops on a sideways phone still lose their last row; a 2nd page would fix it.
+      z = Math.min(3, Math.max(0.5, z * avail / used));
+      kids.forEach((k) => { k.style.zoom = z; });
+    }
+  }
+}
+let fitQueued = false;
+const queueFit = () => { if (!fitQueued) { fitQueued = true; requestAnimationFrame(() => { fitQueued = false; fitBoard(); }); } };
+new MutationObserver(queueFit).observe($("#stops"), { childList: true, subtree: true });
+addEventListener("resize", queueFit);
 function applyBoard() {
   const on = isBoard();
   document.body.classList.toggle("board", on);
   if (on) { setAdd(false); setPrefs(false); setEdit(null); wake(); } else if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  queueFit();
+  if (!on && document.fullscreenElement) document.exitFullscreen().catch((e) => console.warn("fullscreen:", e.message));
 }
+// Browsers only go full screen on a tap, so the board's first tap hides the browser's bars.
+document.addEventListener("pointerdown", (e) => {
+  if (isBoard() && !document.fullscreenElement && !e.target.closest("#board-exit"))
+    document.documentElement.requestFullscreen?.().catch((err) => console.warn("fullscreen:", err.message));
+});
 tick(); setInterval(tick, 10000);
 sideways.addEventListener("change", () => { if (!sideways.matches) boardExited = false; applyBoard(); });
 $("#board-exit").onclick = () => {
@@ -869,4 +908,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=76").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=77").catch((e) => console.warn("sw:", e.message));
