@@ -221,6 +221,8 @@ footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1p
 #near-map { height: 220px; border-radius: 12px; background: var(--card-2); }
 #near-map :is(.leaflet-tile, .leaflet-gl-layer) { filter: var(--tile-filter); }
 .leaflet-container a { color: var(--accent); }
+/* A tapped pin keeps focus and showed a square ring; keyboard focus still gets one. */
+.leaflet-marker-icon:focus:not(:focus-visible) { outline: none; }
 #add:has(#results li) .hint { display: none; } /* results replace the help text */
 #results .note-row { display: block; color: var(--muted); font-size: .9rem; }
 /* Search row: the box plus "Near me"; results come as you type, so no Find button. */
