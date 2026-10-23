@@ -1,7 +1,7 @@
 // Bump ?v= here, in index.html and in app.js (sw register) with CACHE: Cloudflare edge-caches JS for 4 h.
 // App shell cached for offline start; /api is always network (the page falls back to its saved timetables).
-const CACHE = "yeg-v79";
-const SHELL = ["./", "index.html", "style.css?v=79", "app.js?v=79", "manifest.webmanifest", "icon.svg", "cookie.svg"];
+const CACHE = "yeg-v80";
+const SHELL = ["./", "index.html", "style.css?v=80", "app.js?v=80", "manifest.webmanifest", "icon.svg", "cookie.svg"];
 
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener("activate", (e) => e.waitUntil(
