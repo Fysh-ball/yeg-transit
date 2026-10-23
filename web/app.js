@@ -84,7 +84,7 @@ function row(d, now, walk = 0, stopId = "") {
   const tag = d.at && !atNow ? `<small class="live">at stop</small>` : d.live ? `<small class="live">live</small>` : `<small>scheduled</small>`;
   const when = atNow ? `<span class="due">At stop</span>` : walk && d.time - walk * 60 - now < 30 ? `<span class="due">Go now</span>` : mins(d.time - walk * 60, now);
   const map = d.live && d.trip ? ` data-trip="${esc(d.trip)}" data-stop="${esc(stopId)}" title="Show this bus on a map"` : "";
-  return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)}">${esc(routeLabel(d.route))}</span>
+  return `<div class="dep"${map}><span class="route" style="background:${esc(bg)};color:${esc(fg)};--len:${routeLabel(d.route).length}">${esc(routeLabel(d.route))}</span>
     <span class="head">${esc(headLabel(d.headsign, d.route))}</span><span class="when">${when}${tag}</span></div>`;
 }
 
@@ -913,4 +913,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=78").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=79").catch((e) => console.warn("sw:", e.message));
