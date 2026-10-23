@@ -310,11 +310,18 @@ main > .stop { animation: rise .5s var(--spring) both; }
 }
 :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body.board main > .stop) .lead .when small { font-size: .85rem; letter-spacing: 0; }
 :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body.board main > .stop) .lead .head { grid-area: h; align-self: start; font-weight: 600; white-space: normal; }
-:is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body.board main > .stop) .lead .wave { display: block; grid-area: v; width: 100%; height: 24px; margin: 10px 0 2px; overflow: visible; }
+:is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body.board main > .stop) .lead .wave { display: block; grid-area: v; width: 100%; height: 24px; margin: 18px 0 2px; overflow: visible; }
 .when .u { font-size: .6em; font-weight: 650; letter-spacing: 0; }
-.wave path { fill: none; stroke-linecap: round; }
+.wave > path { fill: none; stroke-linecap: round; }
 .wave .track { stroke: color-mix(in srgb, currentColor 18%, transparent); stroke-width: 4; }
 .wave .fill { stroke: var(--accent); stroke-width: 5; }
+.wave .bus { fill: var(--accent); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent)) drop-shadow(0 2px 3px rgb(0 0 0 / .35)); }
+.wave .bus :is(.win, .tyre) { fill: color-mix(in srgb, var(--accent) 30%, #000); }
+.wave .bus .stripe { fill: color-mix(in srgb, var(--accent) 55%, #000); }
+.wave .bus .lamp { fill: #fff6c2; }
+.wave .bus-body { animation: idle 1.6s ease-in-out infinite; }
+@keyframes idle { 50% { transform: translateY(-1px); } }
+@media (prefers-reduced-motion: reduce) { .wave .bus-body { animation: none; } }
 
 /* ---- Material ---- */
 [data-look="material"] body { font-family: Roboto, system-ui, sans-serif; }

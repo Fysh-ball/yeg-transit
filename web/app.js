@@ -115,29 +115,38 @@ function grouped(s, list, now) {
 // Wave under the lead bus: full when it's time to go, filling over the last 15 minutes. Drawn by drawWaves().
 function wave(s, d, now) {
   const m = (d.time - walkOf(s) * 60 - now) / 60;
-  const f = Math.min(1, Math.max(0.04, 1 - m / 15));
-  return `<svg class="wave" data-stop="${esc(s.id)}" data-f="${f.toFixed(3)}" viewBox="0 0 330 24" preserveAspectRatio="none" aria-hidden="true"><path class="track"/><path class="fill"/></svg>`;
+  const f = m < 0.5 ? 1 : Math.min(1, Math.max(0.04, 1 - m / 15)); // "Due" (rounds to 0 min) means full, same as mins()
+  return `<svg class="wave" data-stop="${esc(s.id)}" data-f="${f.toFixed(3)}" viewBox="0 0 330 24" aria-hidden="true"><path class="track"/><path class="fill"/>`
+    + `<g class="bus" opacity="0"><g class="bus-body"><path d="M3-10H32Q40-10 40-2V6Q40 9 37 9H3Q0 9 0 6V-7Q0-10 3-10Z"/>`
+    + `<g class="win"><rect x="3" y="-7" width="6" height="6" rx="1.2"/><rect x="11" y="-7" width="6" height="6" rx="1.2"/><rect x="19" y="-7" width="6" height="6" rx="1.2"/><path d="M28-7H34Q37.5-7 37.5-3.5V-1H28Z"/></g>`
+    + `<rect class="stripe" x="0" y="2" width="40" height="1.6"/><circle class="lamp" cx="38" cy="5" r="1.3"/>`
+    + `<circle class="tyre" cx="9" cy="10" r="4"/><circle class="tyre" cx="31" cy="10" r="4"/><circle cx="9" cy="10" r="1.5"/><circle cx="31" cy="10" r="1.5"/></g></g></svg>`;
 }
 // Big waves on the left shrink to flat at the tip, which runs into the track line. On arrival it fills, flattens,
-// and the route badge bounces once. State per stop survives the 30 s re-render so the wave glides, not jumps.
+// the route badge bounces once and a bus pulls in to the end of the line. State per stop survives the 30 s re-render so the wave glides, not jumps.
 const waves = new Map(), still = matchMedia("(prefers-reduced-motion: reduce)");
 function drawWaves() {
   for (const svg of document.querySelectorAll(".stop:not([hidden]) .lead .wave")) {
     if (!svg.getClientRects().length) continue; // hidden by the look or the wall board
-    const f = +svg.dataset.f, id = svg.dataset.stop, W = 330;
-    const w = waves.get(id) || { cur: f, amp: f >= 1 ? 0 : 8, phase: 0, arrived: false };
+    const f = +svg.dataset.f, id = svg.dataset.stop, W = Math.round(svg.clientWidth) || 330;
+    if (svg.viewBox.baseVal.width !== W) svg.setAttribute("viewBox", `0 0 ${W} 24`); // real pixels, so the bus keeps its shape
+    const w = waves.get(id) || { cur: f, amp: f >= 1 ? 0 : 8, phase: 0, arrived: false, bus: f >= 1 ? 1 : 0 };
     const k = still.matches ? 1 : 0.04;
     w.cur += (f - w.cur) * k;
     w.amp += ((f >= 1 ? 0 : 8) - w.amp) * (still.matches ? 1 : 0.08);
     w.phase += still.matches ? 0 : 0.045;
+    w.bus += ((f >= 1 ? 1 : 0) - w.bus) * (still.matches ? 1 : 0.05);
     if (f >= 1 && !w.arrived) { w.arrived = true; svg.closest(".dep").querySelector(".route").classList.add("arrive"); }
     if (f < 1) w.arrived = false;
     waves.set(id, w);
-    const end = w.cur * W, pts = [];
-    for (let x = 0; x <= end; x += 2.5) pts.push(`${x ? "L" : "M"}${x.toFixed(1)} ${(12 + w.amp * Math.pow(1 - x / end, 0.85) * Math.sin(x / 9 - w.phase)).toFixed(2)}`);
+    const end = w.cur * W - w.bus * 26, pts = []; // the line runs under the bus, not past it
+    for (let x = 0; x <= end; x += 2.5) pts.push(`${x ? "L" : "M"}${x.toFixed(1)} ${(12 + w.amp * Math.pow(1 - x / end, 0.85) * Math.sin(x * 330 / W / 9 - w.phase)).toFixed(2)}`);
     pts.push(`L${end.toFixed(1)} 12`);
     svg.querySelector(".fill").setAttribute("d", pts.join(""));
-    svg.querySelector(".track").setAttribute("d", end < W ? `M${end.toFixed(1)} 12H${W}` : "");
+    svg.querySelector(".track").setAttribute("d", end < W && w.bus < 0.5 ? `M${end.toFixed(1)} 12H${W}` : "");
+    const bus = svg.querySelector(".bus"), ease = 1 - Math.pow(1 - w.bus, 3);
+    bus.setAttribute("opacity", Math.min(1, w.bus * 2).toFixed(2));
+    bus.setAttribute("transform", `translate(${(W - 52 - (1 - ease) * W * 0.4).toFixed(1)} -6.2) scale(1.3)`);
   }
   requestAnimationFrame(drawWaves);
 }
@@ -763,4 +772,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=63").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=64").catch((e) => console.warn("sw:", e.message));
