@@ -744,4 +744,4 @@ setInterval(loadWeather, 15 * 60000);
 checkVersion(); setInterval(checkVersion, 10 * 60000);
 window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back from the browser's page cache
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=53").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=54").catch((e) => console.warn("sw:", e.message));

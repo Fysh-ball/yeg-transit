@@ -1,0 +1,173 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YEG Bus board and widget</title>
+<style>
+/* Wall board and Android widget in the v52 looks. A design sample, not app code. */
+* { box-sizing: border-box; }
+body { margin: 0; background: #6f757d; font: 16px/1.35 Roboto, system-ui, sans-serif; padding: 24px; display: grid; gap: 28px; justify-content: center; }
+.m { --bg: #0e1511; --card: #1a211d; --text: #dde4de; --muted: #bfc9c1; --accent: #84d8ac;
+  --pc: #005237; --on-pc: #ffffff; --tc: #144d5b; --on-tc: #ffffff; --tint: rgb(255 255 255 / .12); }
+.m.light { --bg: #f4fbf5; --card: #e9efe9; --text: #161d19; --muted: #3f4943; --accent: #17694a;
+  --pc: #9ff5c6; --on-pc: #002114; --tc: #b8eafb; --on-tc: #001f27; --tint: rgb(255 255 255 / .55); }
+.g { --bg: #eef1f5; --card: rgb(255 255 255 / .72); --text: #11161d; --muted: #5b6573; --accent: #17694a; --line: rgb(0 0 0 / .07); }
+.label { color: #fff; font-weight: 600; margin: 0 0 8px; font-size: 14px; }
+.pair2 { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+
+/* ---- Shared bits ---- */
+.cookie { display: grid; place-items: center; font-weight: 800; background: var(--on-pc); color: var(--pc); flex: none;
+  -webkit-mask: url(../../web/cookie.svg) center / contain no-repeat; mask: url(../../web/cookie.svg) center / contain no-repeat; }
+.walk .cookie { background: var(--on-tc); color: var(--tc); }
+.g .cookie { -webkit-mask: none; mask: none; background: var(--accent); color: #fff; }
+.big { font-weight: 820; letter-spacing: -.04em; line-height: .9; white-space: nowrap; }
+.big span { font-size: .38em; letter-spacing: 0; font-weight: 650; }
+.g .big { color: var(--accent); }
+.wave { width: 100%; overflow: visible; display: block; }
+.wave path { fill: none; stroke-linecap: round; }
+.wave .track { stroke: currentColor; opacity: .18; }
+.wave .fill { stroke: currentColor; }
+.g .wave .fill { stroke: var(--accent); }
+.badge { display: grid; place-items: center; font-weight: 800; background: var(--on-pc); color: var(--pc); }
+.walk .badge { background: var(--on-tc); color: var(--tc); }
+.g .badge { background: var(--accent); color: #fff; }
+.row { display: flex; align-items: center; }
+.row b { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .t { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row .t span { font-size: .55em; font-weight: 650; }
+.m .rows .row { background: var(--tint); }
+.rows { display: flex; flex-direction: column; gap: 3px; }
+.hero { display: grid; grid-template-columns: auto 1fr; align-items: center; }
+.now { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+
+/* ---- Board: everything stacks top to bottom; a stop is its time, the wave, then its next buses ---- */
+.board { width: 560px; border-radius: 28px; overflow: hidden; background: var(--bg); color: var(--text); padding: 22px 22px 26px; display: flex; flex-direction: column; gap: 14px; }
+.g.board { background: radial-gradient(800px 700px at 15% 0%, #dfe9f3, transparent), radial-gradient(700px 600px at 100% 100%, #e3efe8, transparent), #eef1f5; }
+.top { display: flex; align-items: center; gap: 12px; }
+.top img { width: 42px; height: 42px; border-radius: 13px; }
+.top h1 { margin: 0; font-size: 24px; font-weight: 750; flex: 1; }
+.clock { font-size: 52px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+.clock small { font-size: 18px; color: var(--muted); font-weight: 600; margin-left: 5px; letter-spacing: 0; }
+.band { border-radius: 34px; padding: 20px 20px 16px; display: flex; flex-direction: column; }
+.m .band { background: var(--pc); color: var(--on-pc); }
+.m .band.walk { background: var(--tc); color: var(--on-tc); }
+.g .band { background: var(--card); border: 1px solid rgb(255 255 255 / .8); box-shadow: 0 10px 40px rgb(15 30 50 / .08); }
+.band h2 { margin: 0; font-size: 22px; font-weight: 700; }
+.band .sub { font-size: 14px; opacity: .78; margin: 0 0 10px; }
+.g .band .sub { color: var(--muted); opacity: 1; }
+.band .hero { column-gap: 20px; }
+.band .cookie { width: 104px; height: 104px; font-size: 32px; }
+.g .band .cookie { width: 94px; height: 94px; border-radius: 28px; }
+.band .big { font-size: 92px; }
+.band .big.now { font-size: 76px; }
+.band .dest { font-size: 20px; font-weight: 650; margin-top: 6px; }
+.band .then { font-size: 15px; opacity: .78; }
+.band .wave { height: 26px; margin: 14px 0 12px; }
+.band .wave .track { stroke-width: 5; } .band .wave .fill { stroke-width: 6; }
+.band .row { gap: 14px; padding: 11px 16px 11px 10px; border-radius: 8px; }
+.m .band .row:first-child { border-radius: 22px 22px 8px 8px; } .m .band .row:last-child { border-radius: 8px 8px 22px 22px; }
+.g .band .row { border-top: 1px solid var(--line); padding-inline: 2px; border-radius: 0; }
+.band .badge { min-width: 58px; height: 44px; border-radius: 15px; font-size: 19px; padding: 0 8px; }
+.band .row b { font-size: 19px; } .band .row .t { font-size: 30px; }
+
+/* ---- Widgets: one widget, drag to resize; each size adds the next thing below ---- */
+.home { width: 412px; border-radius: 36px; overflow: hidden; padding: 30px 16px 28px; display: flex; flex-direction: column; gap: 10px;
+  background: radial-gradient(500px 500px at 20% 10%, #4d6b5c, transparent), radial-gradient(600px 600px at 90% 90%, #2f4a5c, transparent), #1d2a26; }
+.home.light { background: radial-gradient(500px 500px at 20% 10%, #cfe6d8, transparent), radial-gradient(600px 600px at 90% 90%, #c9dceb, transparent), #e9efe9; }
+.size { color: rgb(255 255 255 / .75); font-size: 12px; font-weight: 600; margin: 8px 4px 0; letter-spacing: .04em; text-transform: uppercase; }
+.light .size { color: rgb(0 0 0 / .55); }
+.w { border-radius: 28px; overflow: hidden; }
+.m .w { background: var(--pc); color: var(--on-pc); }
+.w .hdr { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; opacity: .85; }
+/* Small 2x1: the next bus only */
+.w.s { width: 180px; height: 84px; padding: 0 16px 0 12px; display: flex; align-items: center; gap: 12px; }
+.w.s .cookie { width: 56px; height: 56px; font-size: 18px; }
+.w.s .big { font-size: 40px; }
+/* Medium 4x1: and where it goes */
+.w.mid { height: 96px; padding: 0 22px 0 14px; display: grid; grid-template-columns: auto 1fr auto; column-gap: 14px; align-items: center; }
+.w.mid .cookie { width: 64px; height: 64px; font-size: 20px; }
+.w.mid .dest { font-size: 17px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w.mid .dest small { display: block; font-size: 13px; font-weight: 500; opacity: .8; }
+.w.mid .big { font-size: 46px; }
+/* Tall 4x2: and the wave and two more buses underneath */
+.w.tall, .w.l { padding: 16px 16px 14px; }
+.w .hero { column-gap: 14px; margin-top: 6px; }
+.w.tall .cookie, .w.l .cookie { width: 70px; height: 70px; font-size: 22px; }
+.w.tall .big, .w.l .big { font-size: 54px; }
+.w .hero .dest { font-size: 15px; font-weight: 650; margin-top: 2px; }
+.w .wave { height: 18px; margin: 8px 0 6px; }
+.w .wave .track { stroke-width: 4; } .w .wave .fill { stroke-width: 5; }
+.w .row { gap: 12px; padding: 7px 12px 7px 8px; border-radius: 6px; }
+.m .w .row:first-child { border-radius: 16px 16px 6px 6px; } .m .w .row:last-child { border-radius: 6px 6px 16px 16px; }
+.w .badge { min-width: 44px; height: 32px; border-radius: 11px; font-size: 15px; padding: 0 6px; }
+.w .row b { font-size: 15px; } .w .row .t { font-size: 19px; }
+/* Large 4x3: and the next stop underneath */
+.w.l .stop2 { margin-top: 12px; padding-top: 10px; border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
+/* Glass look: see-through, white type with a soft shadow */
+.g .w { background: none; color: #fff; text-shadow: 0 1px 4px rgb(0 0 0 / .6); }
+.g .w .cookie, .g .w .badge { background: rgb(255 255 255 / .92); color: #0e3b2a; text-shadow: none; }
+.g .w .cookie { border-radius: 20px; }
+.g .w .badge { border-radius: 11px; }
+.g .w .big { color: #fff; }
+.g .w .wave .fill { stroke: #fff; }
+.g .w .row { padding-inline: 0; }
+</style></head>
+<body>
+
+<div class="pair2" id="boards"></div>
+<template id="board">
+  <div class="top"><img src="../../web/icon.svg" alt=""><h1>YEG Bus</h1><div class="clock">5:52<small>PM</small></div></div>
+  <div class="band"><h2>University Transit Centre</h2><p class="sub">Stop #2002 &middot; Southbound</p>
+    <div class="hero"><div class="cookie">4</div><div><div class="big">3<span> min</span></div><div class="dest">Capilano</div><div class="then">then 13, 25 min</div></div></div>
+    <svg class="wave" data-f=".8"><path class="track"/><path class="fill"/></svg>
+    <div class="rows"><div class="row"><span class="badge">902</span><b>NAIT</b><span class="t">5<span> min</span></span></div>
+      <div class="row"><span class="badge">8</span><b>Abbottsfield</b><span class="t">11<span> min</span></span></div></div></div>
+  <div class="band walk"><h2>Southgate</h2><p class="sub">Times show when to leave &middot; 6 min walk</p>
+    <div class="hero"><div class="cookie">31</div><div><div class="big now">Go now</div><div class="dest">Leger Super Express</div><div class="then">bus in 7 min</div></div></div>
+    <svg class="wave" data-f="1"><path class="track"/><path class="fill"/></svg>
+    <div class="rows"><div class="row"><span class="badge">4</span><b>Lewis Farms</b><span class="t">9<span> min</span></span></div>
+      <div class="row"><span class="badge">9</span><b>Eaux Claires</b><span class="t">17<span> min</span></span></div></div></div>
+</template>
+
+<div class="pair2" id="widgets"></div>
+<template id="wsizes">
+  <div class="size">Small</div>
+  <div class="w s"><div class="cookie">4</div><div class="big">3<span> min</span></div></div>
+  <div class="size">Medium</div>
+  <div class="w mid"><div class="cookie">4</div><div class="dest">Capilano<small>University TC &middot; then 13</small></div><div class="big">3<span> min</span></div></div>
+  <div class="size">Tall</div>
+  <div class="w tall"><div class="hdr"><span>University Transit Centre</span><span>5:52</span></div>
+    <div class="hero"><div class="cookie">4</div><div><div class="big">3<span> min</span></div><div class="dest">Capilano &middot; then 13, 25</div></div></div>
+    <svg class="wave" data-f=".8"><path class="track"/><path class="fill"/></svg>
+    <div class="rows"><div class="row"><span class="badge">902</span><b>NAIT</b><span class="t">5<span> min</span></span></div>
+      <div class="row"><span class="badge">8</span><b>Abbottsfield</b><span class="t">11<span> min</span></span></div></div></div>
+  <div class="size">Large</div>
+  <div class="w l"><div class="hdr"><span>University Transit Centre</span><span>5:52</span></div>
+    <div class="hero"><div class="cookie">4</div><div><div class="big">3<span> min</span></div><div class="dest">Capilano &middot; then 13, 25</div></div></div>
+    <svg class="wave" data-f=".8"><path class="track"/><path class="fill"/></svg>
+    <div class="rows"><div class="row"><span class="badge">902</span><b>NAIT</b><span class="t">5<span> min</span></span></div>
+      <div class="row"><span class="badge">8</span><b>Abbottsfield</b><span class="t">11<span> min</span></span></div></div>
+    <div class="stop2"><div class="hdr"><span>Southgate &middot; leave now</span></div>
+      <div class="rows" style="margin-top:6px"><div class="row"><span class="badge">31</span><b>Leger Super Express</b><span class="t">Go</span></div>
+        <div class="row"><span class="badge">4</span><b>Lewis Farms</b><span class="t">9<span> min</span></span></div></div></div></div>
+</template>
+
+<script>
+const fill = (id, tpl, list, cls) => list.forEach(([c, label]) =>
+  document.getElementById(id).insertAdjacentHTML("beforeend", `<div><p class="label">${label}</p><div class="${cls} ${c}">${document.getElementById(tpl).innerHTML}</div></div>`));
+fill("boards", "board", [["m", "Wall board, Look: Material, dark"], ["g", "Wall board, Look: Glass, light"]], "board");
+fill("widgets", "wsizes", [["m", "Widget, Look: Material, dark"], ["m light", "Widget, Look: Material, light"], ["g", "Widget, Look: Glass (see-through)"]], "home");
+// Same wave as the app: big on the left, flat at the tip, moving.
+let phase = 0;
+function draw() {
+  document.querySelectorAll(".wave").forEach((svg) => {
+    const W = svg.clientWidth, f = +svg.dataset.f, end = W * f, mid = svg.clientHeight / 2, A = mid * .7;
+    let d = "";
+    for (let x = 0; x <= end; x += 2) d += `${x ? "L" : "M"}${x} ${(mid + A * Math.pow(1 - x / end, .85) * Math.sin(x / 11 - phase)).toFixed(1)}`;
+    svg.querySelector(".fill").setAttribute("d", d + `L${end} ${mid}`);
+    svg.querySelector(".track").setAttribute("d", end < W ? `M${end + 8} ${mid}H${W}` : "");
+  });
+  phase += .045; requestAnimationFrame(draw);
+}
+draw();
+</script>
+</body></html>
