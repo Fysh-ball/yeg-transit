@@ -8,13 +8,15 @@ AT_1797 = (53.561262, -113.5091)
 KM_SOUTH = (53.552252, -113.5091)  # 1 km south, between stops 10 and 11
 
 
-def run(pos, eta=0, route="201", ets_seq=11, at_seq=13, bearing=0):
+def run(pos, eta=0, route="201", ets_seq=11, at_seq=13, bearing=0, fed=10, raw=False):
     now = int(time.time())
     sched = [{"trip": "t", "seq": 11, "sched": now + eta, "route": route}]
     vehicles = {"t": (*pos, bearing, now - 10, at_seq, "r", 0)} if pos else {}
     with mock.patch.object(app, "scheduled", lambda *a: [dict(d) for d in sched]), \
-            mock.patch.object(app.LIVE, "trips", {"t": ({"1797": now + eta}, 0, {"1797": ets_seq})}), mock.patch.object(app.LIVE, "vehicles", vehicles):
+            mock.patch.object(app.LIVE, "trips", {"t": ({"1797": now + eta}, 0, {"1797": ets_seq})}), mock.patch.object(app.LIVE, "vehicles", vehicles), mock.patch.object(app.LIVE, "ts", now - fed):
         out = app.departures(fixture(), "1797", 8)
+    if raw:
+        return out[0]
     return out and {"in": out[0]["time"] - now, "at": out[0].get("at", False)}
 
 
@@ -41,6 +43,10 @@ class Departures(unittest.TestCase):
 
     def test_a_bus_ahead_of_its_prediction_keeps_it(self):
         self.assertEqual(run(KM_SOUTH, eta=600), {"in": 600, "at": False})
+
+    def test_a_stalled_feed_is_not_live(self):  # ETS's last predictions, 10 min old, are not live times
+        self.assertTrue(run(None, eta=600, raw=True)["live"])
+        self.assertFalse(run(None, eta=600, fed=600, raw=True)["live"])
 
     def test_trains_keep_ets_times(self):
         self.assertEqual(run(KM_SOUTH, route="Capital")["in"], 0)

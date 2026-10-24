@@ -106,7 +106,7 @@ class Live:
 
     def __init__(self):
         self.trips, self.ts, self.error = {}, 0, None
-        self.vehicles, self.vp_error = {}, None
+        self.vehicles, self.vp_error, self.vp_ts = {}, None, 0
         self.assigned, self.on_trip = {}, {}  # trip_id -> vehicle id ETS has put on it; vehicle id -> trip it is driving now
         self.alerts, self.alerts_at = {}, 0
 
@@ -146,7 +146,7 @@ class Live:
                                               v.timestamp or feed.header.timestamp, v.current_stop_sequence,
                                               v.trip.route_id, v.trip.direction_id) for v in vps}
             self.on_trip = {v.vehicle.id: v.trip.trip_id for v in vps if v.vehicle.id}
-            self.vp_error = None
+            self.vp_error, self.vp_ts = None, feed.header.timestamp or int(time.time())
         except Exception as e:
             self.vp_error = f"{type(e).__name__}: {e}"
             print("vehicle poll failed:", self.vp_error, file=sys.stderr)
@@ -220,7 +220,7 @@ TRAINS = {"Capital", "Metro", "Valley"}
 def departures(db, stop_id, n):
     now = int(time.time())
     here = db.execute("SELECT lat, lon FROM stops WHERE stop_id=?", (stop_id,)).fetchone()
-    out = []
+    out, fresh = [], LIVE.ts and time.time() - LIVE.ts <= 120  # ETS's feed stalled: its last predictions aren't live
     for d in scheduled(db, stop_id, now - 1800, now + 3 * 3600):
         live = LIVE.trips.get(d["trip"])
         t, seq = d["sched"], d.pop("seq")
@@ -235,7 +235,7 @@ def departures(db, stop_id, n):
                 t = stops[stop_id]
             else:
                 t += delay
-        d["time"], d["live"] = t, bool(live)
+        d["time"], d["live"] = t, bool(live and fresh)
         # ETS holds a late bus's prediction at its old time, so "Due" sat on screens with the bus 1 km out (WEM TC,
         # 2026-10-22). Where the bus is beats what ETS predicts: at the stop, gone past it, or no sooner than it can drive here.
         v = LIVE.vehicles.get(d["trip"])
@@ -621,7 +621,9 @@ class Handler(SimpleHTTPRequestHandler):
         if parts == ["version"]:
             return self.json({"sha": SHA})
         if parts == ["vehicles"]:
-            return self.json({"now": int(time.time()), "buses": fleet(db)}, cache=5)
+            # age: how old the positions are; a failing ETS feed leaves the last ones in place, so the map must say so
+            return self.json({"now": int(time.time()), "age": int(time.time()) - LIVE.vp_ts if LIVE.vp_ts else None,
+                              "buses": fleet(db)}, cache=5)
         if parts == ["weather"]:
             return self.json(walk_weather(), cache=600)
         if len(parts) == 3 and parts[0] == "trips" and parts[2] == "shape":

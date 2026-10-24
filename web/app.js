@@ -274,6 +274,10 @@ function stopHead(s) {
     </button></div>`;
 }
 
+// Why a stop shows nothing: say the walk time hid them when it did, not that no bus is coming.
+const none = (s, list) => `<p class="note">${s.walk && list.some((d) => !s.only || s.only.includes(d.route))
+  ? "No bus you can still walk to in the next 3 hours." : `No ${s.only ? "buses on your routes" : "departures"} in the next 3 hours.`}</p>`;
+
 async function renderStop(s, el) {
   const now = Math.floor(Date.now() / 1000);
   let body, offline = false;
@@ -287,7 +291,7 @@ async function renderStop(s, el) {
     save();
     const xf = await x;
     body = alertBox(s, d.alerts || []) + (xf ? xferLine(s, xf, d.now) : "") +
-      (grouped(s, d.departures, d.now) || `<p class="note">No ${s.only ? "buses on your routes" : "departures"} in the next 3 hours.</p>`);
+      (grouped(s, d.departures, d.now) || none(s, d.departures));
     el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
   } catch (e) {
@@ -300,7 +304,8 @@ async function renderStop(s, el) {
     offline = true;
     console.warn("live fetch failed:", e.message);
     const rows = offlineRows(s, now);
-    body = (rows && grouped(s, rows, now)) || `<p class="note">No saved timetable for this stop yet.</p>`;
+    body = !rows ? `<p class="note">No saved timetable for this stop yet.</p>` : grouped(s, rows, now) ||
+      (rows.length ? none(s, rows) : `<p class="note">The saved timetable has run out. It updates next time you're online.</p>`);
     body += `<p class="note">Scheduled times only. Buses may be early or late.</p>`;
   }
   if (offline && smsOk(s)) body += `<a class="sms" href="${smsLink(s)}">Text ${esc(s.code)} to 31100 for live times</a>`;
@@ -334,7 +339,8 @@ async function renderAll() {
   const off = results.some(Boolean);
   $("#offline").hidden = !off;
   $("#offline").textContent = !off ? "" : navigator.onLine ? "Live times are down right now. Showing saved scheduled times instead." : "No connection. Showing saved scheduled times instead of live times.";
-  $("#updated").textContent = stops.length && !off ? `Live times, updated ${clock(Date.now() / 1000)}` : "";
+  const at = [...main.children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live); // ETS's own last update, not ours
+  $("#updated").textContent = stops.length && !off ? `Live times, updated ${clock(at.length ? Math.min(...at) : Date.now() / 1000)}` : "";
   checkStale();
 }
 
@@ -679,7 +685,7 @@ async function placeFleet() {
   try {
     const d = await api("vehicles");
     if (mapState.trip !== "all") return;
-    mapState.buses = d.buses;
+    mapState.buses = d.buses; mapState.vpAt = d.age > 90 ? d.now - d.age : 0;
     drawFleet();
   } catch (e) { if (mapState.trip === "all") $("#map-note").textContent = `Can't get bus positions (${e.message}).`; }
 }
@@ -690,7 +696,9 @@ function drawFleet() { // only the buses in view: a city of pins at once makes a
   for (const [lat, lon, , route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [40, 40],
     html: `<span class="bus-pin fleet${far ? " far" : ""}">${far ? "" : esc(routeLabel(route))}</span>` }) })
     .bindTooltip(`Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}`).addTo(m.fleet);
-  $("#map-note").textContent = `${m.buses.length} buses running, ${seen.length} here. ETS updates every 30 s.`;
+  $("#map-title").firstChild.textContent = m.vpAt ? "Every bus, not live" : "Every bus, live";
+  $("#map-note").textContent = m.vpAt // ETS's position feed stalled: these are where buses were, not are
+    ? `Bus positions from ${clock(m.vpAt)}: ETS isn't sending new ones.` : `${m.buses.length} buses running, ${seen.length} here. ETS updates every 30 s.`;
 }
 // Slide the bus to its new spot over 2 s instead of jumping, like the big apps do.
 function glide(marker, to) {
@@ -925,4 +933,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=92").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=93").catch((e) => console.warn("sw:", e.message));
