@@ -226,8 +226,15 @@ public class BusWidget extends AppWidgetProvider {
         v.setTextViewText(R.id.stop, here > 1 ? (group.isEmpty() ? here + " stops" : group) : stop);
         if (tall && !glass) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, fill, chip));
         int rowH = here > 1 ? 50 : 34;
-        for (long[] o : order.subList(1, order.size())) {
-            if (room < rowH) break;
+        // Each stop's next bus first, then the soonest of the rest: ten routes at a transit centre used to fill the
+        // rows and hide your other stop's only bus under a "2 stops" heading (2026-10-24).
+        java.util.Set<String> seen = new java.util.HashSet<>(java.util.Collections.singleton(d.optString("sid")));
+        List<long[]> rest = order.subList(1, order.size()), pick = new ArrayList<>();
+        for (long[] o : rest) if (seen.add(deps.get((int) o[1]).optString("sid"))) pick.add(o);
+        for (long[] o : rest) if (!pick.contains(o)) pick.add(o);
+        pick = new ArrayList<>(pick.subList(0, Math.min(pick.size(), Math.max(0, room / rowH))));
+        pick.sort((x, y) -> Long.compare(x[0], y[0]));
+        for (long[] o : pick) {
             v.addView(R.id.rows, row(c, deps.get((int) o[1]), o[0] - now, here > 1, glass, dark, fg, chip, chipText));
             room -= rowH;
         }
@@ -471,7 +478,7 @@ public class BusWidget extends AppWidgetProvider {
             JSONObject d = all.getJSONObject(i);
             if (only != null && !only.toString().contains("\"" + d.optString("route") + "\"")) continue;
             if (walk > 0 && d.getLong("time") - walk < now) continue;
-            d.put("walking", walk > 0).put("stop", s.optString("name"));
+            d.put("walking", walk > 0).put("stop", s.optString("name")).put("sid", s.optString("id"));
             order.add(new long[]{d.getLong("time") - walk + skew, deps.size()});
             deps.add(d);
             left--;
