@@ -92,8 +92,8 @@ def refresh_gtfs():
     zpath = os.path.join(DATA, "GTFS.zip")
     with fetch(GTFS_URL, 120) as r, open(zpath + ".part", "wb") as f:
         f.write(r.read())
+    import_gtfs(zpath + ".part", DB)  # first: an error page served as 200 must not replace the last good zip
     os.replace(zpath + ".part", zpath)
-    import_gtfs(zpath, DB)
     global VOCAB
     VOCAB = None
     WHERE.clear()
