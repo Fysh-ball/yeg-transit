@@ -513,14 +513,15 @@ VOCAB = None  # every word in a stop name, for typo correction; reset by refresh
 def search_words(db, text):
     """Typed text -> words to match: drop filler, 97th/97st -> 97, swap a misspelt word for the closest stop-name word."""
     global VOCAB
-    if VOCAB is None:
-        VOCAB = {w for (n,) in db.execute("SELECT DISTINCT name FROM stops") for w in re.split(r"[^a-z0-9]+", n.lower()) if w}
+    vocab = VOCAB  # read once: the nightly refresh sets it to None mid-search
+    if vocab is None:
+        vocab = VOCAB = {w for (n,) in db.execute("SELECT DISTINCT name FROM stops") for w in re.split(r"[^a-z0-9]+", n.lower()) if w}
     words = [re.sub(r"^(\d+)(st|nd|rd|th|ave?|street|avenue)$", r"\1", w) for w in re.split(r"[^a-z0-9']+", text.lower())]
     out = []
     for w in [w for w in words if w and w not in FILLER][:5]:
-        if not w.isdigit() and len(w) >= 4 and not any(w in v for v in VOCAB):
-            split = [[w[:i], w[i:]] for i in range(2, len(w) - 1) if w[:i] in VOCAB and w[i:] in VOCAB]  # millwoods
-            out += split[0] if split else [(difflib.get_close_matches(w, VOCAB, 1, 0.75) or [w])[0]]
+        if not w.isdigit() and len(w) >= 4 and not any(w in v for v in vocab):
+            split = [[w[:i], w[i:]] for i in range(2, len(w) - 1) if w[:i] in vocab and w[i:] in vocab]  # millwoods
+            out += split[0] if split else [(difflib.get_close_matches(w, vocab, 1, 0.75) or [w])[0]]
             continue
         out.append(w)
     return out
