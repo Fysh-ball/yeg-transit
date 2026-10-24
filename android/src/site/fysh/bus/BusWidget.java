@@ -154,14 +154,19 @@ public class BusWidget extends AppWidgetProvider {
         java.util.Set<String> alerts = new java.util.LinkedHashSet<>(); // ETS: stop closed or moved, use #1457
         int here = 0; // stops in this group: more than one, and each row says its stop
         String blocked = blocked(c); // Android keeping us off the network, which looks like no connection
+        boolean failed = false, walking = false, picked = false; // for the empty message: why there's nothing to show
         for (JSONObject s : stops) {
             if (!group.isEmpty() && !group.equals(s.optString("group"))) continue;
             here++;
+            walking |= s.optLong("walk", 0) > 0;
+            picked |= s.has("only");
             try {
-                offline |= departures(p, s, extra, deps, order, alerts, 0);
+                offline |= departures(c, p, s, extra, deps, order, alerts, 0);
             } catch (Exception e) {
+                android.util.Log.w("yeg", s.optString("name") + ": " + e);
                 if (!blocked.isEmpty()) { offline = true; continue; } // said once below, not per stop
-                v.addView(R.id.rows, note(c, s.optString("name") + ": couldn't load (" + e.getMessage() + ")", fg));
+                failed = true;
+                v.addView(R.id.rows, note(c, s.optString("name") + ": can't load, and no saved timetable yet.", fg));
                 room -= 34;
             }
         }
@@ -182,11 +187,13 @@ public class BusWidget extends AppWidgetProvider {
             v.addView(R.id.rows, n);
             room -= 50;
         } else if (offline && room >= 34) {
-            v.addView(R.id.rows, note(c, "No connection: scheduled times.", fg));
+            v.addView(R.id.rows, note(c, online(c) ? "Live times are down right now: scheduled times." : "No connection: scheduled times.", fg));
             room -= 34;
         }
-        if (order.isEmpty()) {
-            if (!(offline && !blocked.isEmpty())) v.addView(R.id.rows, alone(note(c, "No buses in the next 3 hours.", fg)));
+        if (order.isEmpty()) { // the same words as the page, plus the walk: a bus you can't reach isn't shown
+            if (!failed && !(offline && !blocked.isEmpty())) v.addView(R.id.rows, alone(note(c, walking
+                ? "No bus you can still walk to in the next 3 hours." : picked ? "No buses on your routes in the next 3 hours."
+                : "No buses in the next 3 hours.", fg)));
             return v;
         }
         long now = System.currentTimeMillis() / 1000;
@@ -210,6 +217,8 @@ public class BusWidget extends AppWidgetProvider {
             next.append(i == 1 ? "then " : ", ").append(Math.max(0, Math.round((later.get(i) - now) / 60.0)));
         String stop = d.optString("stop"), more = later.size() > 1 ? next + " min" : tall ? "" : stop;
         if (here > 1 && !more.equals(stop)) more = more.isEmpty() ? stop : stop + " \u00b7 " + more;
+        // Not live (timetable, or ETS's feed stalled): say so on the hero itself, as a small widget has no room for notes.
+        if (!d.optBoolean("live")) more = more.isEmpty() ? "Not live" : "Not live \u00b7 " + more;
         v.setTextViewText(R.id.then, glass && !more.isEmpty() ? "\u00b7 " + more : more);
         v.setTextViewText(R.id.stop, here > 1 ? (group.isEmpty() ? here + " stops" : group) : stop);
         if (tall && !glass) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, fill, chip));
@@ -231,7 +240,7 @@ public class BusWidget extends AppWidgetProvider {
                 if (!g.equals(s.optString("group"))) continue;
                 n++;
                 try {
-                    departures(p, s, extra, gd, go, new java.util.HashSet<>(), 300);
+                    departures(c, p, s, extra, gd, go, new java.util.HashSet<>(), 300);
                 } catch (Exception e) {
                     android.util.Log.w("yeg", g + " " + s.optString("name") + ": " + e);
                 }
@@ -401,7 +410,7 @@ public class BusWidget extends AppWidgetProvider {
      * One stop's buses, filtered like the page (my routes, walk time, how many), added as {leave time, index}.
      * Offline it falls back to the stop's saved 30 h timetable, as the page does, and returns true.
      */
-    private static boolean departures(SharedPreferences p, JSONObject s, int extra, List<JSONObject> deps, List<long[]> order,
+    private static boolean departures(Context c, SharedPreferences p, JSONObject s, int extra, List<JSONObject> deps, List<long[]> order,
                                       java.util.Set<String> alerts, int maxAge) throws Exception {
         String id = Uri.encode(s.optString("id")), key = "tt:" + s.optString("id");
         JSONObject tt = new JSONObject(p.getString(key, "{}"));
@@ -419,6 +428,11 @@ public class BusWidget extends AppWidgetProvider {
             // a reused answer: the server's "now" moved on by as long as the phone's has since it came
             now = r.getLong("now") + System.currentTimeMillis() / 1000 - r.getLong("phone");
             all = r.getJSONArray("departures");
+            if (r.optLong("live_age") > 120) { // ETS's feed stalled: its last predictions aren't live any more, as the page says
+                alerts.add("Times may be out of date (last live " + DateFormat.getTimeFormat(c)
+                    .format(new java.util.Date((now - r.optLong("live_age")) * 1000)) + ").");
+                for (int i = 0; i < all.length(); i++) all.getJSONObject(i).put("live", false);
+            }
             JSONArray al = r.optJSONArray("alerts");
             for (int i = 0; al != null && i < al.length(); i++) {
                 JSONObject a = al.getJSONObject(i);
@@ -470,6 +484,13 @@ public class BusWidget extends AppWidgetProvider {
         if (cm.isActiveNetworkMetered() && cm.getRestrictBackgroundStatus() == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED)
             return "Data saver stops live times here.";
         return "";
+    }
+
+    /** The phone has a working internet connection, so a failed fetch is our end. */
+    private static boolean online(Context c) {
+        ConnectivityManager cm = c.getSystemService(ConnectivityManager.class);
+        android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(cm.getActiveNetwork());
+        return nc != null && nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }
 
     private static RemoteViews alone(RemoteViews note) { // the only thing on the widget: in the middle
