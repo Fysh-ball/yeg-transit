@@ -507,21 +507,27 @@ def walk_weather():
 
 
 FILLER = {"and", "at", "the", "of", "nw", "sw", "ne", "se"}
-VOCAB = None  # every word in a stop name, for typo correction; reset by refresh_gtfs
+VOCAB = None  # every word in a stop name, and each two neighbours run together, for typo correction; reset by refresh_gtfs
 
 
 def search_words(db, text):
     """Typed text -> words to match: drop filler, 97th/97st -> 97, swap a misspelt word for the closest stop-name word."""
     global VOCAB
-    vocab = VOCAB  # read once: the nightly refresh sets it to None mid-search
-    if vocab is None:
-        vocab = VOCAB = {w for (n,) in db.execute("SELECT DISTINCT name FROM stops") for w in re.split(r"[^a-z0-9]+", n.lower()) if w}
+    if (got := VOCAB) is None:  # read once: the nightly refresh sets it to None mid-search
+        names = [[w for w in re.split(r"[^a-z0-9]+", n.lower()) if w] for (n,) in db.execute("SELECT DISTINCT name FROM stops")]
+        vocab = {w for n in names for w in n}
+        pairs = {a + b: [a, b] for n in names for a, b in zip(n, n[1:])}  # "millwods" is closest to "millwoods": "Mill Woods"
+        got = VOCAB = (vocab, pairs, vocab | pairs.keys())
+    vocab, pairs, near = got
     words = [re.sub(r"^(\d+)(st|nd|rd|th|ave?|street|avenue)$", r"\1", w) for w in re.split(r"[^a-z0-9']+", text.lower())]
     out = []
     for w in [w for w in words if w and w not in FILLER][:5]:
         if not w.isdigit() and len(w) >= 4 and not any(w in v for v in vocab):
             split = [[w[:i], w[i:]] for i in range(2, len(w) - 1) if w[:i] in vocab and w[i:] in vocab]  # millwoods
-            out += split[0] if split else [(difflib.get_close_matches(w, vocab, 1, 0.75) or [w])[0]]
+            if not split:
+                m = (difflib.get_close_matches(w, near, 1, 0.75) or [w])[0]
+                split = [pairs.get(m, [m])]
+            out += split[0]
             continue
         out.append(w)
     return out
