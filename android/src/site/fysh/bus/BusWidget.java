@@ -18,7 +18,10 @@ import android.graphics.Path;
 import android.graphics.Typeface;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.ConnectivityManager;
 import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.text.format.DateFormat;
 import android.util.TypedValue;
 import android.view.View;
@@ -150,12 +153,14 @@ public class BusWidget extends AppWidgetProvider {
         boolean offline = false;
         java.util.Set<String> alerts = new java.util.LinkedHashSet<>(); // ETS: stop closed or moved, use #1457
         int here = 0; // stops in this group: more than one, and each row says its stop
+        String blocked = blocked(c); // Android keeping us off the network, which looks like no connection
         for (JSONObject s : stops) {
             if (!group.isEmpty() && !group.equals(s.optString("group"))) continue;
             here++;
             try {
                 offline |= departures(p, s, extra, deps, order, alerts, 0);
             } catch (Exception e) {
+                if (!blocked.isEmpty()) { offline = true; continue; } // said once below, not per stop
                 v.addView(R.id.rows, note(c, s.optString("name") + ": couldn't load (" + e.getMessage() + ")", fg));
                 room -= 34;
             }
@@ -168,12 +173,20 @@ public class BusWidget extends AppWidgetProvider {
             v.addView(R.id.rows, n);
             room -= 34;
         }
-        if (offline && room >= 34) {
+        if (offline && !blocked.isEmpty()) { // say it even when there's no room: it's why the times are wrong
+            RemoteViews n = note(c, blocked + " Tap to allow it.", fg);
+            n.setInt(R.id.text, "setMaxLines", 2);
+            n.setBoolean(R.id.text, "setSingleLine", false);
+            n.setOnClickPendingIntent(R.id.text, PendingIntent.getActivity(c, 2, new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + c.getPackageName())), PendingIntent.FLAG_IMMUTABLE));
+            v.addView(R.id.rows, n);
+            room -= 50;
+        } else if (offline && room >= 34) {
             v.addView(R.id.rows, note(c, "No connection: scheduled times.", fg));
             room -= 34;
         }
         if (order.isEmpty()) {
-            v.addView(R.id.rows, alone(note(c, "No buses in the next 3 hours.", fg)));
+            if (!(offline && !blocked.isEmpty())) v.addView(R.id.rows, alone(note(c, "No buses in the next 3 hours.", fg)));
             return v;
         }
         long now = System.currentTimeMillis() / 1000;
@@ -446,6 +459,17 @@ public class BusWidget extends AppWidgetProvider {
             left--;
         }
         return offline;
+    }
+
+    /** Why Android won't let the widget fetch while the app is closed, or "" when it would: then it's really offline. */
+    private static String blocked(Context c) {
+        PowerManager pm = c.getSystemService(PowerManager.class);
+        if (pm.isPowerSaveMode() && !pm.isIgnoringBatteryOptimizations(c.getPackageName()))
+            return "Battery saver stops live times here.";
+        ConnectivityManager cm = c.getSystemService(ConnectivityManager.class); // Data saver only limits metered networks
+        if (cm.isActiveNetworkMetered() && cm.getRestrictBackgroundStatus() == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED)
+            return "Data saver stops live times here.";
+        return "";
     }
 
     private static RemoteViews alone(RemoteViews note) { // the only thing on the widget: in the middle
