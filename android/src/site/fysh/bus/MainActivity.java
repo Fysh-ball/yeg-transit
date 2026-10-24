@@ -20,6 +20,7 @@ public class MainActivity extends Activity {
     private WebView web;
     private String geoOrigin;
     private GeolocationPermissions.Callback geoCallback;
+    private volatile boolean ours = true; // the page on screen is yegbus.com: only it may write the widget's stops
 
     @Override
     protected void onCreate(Bundle state) {
@@ -34,6 +35,11 @@ public class MainActivity extends Activity {
         s.setAllowContentAccess(false);
         web.addJavascriptInterface(new Bridge(), "YegApp");
         web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
+                ours = url.startsWith(SITE); // a load shouldOverrideUrlLoading never sees (a POST) can't use the bridge
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
@@ -91,22 +97,26 @@ public class MainActivity extends Activity {
     class Bridge {
         @JavascriptInterface
         public void sync(String stops, String group) {
+            if (!ours) return;
             getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).edit()
                 .putString("stops", stops).putString("group", group).apply();
         }
 
         @JavascriptInterface
         public void look(String look) { // "material-dark", "glass-light"...: the widget dresses like the app
+            if (!ours) return;
             getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).edit().putString("look", look).apply();
         }
 
         @JavascriptInterface
         public void widget(String style) { // "card" (like the app) or "ring" (clear)
+            if (!ours) return;
             getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).edit().putString("widget", style).apply();
         }
 
         @JavascriptInterface
         public String stops() {
+            if (!ours) return "[]";
             return getSharedPreferences(BusWidget.PREFS, MODE_PRIVATE).getString("stops", "[]");
         }
     }

@@ -449,6 +449,7 @@ public class BusWidget extends AppWidgetProvider {
                 android.util.Log.w("yeg", "timetable: " + e);
             }
         } catch (Exception e) {
+            android.util.Log.w("yeg", "stop " + id + ", using the saved timetable: " + e);
             JSONArray rows = tt.optJSONArray("rows");
             if (rows == null) throw e;
             offline = true;
