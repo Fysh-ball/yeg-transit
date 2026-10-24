@@ -286,6 +286,8 @@ def stop_alerts(db, stop_id, code):
     """ETS alerts naming this stop, one per message (ETS repeats it per route), with the stops it says to use instead."""
     merged = {}
     for a in LIVE.alerts.get(stop_id, []):
+        if 0 < a["until"] < time.time():  # ended since the last good alerts poll (it keeps them if a poll fails)
+            continue
         m = merged.setdefault(a["head"], {**a, "routes": set()})
         m["routes"].update(a["routes"])
     out = []
@@ -458,7 +460,7 @@ def stop_where(db, stop):
     return out
 
 
-WEATHER = {"at": 0, "value": {"extra": 0, "why": "", "soon": "", "temp": None}}
+WEATHER = {"at": 0, "good": 0, "value": {"extra": 0, "why": "", "soon": "", "temp": None}}
 PHOTON, PHOTON_LOCK = {"at": 0, "cache": {}}, threading.Lock()  # cache: Photon URL -> answer, newest 500
 
 
@@ -476,6 +478,8 @@ def walk_weather():
     except Exception as e:
         print("weather lookup failed:", repr(e), file=sys.stderr)
         WEATHER["at"] = time.time() - 600  # retry in 5 min, keep the last answer meanwhile
+        if time.time() - WEATHER["good"] > 7200:  # but not for hours: "+2 for snow" and 1° must be today's weather
+            WEATHER["value"] = {"extra": 0, "why": "", "soon": "", "temp": None}
         return WEATHER["value"]
     extra, why = 0, []
     if (c.get("snowfall") or 0) > 0:
@@ -492,7 +496,7 @@ def walk_weather():
     if wet:
         soon = ("Snow" if any((x or 0) > 0 for x in hr.get("snowfall") or []) else "Rain") + (" soon" if wet[0] < 3 else " later")
     temp = c.get("temperature_2m")
-    WEATHER.update(at=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why), "soon": soon,
+    WEATHER.update(at=time.time(), good=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why), "soon": soon,
                                           "temp": None if temp is None else round(temp)})
     return WEATHER["value"]
 

@@ -284,13 +284,13 @@ async function renderStop(s, el) {
   try {
     const x = s.xfer?.to && api(`stops/${encodeURIComponent(s.id)}/transfer?` + new URLSearchParams(
       { route: s.xfer.route, off: s.xfer.off, at: s.xfer.at, to: s.xfer.to, walk_m: s.xfer.walk_m }))
-      .catch((e) => console.warn("transfer:", e.message));
+      .catch((e) => ({ error: e.message })); // said on the card: a missing line would read as no transfer to make
     const d = await api(`stops/${encodeURIComponent(s.id)}/departures?n=30`);
     if (d.stop.routes) s.allRoutes = d.stop.routes.split(",");
     Object.assign(s, { lat: d.stop.lat, lon: d.stop.lon, where: d.stop.where }); // nearest group; which kerb
     save();
     const xf = await x;
-    body = alertBox(s, d.alerts || []) + (xf ? xferLine(s, xf, d.now) : "") +
+    body = alertBox(s, d.alerts || []) + (xf?.error ? `<p class="note">Can't check your change to ${esc(routeLabel(s.xfer.to))} right now.</p>` : xf ? xferLine(s, xf, d.now) : "") +
       (grouped(s, d.departures, d.now) || none(s, d.departures));
     el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
@@ -933,4 +933,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=93").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=94").catch((e) => console.warn("sw:", e.message));
