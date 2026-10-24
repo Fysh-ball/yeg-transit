@@ -250,14 +250,14 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
 .pin-card .sub { color: #5b6675; font-size: 12.5px; }
 .pin-card button { margin-top: 6px; min-height: 40px; background: var(--accent); color: var(--accent-text); border: 0; font-weight: 600; }
 .pin-card button:disabled { opacity: .6; }
-/* Desktop: stops side by side. The page is as wide as the stops it shows, so header, panels and cards line up. */
+/* Desktop: the page fills the screen. Stops sit side by side, and a wide card lays its routes out in columns. */
 .mouse { display: none; }
 @media (hover: hover) and (pointer: fine) { .mouse { display: inline; } .touch { display: none; } }
 @media (min-width: 1000px) {
-  body:not(.board) { max-width: 640px; padding-inline: 32px; }
-  body:not(.board):has(main > .stop:not([hidden]) ~ .stop:not([hidden])) { max-width: 1000px; }
-  body:not(.board):has(main > .stop:not([hidden]) ~ .stop:not([hidden]) ~ .stop:not([hidden])) { max-width: 1320px; }
-  body:not(.board) main { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 0 16px; align-items: start; }
+  body:not(.board) { max-width: 1680px; padding-inline: 32px; }
+  body:not(.board) main { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 0 20px; align-items: start; }
+  body:not(.board) .deps { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0 28px; align-items: start; }
+  body:not(.board) .deps > .grp:first-child { grid-column: 1 / -1; } /* the soonest bus keeps its own full-width row */
   body:not(.board) :is(#add, #prefs, #tips, #offline, #stale, #empty) { width: min(640px, 100%); margin-inline: auto; }
   body:not(.board) footer { text-align: center; max-width: 720px; margin-inline: auto; }
   #map-sheet { width: min(720px, 90vw); margin: auto; border-radius: 16px; }
