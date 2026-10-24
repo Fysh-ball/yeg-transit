@@ -110,6 +110,11 @@ class Live:
         self.assigned, self.on_trip = {}, {}  # trip_id -> vehicle id ETS has put on it; vehicle id -> trip it is driving now
         self.alerts, self.alerts_at = {}, 0
 
+    def trip(self, trip_id):
+        """ETS's prediction for a trip, or None if ETS's feed has stalled: its last predictions shown as scheduled
+        times would be neither, and shown as live would be a lie."""
+        return self.trips.get(trip_id) if self.ts and time.time() - self.ts <= 120 else None
+
     def poll(self):
         try:
             with fetch(RT_URL, 20) as r:
@@ -128,7 +133,7 @@ class Live:
                     # A loop starts and ends at the same stop (918B at WEM): keep the first pass, when it leaves,
                     # not the arrival back 30 min later. Passes ETS has already dropped leave the next one first.
                     if s.stop_id not in stops:
-                        stops[s.stop_id] = None if s.schedule_relationship == SKIPPED else (ev.time or None)
+                        stops[s.stop_id] = None if s.schedule_relationship == SKIPPED else ev.time  # 0: a delay but no time
                         seqs[s.stop_id] = s.stop_sequence
                 trips[tu.trip.trip_id] = (stops, delay, seqs)
                 if tu.vehicle.id:
@@ -220,9 +225,9 @@ TRAINS = {"Capital", "Metro", "Valley"}
 def departures(db, stop_id, n):
     now = int(time.time())
     here = db.execute("SELECT lat, lon FROM stops WHERE stop_id=?", (stop_id,)).fetchone()
-    out, fresh = [], LIVE.ts and time.time() - LIVE.ts <= 120  # ETS's feed stalled: its last predictions aren't live
+    out = []
     for d in scheduled(db, stop_id, now - 1800, now + 3 * 3600):
-        live = LIVE.trips.get(d["trip"])
+        live = LIVE.trip(d["trip"])
         t, seq = d["sched"], d.pop("seq")
         if live:
             stops, delay, seqs = live
@@ -232,10 +237,10 @@ def departures(db, stop_id, n):
             if stop_id in stops and seqs[stop_id] in (0, seq):
                 if stops[stop_id] is None:
                     continue
-                t = stops[stop_id]
+                t = stops[stop_id] or t + delay
             else:
                 t += delay
-        d["time"], d["live"] = t, bool(live and fresh)
+        d["time"], d["live"] = t, bool(live)
         # ETS holds a late bus's prediction at its old time, so "Due" sat on screens with the bus 1 km out (WEM TC,
         # 2026-10-22). Where the bus is beats what ETS predicts: at the stop, gone past it, or no sooner than it can drive here.
         v = LIVE.vehicles.get(d["trip"])
@@ -274,7 +279,7 @@ def fleet(db):
     if FLEET[0] is not vehicles:
         now, out = int(time.time()), []
         for trip, v in vehicles.items():
-            r = now - v[3] < 300 and db.execute("SELECT r.short, t.headsign FROM trips t JOIN routes r USING(route_id) "
+            r = now - v[3] < 120 and db.execute("SELECT r.short, t.headsign FROM trips t JOIN routes r USING(route_id) "
                                                 "WHERE t.trip_id=?", (trip,)).fetchone()
             if r:
                 out.append([round(v[0], 5), round(v[1], 5), round(v[2] or 0), r[0], r[1] or "", trip])
@@ -350,7 +355,7 @@ def transfer(db, stop_id, route, off, at, to, walk_m):
         if not hop:
             continue
         sched_arr = d["sched"] + hop[0]
-        live = LIVE.trips.get(d["trip"])
+        live = LIVE.trip(d["trip"])
         arr = sched_arr + (d["time"] - d["sched"])  # running late or early here: assume the same there
         if live and (live[0].get(off) or 0) > d["time"]:  # not a loop's first pass, before you even board
             arr = live[0][off]
@@ -444,7 +449,7 @@ def stop_where(db, stop):
         d = int((math.degrees(math.atan2((b[1] - a[1]) * k, b[0] - a[0])) + 45) % 360 // 90)  # 0 N, 1 E, 2 S, 3 W
         out = ("Northbound", "Eastbound", "Southbound", "Westbound")[d]
         parts = re.split(r" & | at ", name)
-        kind = lambda s: re.sub(r"\s+(NW|SW|NE|SE)$", "", s).split()[-1]
+        kind = lambda s: (re.sub(r"\s+(NW|SW|NE|SE)$", "", s).split() or [""])[-1]
         along, across = (("Street", "St"), ("Avenue", "Ave")) if d % 2 == 0 else (("Avenue", "Ave"), ("Street", "St"))
         street = next((p for p in parts if kind(p) in along), None)
         if not street and len(parts) == 2 and kind(parts[1]) in across and " at " not in name:
@@ -556,7 +561,7 @@ def next_stop(db, trip, v):
 
 def stop_row(r):
     return {"id": r[0], "code": r[1], "name": r[2], "lat": r[3], "lon": r[4], "routes": (r[5] or "") if len(r) > 5 else "",
-            "alert": (LIVE.alerts.get(r[0]) or [{}])[0].get("head", "")}  # "Closure of stop 1321..." in search results
+            "alert": next((a["head"] for a in LIVE.alerts.get(r[0], []) if not 0 < a["until"] < time.time()), "")}  # "Closure of stop 1321..." in search results
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -684,7 +689,7 @@ class Handler(SimpleHTTPRequestHandler):
                 hub = ("transit centre", "station")
                 rows.sort(key=lambda r: (text not in (r[0], r[1]), not r[2].lower().startswith(words[0]),
                                          not any(h in r[2].lower() for h in hub), len(r[2])))
-            return self.json([stop_row(r) for r in rows[:30]], cache=3600)
+            return self.json([stop_row(r) for r in rows[:30]], cache=300)  # alert heads ride along
         if parts == ["places", "local"]:
             near = (float(q["lat"]), float(q["lon"])) if "lat" in q else None
             return self.json(local_places(ALIASES.get(q["q"].strip().lower(), (0, 0))[1] or q["q"], near), cache=86400)

@@ -48,6 +48,14 @@ class Departures(unittest.TestCase):
         self.assertTrue(run(None, eta=600, raw=True)["live"])
         self.assertFalse(run(None, eta=600, fed=600, raw=True)["live"])
 
+    def test_a_delay_without_a_time_is_not_a_skip(self):  # ETS may send only "2 min late" for a stop
+        now = int(time.time())
+        with mock.patch.object(app, "scheduled", lambda *a: [{"trip": "t", "seq": 11, "sched": now + 600, "route": "201"}]), \
+                mock.patch.object(app.LIVE, "trips", {"t": ({"1797": 0}, 120, {"1797": 11})}), \
+                mock.patch.object(app.LIVE, "vehicles", {}), mock.patch.object(app.LIVE, "ts", now):
+            out = app.departures(fixture(), "1797", 8)
+        self.assertEqual((out[0]["time"] - now, out[0]["live"]), (720, True))
+
     def test_trains_keep_ets_times(self):
         self.assertEqual(run(KM_SOUTH, route="Capital")["in"], 0)
 

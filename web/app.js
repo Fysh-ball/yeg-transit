@@ -48,7 +48,7 @@ function sync() {
 
 async function api(path) {
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 8000);
+  const t = setTimeout(() => ctl.abort(), 11000); // the edge tries the Pi 4 s, then TrueNAS 6 s
   try {
     const r = await fetch("/api/" + path, { signal: ctl.signal });
     if (!r.ok) throw new Error(`${r.status} ${(await r.json().catch(() => ({}))).error || ""}`);
@@ -292,7 +292,8 @@ async function renderStop(s, el) {
     const xf = await x;
     body = alertBox(s, d.alerts || []) + (xf?.error ? `<p class="note">Can't check your change to ${esc(routeLabel(s.xfer.to))} right now.</p>` : xf ? xferLine(s, xf, d.now) : "") +
       (grouped(s, d.departures, d.now) || none(s, d.departures));
-    el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
+    if (d.live_age == null) delete el.dataset.live; // ETS never answered since the server started: nothing here is live
+    else el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
   } catch (e) {
     if (e.message.startsWith("404")) { // dropped from the ETS schedule: old saved times would send people to a dead stop
@@ -340,7 +341,7 @@ async function renderAll() {
   $("#offline").hidden = !off;
   $("#offline").textContent = !off ? "" : navigator.onLine ? "Live times are down right now. Showing saved scheduled times instead." : "No connection. Showing saved scheduled times instead of live times.";
   const at = [...main.children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live); // ETS's own last update, not ours
-  $("#updated").textContent = stops.length && !off ? `Live times, updated ${clock(at.length ? Math.min(...at) : Date.now() / 1000)}` : "";
+  $("#updated").textContent = !stops.length || off ? "" : at.length ? `Live times, updated ${clock(Math.min(...at))}` : "No live times from ETS right now: scheduled times.";
   checkStale();
 }
 
@@ -687,7 +688,11 @@ async function placeFleet() {
     if (mapState.trip !== "all") return;
     mapState.buses = d.buses; mapState.vpAt = d.age > 90 ? d.now - d.age : 0;
     drawFleet();
-  } catch (e) { if (mapState.trip === "all") $("#map-note").textContent = `Can't get bus positions (${e.message}).`; }
+  } catch (e) {
+    if (mapState.trip !== "all") return;
+    $("#map-title").firstChild.textContent = "Every bus, not live";
+    $("#map-note").textContent = `Can't get bus positions (${e.message}).`;
+  }
 }
 function drawFleet() { // only the buses in view: a city of pins at once makes a phone crawl
   const m = mapState, view = m.map.getBounds().pad(0.2), far = m.map.getZoom() < 13;
@@ -933,4 +938,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=94").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=95").catch((e) => console.warn("sw:", e.message));

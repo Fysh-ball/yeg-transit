@@ -44,6 +44,8 @@ class Transfer(unittest.TestCase):
         p.start()
         self.addCleanup(p.stop)
         self.addCleanup(setattr, app.LIVE, "trips", app.LIVE.trips)
+        self.addCleanup(setattr, app.LIVE, "ts", app.LIVE.ts)
+        app.LIVE.ts = NOON  # a feed that just came in
 
     def first(self, live):
         app.LIVE.trips = live
