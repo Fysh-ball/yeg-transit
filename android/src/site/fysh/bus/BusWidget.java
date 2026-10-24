@@ -107,6 +107,9 @@ public class BusWidget extends AppWidgetProvider {
         RemoteViews v = new RemoteViews(c.getPackageName(), glass ? R.layout.widget_glass : R.layout.widget);
         if (!glass) v.setInt(R.id.root, "setBackgroundResource", dark ? R.drawable.widget_bg_dark : R.drawable.widget_bg_light);
         for (int id : new int[]{R.id.stop, R.id.clock, R.id.big, R.id.dest, R.id.then}) v.setTextColor(id, fg);
+        // When it was drawn, not a live clock: Android can stop our redraws (battery saver), and a ticking clock
+        // over frozen minutes passed 5:29 p.m. times off as current at 2:30 a.m. (2026-10-24).
+        v.setTextViewText(R.id.clock, DateFormat.format(DateFormat.is24HourFormat(c) ? "H:mm" : "h:mm", System.currentTimeMillis()));
         v.removeAllViews(R.id.rows);
         v.setOnClickPendingIntent(R.id.root, PendingIntent.getActivity(c, 0,
             new Intent(c, MainActivity.class), PendingIntent.FLAG_IMMUTABLE));

@@ -9,8 +9,8 @@
       android:textSize="12sp" android:textStyle="bold" android:singleLine="true" android:ellipsize="end"/>
     <TextView android:id="@+id/wx" android:layout_width="wrap_content" android:layout_height="wrap_content"
       android:paddingEnd="8dp" android:textSize="12sp" android:singleLine="true" android:visibility="gone"/>
-    <TextClock android:id="@+id/clock" android:layout_width="wrap_content" android:layout_height="wrap_content"
-      android:format12Hour="h:mm" android:format24Hour="H:mm" android:textSize="12sp" android:textStyle="bold"/>
+    <TextView android:id="@+id/clock" android:layout_width="wrap_content" android:layout_height="wrap_content"
+      android:textSize="12sp" android:textStyle="bold"/>
   </LinearLayout>
   <LinearLayout android:id="@+id/hero" android:layout_width="match_parent" android:layout_height="wrap_content"
     android:gravity="center_vertical">
