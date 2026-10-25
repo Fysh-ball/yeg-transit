@@ -1,8 +1,8 @@
 # YEG Bus
 
-Live Edmonton Transit Service (ETS) bus and LRT arrivals for the stops you use. Live at [yegbus.com](https://yegbus.com).
+Live Edmonton Transit Service (ETS) bus and LRT arrivals to your stops. Live at [yegbus.com](https://yegbus.com).
 
-- Save your stops, grouped by Home, School, Work or your own names. No account.
+- Save your stops, grouped by Home, School, Work or make your own. No account.
 - Live countdowns from ETS's GPS feed, and the bus on a map with how many stops away it is.
 - Pick the routes you ride and your walk time; it tells you when to leave, and adds a few minutes for snow or cold.
 - Saved trips with a transfer say whether the change still works.
