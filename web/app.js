@@ -200,14 +200,14 @@ function drawWaves() {
 }
 requestAnimationFrame(drawWaves);
 const editing = new Set();
-let firstStop = null;
+let firstStop = null, wiz = 0;
 function settingsPanel(s) {
   const all = s.allRoutes || [];
+  if (s.id === firstStop) return setupStep(s, all);
   const chips = all.map((r) => `<button class="chip" aria-pressed="${!s.only || s.only.includes(r)}" data-route="${esc(r)}">${esc(routeLabel(r))}</button>`).join("");
   const opt = (vals, cur, f) => vals.map((v) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${f(v)}</option>`).join("");
   return `<div class="settings" data-stop="${esc(s.id)}">
     <div class="prefs-bar"><button class="icon-btn" type="button" data-settings="${esc(s.id)}" aria-label="Back" title="Back"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h2>${esc(s.name)}<span class="sub">Stop #${esc(s.code)}</span></h2></div>
-    ${s.id === firstStop ? `<p class="note">Pick the routes you ride and how long your walk is. Change it any time with the sliders button.</p>` : ""}
     ${all.length ? `<p class="label">Pick routes</p><div class="chips">${chips}</div>` : ""}
     <label>Walk to this stop <span><input type="number" data-set="walk" min="0" max="60" step="1" inputmode="numeric" value="${Number(s.walk) || 0}"> min</span></label>
     <label>Group <select data-set="group">${opt(["", ...new Set([...GROUPS, ...groupNames()]), "+"], s.group || "",
@@ -217,6 +217,30 @@ function settingsPanel(s) {
     ${all.length ? `<label>I change buses: ride <select data-set="ride">${opt(["", ...(s.only || all)], s.xfer?.route || "",
       (v) => (v ? esc(routeLabel(v)) : "No"))}</select></label>${s.xfer ? xferPicker(s) : ""}` : ""}
     <button class="primary" data-settings="${esc(s.id)}">Done</button></div>`;
+}
+
+// First stop: one plain question a screen, big buttons (ask 144). Steps: routes, walk, what it's for, done.
+function setupStep(s, all) {
+  if (wiz === 0 && !all.length) wiz = 1;
+  const id = esc(s.id), back = wiz > (all.length ? 0 : 1) ? `data-wiz="-1"` : `data-settings="${id}"`;
+  const dots = [0, 1, 2, 3].map((i) => `<span${i === wiz ? ' class="on"' : ""}></span>`).join("");
+  const next = `<button class="primary big" type="button" data-wiz="1">Next</button>`;
+  const steps = [
+    () => `<h2>Which buses do you take?</h2><p class="note">Leave them all ticked if you're not sure.</p>
+      <div class="wiz-list">${all.map((r) => `<button class="wiz-row" type="button" aria-pressed="${!s.only || s.only.includes(r)}" data-route="${esc(r)}"><span class="tick"></span>${esc(routeLabel(r))}</button>`).join("")}</div>${next}`,
+    () => `<h2>How long is your walk to the stop?</h2>
+      <div class="wiz-walk"><button class="icon-btn" type="button" data-walk="-1" aria-label="Less">&minus;</button><b>${Number(s.walk) || 0} min</b><button class="icon-btn" type="button" data-walk="1" aria-label="More">+</button></div>
+      <input type="range" data-set="walk" min="0" max="30" step="1" value="${Number(s.walk) || 0}" aria-label="Walk in minutes">
+      <p class="note">On snowy or very cold days we add a little extra time for you.</p>${next}
+      <button class="big" type="button" data-walk="0">I don't need this</button>`,
+    () => `<h2>What's this stop for?</h2><div class="wiz-tiles">${[...GROUPS, "Shopping"].map((g) => `<button type="button" data-wiz-group="${g}">${g}</button>`).join("")}</div>
+      <button class="big" type="button" data-wiz-group="+">Something else</button><button class="big" type="button" data-wiz-group="">Skip</button>`,
+    () => `<h2>You're all set</h2><p class="note">${esc(s.name)} is saved. Change anything later with the sliders button on its card.</p>
+      <button class="primary big" type="button" data-settings="${id}">Show my bus</button><button class="big" type="button" data-wiz-add>Add another stop</button>`,
+  ];
+  return `<div class="settings wiz" data-stop="${id}">
+    <div class="prefs-bar"><button class="icon-btn" type="button" ${back} aria-label="Back" title="Back"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="dots" aria-label="Step ${wiz + 1} of 4">${dots}</div></div>
+    ${steps[wiz]()}</div>`;
 }
 
 // Saved transfer: ride s.xfer.route from this stop, change to s.xfer.to; the card says if the change still works.
@@ -441,7 +465,7 @@ function setAdd(open, focus = true) {
   $("#add").hidden = !open;
   $("#add-btn").setAttribute("aria-expanded", String(open));
   $("#add-btn").textContent = open ? "Close" : "+ Add stop";
-  if (open) { if (focus) $("#q").focus(); } else { $("#results").innerHTML = ""; $("#q").value = ""; }
+  if (open) { if (focus) $("#q").focus(); } else { $("#results").innerHTML = ""; $("#q").value = ""; $("#q").placeholder = "Address, place or stop #"; $("#q").inputMode = "search"; }
 }
 
 $("#add-btn").onclick = () => setAdd($("#add").hidden);
@@ -498,7 +522,7 @@ document.addEventListener("click", (e) => {
   const add = e.target.closest("[data-add]");
   if (add) {
     const s = JSON.parse(add.dataset.add);
-    if (!stops.length) { firstStop = s.id; setEdit(s.id); } // onboarding: straight into its settings
+    if (!stops.length) { firstStop = s.id; wiz = 0; setEdit(s.id); } // onboarding: straight into its settings
     if (!stops.some((x) => x.id === s.id)) { stops.push(s); save(); }
     setAdd(false);
     renderAll();
@@ -543,6 +567,24 @@ document.addEventListener("click", (e) => {
       const main = $("#stops"), el = main.querySelector(`[data-id="${CSS.escape(gone.id)}"]`); // renderAll adds it last
       main.insertBefore(el, main.children[i]);
     };
+  }
+  const step = e.target.closest("[data-wiz],[data-walk],[data-wiz-group],[data-wiz-add]");
+  if (step) {
+    const s = stops.find((x) => x.id === firstStop), d = step.dataset;
+    if (!s) return;
+    if (d.walk === "0") { s.walk = 0; wiz++; }
+    else if (d.walk) s.walk = Math.min(30, Math.max(0, (Number(s.walk) || 0) + Number(d.walk)));
+    else if (d.wizGroup != null) {
+      let g = d.wizGroup;
+      if (g === "+") { g = (prompt("Name it, like Gym or Mom's") || "").trim().slice(0, 20); if (!g) return; }
+      s.group = g || undefined; wiz++; showGroup();
+    } else if (d.wiz) wiz = Math.max(0, wiz + Number(d.wiz));
+    save();
+    if (d.wizAdd != null) { // the search box is hidden until the stop's page closes
+      if (history.state?.edit) { addEventListener("popstate", () => setAdd(true), { once: true }); history.back(); } else { setEdit(null); setAdd(true); }
+      return;
+    }
+    rerender(s.id); scrollTo(0, 0);
   }
   const more = e.target.closest("[data-more]");
   if (more) { const id = more.dataset.more; allRoutes.has(id) ? allRoutes.delete(id) : allRoutes.add(id); rerender(id); }
@@ -783,6 +825,8 @@ $("#map-sheet").addEventListener("click", (e) => { if (e.target.id === "map-shee
 
 // Onboarding: the empty screen offers the two ways in; tips show once, after the first stop's settings.
 $("#ob-near").onclick = () => { setAdd(true, false); $("#near").click(); };
+for (const [b, hint, mode] of [["#ob-addr", "Type an address or place", "search"], ["#ob-code", "Stop number, on the sign", "numeric"]])
+  $(b).onclick = () => { $("#q").placeholder = hint; $("#q").inputMode = mode; setAdd(true); };
 // In the Android app the page is already installed: point at the widget instead of the browser's install menu.
 if (window.YegApp) $("#tip-handy").innerHTML = "<b>Widget:</b> hold your home screen &rarr; <b>Widgets</b> &rarr; <b>YEG Bus</b>.";
 let installEvt = null;
@@ -969,4 +1013,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=97").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=98").catch((e) => console.warn("sw:", e.message));

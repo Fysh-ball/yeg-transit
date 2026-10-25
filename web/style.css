@@ -144,6 +144,25 @@ input {
 #empty p { margin: 8px auto 20px; max-width: 26em; }
 #empty h2 { color: var(--text); font-size: 1rem; margin: 16px 0 0; }
 .big { display: block; width: 100%; max-width: 22em; margin: 10px auto 0; min-height: 48px; font-weight: 600; }
+#empty .big { min-height: 64px; font-size: 1.1rem; }
+/* First-stop setup (app.js setupStep): one question a screen, big targets. */
+.stop.editing .settings.wiz { display: grid; gap: 14px; }
+.wiz h2 { margin: 0; font-size: 1.5rem; line-height: 1.25; }
+.wiz .big { min-height: 60px; font-size: 1.1rem; margin: 0; max-width: none; }
+.wiz .prefs-bar { margin-bottom: 4px; }
+.dots { display: flex; gap: 6px; }
+.dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.dots .on { width: 22px; border-radius: 4px; background: var(--accent); }
+.wiz-list { display: grid; gap: 8px; }
+.wiz-row { display: flex; align-items: center; gap: 14px; min-height: 60px; font-size: 1.2rem; font-weight: 700; text-align: left; }
+.wiz-row .tick { width: 26px; height: 26px; border-radius: 7px; border: 2px solid var(--muted); flex: none; }
+.wiz-row[aria-pressed="true"] .tick { background: var(--accent); border-color: var(--accent); box-shadow: inset 0 0 0 4px var(--card); }
+.wiz-walk { display: flex; align-items: center; justify-content: center; gap: 24px; }
+.wiz-walk b { font-size: 2.6rem; min-width: 4.2em; text-align: center; }
+.wiz-walk .icon-btn { width: 64px; height: 64px; font-size: 2rem; color: var(--text); border-radius: 50%; }
+.wiz input[type=range] { width: 100%; height: 40px; accent-color: var(--accent); }
+.wiz-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wiz-tiles button { min-height: 88px; font-size: 1.2rem; font-weight: 700; }
 .tips-head { display: flex; align-items: center; justify-content: space-between; }
 #tips h2 { font-size: 1.05rem; margin: 10px 0 4px; }
 #tips-ok { min-width: 44px; min-height: 44px; font-size: 1.4rem; line-height: 1; background: none; border-color: transparent; color: var(--muted); }
