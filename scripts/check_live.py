@@ -30,8 +30,12 @@ def main():
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(get(RT_URL))
     ets, delay, firsts = {}, {}, {}  # (trip, stop) -> first-pass time; trip and (trip, stop) -> delay; stop -> trips starting there
+    raw = {}  # trip -> each ETS entry for it, printed with a WRONG line (1407/002, 2026-10-24: site 13 min, delay said 48)
     for e in feed.entity:
         tu = e.trip_update
+        raw.setdefault(tu.trip.trip_id, []).append(f"veh {tu.vehicle.id or '-'} seq:delay " + " ".join(
+            f"{s.stop_sequence}:{(s.departure if s.HasField('departure') else s.arrival).delay // 60:+d}"
+            for s in tu.stop_time_update[:8]))
         for i, s in enumerate(tu.stop_time_update):
             ev = s.departure if s.HasField("departure") else s.arrival
             if ev.time:
@@ -64,6 +68,7 @@ def main():
             mine, theirs = x["time"], ets.get((x["trip"], stop))
             expect = x["sched"] + delay.get((x["trip"], stop), delay[x["trip"]])
             bus = f"stop {stop} route {x['route']} trip {x['trip']}: shows {round((mine - d['now']) / 60)} min"
+            n = len(wrong)
             if theirs and abs(mine - theirs) > OFF:
                 wrong.append(f"{bus}, ETS says {round((theirs - d['now']) / 60)} min")
             elif abs(mine - expect) > OFF:
@@ -73,6 +78,8 @@ def main():
                                (v.position.longitude - d["stop"]["lon"]) * math.cos(math.radians(d["stop"]["lat"]))) * 111000
                 if m > FAR:
                     wrong.append(f"{bus}, its GPS is {m / 1000:.1f} km away")
+            if len(wrong) > n:
+                wrong[-1] += "".join(f"\n      ETS {r}" for r in raw[x["trip"]])
     print(f"{SITE}: {checked} live buses at {len(stops)} stops, {len(wrong)} wrong ({time.strftime('%H:%M')})")
     for w in wrong:
         print("WRONG", w)
