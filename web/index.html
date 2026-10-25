@@ -45,7 +45,7 @@ if (window.YegApp || navigator.standalone || matchMedia("(display-mode: standalo
 if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add button can float
 // The app's bridge (YegApp) is open to every frame in the page, so in the app no frame may load at all.
 if (window.YegApp) document.head.append(Object.assign(document.createElement("meta"), { httpEquiv: "Content-Security-Policy", content: "frame-src 'none'" }));</script>
-<link rel="stylesheet" href="style.css?v=95">
+<link rel="stylesheet" href="style.css?v=97">
 </head>
 <body>
 <header>
@@ -82,7 +82,12 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
     <option value="on">Always</option>
     <option value="off">Off</option>
   </select></label>
-  <p class="hint">Wall board shows big times and a clock and keeps the screen on, for a tablet by the door.</p>
+  <label>Dim the board at night <select id="board-night">
+    <option value="22">10 pm to 6 am</option>
+    <option value="23">11 pm to 6 am</option>
+    <option value="off">Off</option>
+  </select></label>
+  <p class="hint">Wall board shows big times and a clock and keeps the screen on, for a tablet by the door. At night it turns dark and faint; a web page can't lower the screen's own light, so turn the tablet's brightness down too.</p>
   <label id="ads-row" hidden>Ads based on your interests <select id="ads-mode">
     <option value="off">Off</option>
     <option value="on">Allow</option>
@@ -144,6 +149,6 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
   <p class="legal">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
   <a href="guide.html">Help</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
 </footer>
-<script src="app.js?v=95"></script>
+<script src="app.js?v=97"></script>
 </body>
 </html>

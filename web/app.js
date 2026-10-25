@@ -105,8 +105,9 @@ async function loadWeather() {
 }
 function grouped(s, list, now) {
   const walk = walkOf(s) * 60, groups = new Map();
-  for (const d of list) {
-    if ((s.only && !s.only.includes(d.route)) || (walk && d.time - walk < now)) continue;
+  const keep = list.filter((d) => !(s.only && !s.only.includes(d.route)) && !(walk && d.time - walk < now));
+  if (s.list === "time") return byTime(s, keep.sort((a, b) => a.time - b.time), now);
+  for (const d of keep) {
     const key = `${s.id}|${d.route}|${d.headsign}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(d);
@@ -128,6 +129,16 @@ function grouped(s, list, now) {
   }).join("");
   const more = groups.size - (s.n || 3); // past the card's route count: say so, or a route just looks like it stopped running
   return html && `<div class="deps">${html}</div>` + (more > 0 ? `<button class="more-routes" data-more="${esc(s.id)}" aria-expanded="${allRoutes.has(s.id)}">${allRoutes.has(s.id) ? "Show fewer routes" : `Show ${more} more route${more > 1 ? "s" : ""}`}</button>` : "");
+}
+// "All by time": one list, soonest first, across the stop's chosen routes; "Buses to show" counts buses here.
+function byTime(s, ds, now) {
+  const n = allRoutes.has(s.id) ? Math.min(ds.length, 30) : s.n || 3;
+  const html = ds.slice(0, n).map((d, i) => {
+    const r = row(d, now, walkOf(s), s.id);
+    return `<div class="grp">${i ? r : r.replace('class="dep', 'class="dep lead').replace(/<\/div>$/, wave(s, d, now) + "</div>")}</div>`;
+  }).join("");
+  const more = Math.min(ds.length, 30) - (s.n || 3);
+  return html && `<div class="deps">${html}</div>` + (more > 0 ? `<button class="more-routes" data-more="${esc(s.id)}" aria-expanded="${allRoutes.has(s.id)}">${allRoutes.has(s.id) ? "Show fewer buses" : `Show ${more} more bus${more > 1 ? "es" : ""}`}</button>` : "");
 }
 
 // Wave under the lead bus: full when it's time to go, filling over the last 15 minutes. Drawn by drawWaves().
@@ -202,6 +213,7 @@ function settingsPanel(s) {
     <label>Group <select data-set="group">${opt(["", ...new Set([...GROUPS, ...groupNames()]), "+"], s.group || "",
       (v) => esc(v === "" ? "None" : v === "+" ? "New group..." : v))}</select></label>
     <label>Buses to show <select data-set="n">${opt([3, 4, 5, 6, 8, 10], s.n || 3, String)}</select></label>
+    <label>List <select data-set="list">${opt(["", "time"], s.list || "", (v) => (v ? "All buses by time" : "Grouped by route"))}</select></label>
     ${all.length ? `<label>I change buses: ride <select data-set="ride">${opt(["", ...(s.only || all)], s.xfer?.route || "",
       (v) => (v ? esc(routeLabel(v)) : "No"))}</select></label>${s.xfer ? xferPicker(s) : ""}` : ""}
     <button class="primary" data-settings="${esc(s.id)}">Done</button></div>`;
@@ -560,6 +572,11 @@ document.addEventListener("change", (e) => {
     save(); rerender(s.id);
     return;
   }
+  if (k === "list") {
+    s.list = e.target.value || undefined;
+    save(); rerender(s.id);
+    return;
+  }
   s[k] = k === "walk" ? Math.min(60, Math.max(0, Math.round(Number(e.target.value) || 0))) : Number(e.target.value);
   save(); rerender(s.id);
 });
@@ -833,7 +850,21 @@ async function wake() {
   if (!isBoard() || !navigator.wakeLock || document.hidden) return;
   try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { console.warn("wake lock:", e.message); }
 }
-function tick() { $("#clock").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); checkStale(); }
+// Night: the board goes dark and faint from the hour picked until 6 am. A page can't set the backlight.
+let nightFrom = "22";
+try { nightFrom = localStorage.getItem("yeg.night") || "22"; } catch { /* storage blocked: default */ }
+$("#board-night").value = nightFrom;
+$("#board-night").onchange = (e) => {
+  nightFrom = e.target.value;
+  try { localStorage.setItem("yeg.night", nightFrom); } catch (err) { console.warn("night:", err.message); }
+  tick();
+};
+function tick() {
+  const now = new Date(), h = now.getHours();
+  $("#clock").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  document.body.classList.toggle("night", nightFrom !== "off" && (h >= +nightFrom || h < 6));
+  checkStale();
+}
 // A tab left open can fall behind (a sleeping laptop, a frozen tab, a stop's settings left open, a new release):
 // say so where it shows, the wall board included, instead of passing old times off as live.
 let newVersion = false, firstSha = null, undoTimer;
@@ -938,4 +969,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=95").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=97").catch((e) => console.warn("sw:", e.message));

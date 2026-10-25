@@ -174,6 +174,13 @@ footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1p
 .board .brand img { width: 1.4em; height: 1.4em; }
 .board #clock { display: block; font-size: 1.6em; font-weight: 800; font-variant-numeric: tabular-nums; }
 .board h1 { font-size: 1em; color: var(--muted); }
+/* Night (app.js tick): black, low-contrast, route colours dimmed, so a tablet by the door doesn't light the hall. */
+html:has(.board.night) { background: #000; }
+.board.night {
+  color-scheme: dark; --bg: #000; --card: #000; --card-2: #000; --text: #8a9099; --muted: #5a6068; --line: #15181c;
+  --accent: #3f7a5c; --live: #3f7a5c; --shadow: none; --pill-ring: transparent; --warn-bg: #000; --warn-text: #8a7a50;
+}
+.board.night > * { filter: brightness(.45) saturate(.5); }
 .board main { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15em), 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 16px; pointer-events: none; }
 .board main > .stop { min-height: 0; overflow: hidden; margin: 0; }
 .board #stops .more-routes { display: none; }
