@@ -4,7 +4,10 @@ from contextlib import redirect_stdout
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import check_live
+try:
+    import check_live
+except ModuleNotFoundError as e:  # the server image's test gate has no scripts/: check_live runs on the laptop
+    raise unittest.SkipTest(f"scripts/check_live.py not here ({e})")
 from google.transit import gtfs_realtime_pb2
 
 NOW = 1_800_000_000
