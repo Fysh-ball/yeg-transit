@@ -56,6 +56,19 @@ class Departures(unittest.TestCase):
             out = app.departures(fixture(), "1797", 8)
         self.assertEqual((out[0]["time"] - now, out[0]["live"]), (720, True))
 
+    def test_a_trip_not_started_waits_for_its_bus(self):  # 560 at Kingsway, 2026-10-26: ETS's start 19 min gone, bus 12.7 km off
+        now = int(time.time())
+        def first_stop(pos, eta, seqs={"11095": 9}, delay=2400):
+            with mock.patch.object(app, "scheduled", lambda *a: [{"trip": "t", "seq": 9, "sched": now + eta, "route": "560"}]), \
+                    mock.patch.object(app.LIVE, "trips", {"t": ({k: now + eta for k in seqs}, delay, seqs)}), \
+                    mock.patch.object(app.LIVE, "assigned", {"t": "2989"}), mock.patch.object(app.LIVE, "on_trip", {"2989": "before"}), \
+                    mock.patch.object(app.LIVE, "vehicles", {"before": (*pos, 0, now - 10, 38, "r", 0)}), mock.patch.object(app.LIVE, "ts", now):
+                out = app.departures(fixture(), "11095", 8)
+            return out and out[0]["time"] - now
+        self.assertTrue(85 <= first_stop(KM_SOUTH, -1140) <= 95)  # 0.8 km off: shown at 1.5 min, not hidden as gone
+        self.assertEqual(first_stop(KM_SOUTH, 600), 600)  # time enough to get here: ETS's time stands
+        self.assertFalse(first_stop(KM_SOUTH, -1140, {"1797": 11}, 0))  # ETS past its first stop: under way, no bound
+
     def test_trains_keep_ets_times(self):
         self.assertEqual(run(KM_SOUTH, route="Capital")["in"], 0)
 

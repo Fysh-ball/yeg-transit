@@ -130,15 +130,19 @@ def check(SITE):
             expect = x["sched"] + delay.get((x["trip"], stop), delay[x["trip"]])
             bus = f"stop {stop} route {x['route']} trip {x['trip']}: shows {round((mine - d['now']) / 60)} min"
             n = len(wrong)
-            if theirs and abs(mine - theirs) > OFF:
-                wrong.append(f"WRONG {bus}, ETS says {round((theirs - d['now']) / 60)} min")
-            elif abs(mine - expect) > OFF:
-                wrong.append(f"WRONG {bus}, timetable plus its delay says {round((expect - d['now']) / 60)} min")
-            elif mine - d["now"] <= 60 and not x.get("at") and (v := gps.get(x["trip"])) and d["now"] - v.timestamp < 120:
-                m = math.hypot(v.position.latitude - d["stop"]["lat"],
-                               (v.position.longitude - d["stop"]["lon"]) * math.cos(math.radians(d["stop"]["lat"]))) * 111000
-                if m > FAR:
-                    wrong.append(f"WRONG {bus}, its GPS is {m / 1000:.1f} km away")
+            v = gps.get(x["trip"])
+            m = v and d["now"] - v.timestamp < 120 and math.hypot(v.position.latitude - d["stop"]["lat"], (
+                v.position.longitude - d["stop"]["lon"]) * math.cos(math.radians(d["stop"]["lat"]))) * 111000
+            # ETS's time and its own delay can disagree: a 560 at Kingsway kept its timetable start, 19 min gone, while
+            # 40 min late (2026-10-26). Then anything between them is ETS's word. Later than both is right when the bus's
+            # GPS can't get here sooner: 2890/008, ETS said 11 min ago with no delay (2026-10-24; inferred: no GPS was logged).
+            said = [t for t in (theirs, expect) if t]
+            if not min(said) - OFF <= mine <= max(said) + OFF and not (
+                    m and mine > max(said) and abs(mine - (v.timestamp + m / 8)) <= OFF):
+                says = f"ETS says {round((theirs - d['now']) / 60)} min, " if theirs else ""
+                wrong.append(f"WRONG {bus}, {says}timetable plus its delay says {round((expect - d['now']) / 60)} min")
+            elif mine - d["now"] <= 60 and not x.get("at") and m and m > FAR:
+                wrong.append(f"WRONG {bus}, its GPS is {m / 1000:.1f} km away")
             if len(wrong) > n:
                 wrong[-1] += "".join(f"\n      ETS {r}" for r in raw[x["trip"]])
                 keys.append(f"wrong {stop} {x['route']}")

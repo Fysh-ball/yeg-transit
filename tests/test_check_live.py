@@ -16,12 +16,20 @@ def empty():
     return f
 
 
-def ets_feed():
+def ets_feed(at=45, delay=2):  # ETS's time at stop 1407 and its delay there, in minutes; the timetable says 43
     f = empty()
     tu = f.entity.add(id="1").trip_update
     tu.trip.trip_id = "T1"
     s = tu.stop_time_update.add(stop_sequence=5, stop_id="1407")
-    s.departure.time, s.departure.delay = NOW + 45 * 60, 120
+    s.departure.time, s.departure.delay = NOW + at * 60, delay * 60
+    return f.SerializeToString()
+
+
+def gps(metres_north):  # the bus on T1, a fresh fix due north of the stop
+    f = empty()
+    v = f.entity.add(id="1").vehicle
+    v.trip.trip_id, v.timestamp = "T1", NOW
+    v.position.latitude, v.position.longitude = 53.5 + metres_north / 111000, -113.5
     return f.SerializeToString()
 
 
@@ -50,8 +58,8 @@ class CheckLive(unittest.TestCase):
         with mock.patch.object(check_live.urllib.request, "urlopen", urlopen), redirect_stdout(out):
             return check_live.main(list(argv)), out.getvalue()
 
-    def answers(self, *site_answers):
-        return {check_live.RT_URL: [ets_feed()], check_live.VP_URL: [empty().SerializeToString()],
+    def answers(self, *site_answers, ets=None, vp=None):
+        return {check_live.RT_URL: [ets or ets_feed()], check_live.VP_URL: [vp or empty().SerializeToString()],
                 "https://yegbus.com/api/stops/1407/departures": list(site_answers)}
 
     def test_a_right_time_passes(self):
@@ -71,6 +79,18 @@ class CheckLive(unittest.TestCase):
         later = time.time() + 6 * 3600 + 1
         with mock.patch.object(check_live.time, "time", lambda: later):
             self.assertEqual(self.run_check(self.answers(site(12)), "--page")[0], 1)
+
+    def test_ets_disagreeing_with_itself_allows_either(self):  # 560 at Kingsway: timetable start gone, 40 min late
+        ets = ets_feed(at=43, delay=40)
+        self.assertEqual(self.run_check(self.answers(site(83), ets=ets))[0], 0)
+        self.assertEqual(self.run_check(self.answers(site(60), ets=ets))[0], 0)
+        self.assertEqual(self.run_check(self.answers(site(110), ets=ets))[0], 1)
+
+    def test_later_than_ets_is_right_only_where_the_gps_says(self):  # 2890/008: ETS said 11 min ago, the bus 4.3 km off
+        ets = ets_feed(at=-11, delay=-54)
+        self.assertEqual(self.run_check(self.answers(site(9), ets=ets, vp=gps(4300)))[0], 0)
+        self.assertEqual(self.run_check(self.answers(site(30), ets=ets, vp=gps(4300)))[0], 1)
+        self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(300)))[0], 1)  # 300 m off: due in 1 min, not 20
 
     def test_a_timeout_is_retried_once(self):
         self.assertEqual(self.run_check(self.answers(TimeoutError("The read operation timed out"), site(45)))[0], 0)

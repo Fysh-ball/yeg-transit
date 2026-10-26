@@ -269,6 +269,13 @@ def departures(db, stop_id, n):
         # ETS holds a late bus's prediction at its old time, so "Due" sat on screens with the bus 1 km out (WEM TC,
         # 2026-10-22). Where the bus is beats what ETS predicts: at the stop, gone past it, or no sooner than it can drive here.
         v = LIVE.vehicles.get(d["trip"])
+        b = not v and live and LIVE.vehicles.get(LIVE.on_trip.get(LIVE.assigned.get(d["trip"]), ""))
+        if b and here and now - b[3] < 120 and d["route"] not in TRAINS and min(seqs.values(), default=0) <= db.execute(
+                "SELECT min(seq) FROM stop_times WHERE trip_id=?", (d["trip"],)).fetchone()[0]:
+            # Not started: the bus ETS put on it is still driving an earlier trip and must get here first. ETS can hold
+            # the start at its timetable time with a 40 min delay, which hid a 560 at Kingsway as gone (2026-10-26).
+            m = math.hypot(b[0] - here[0], (b[1] - here[1]) * math.cos(math.radians(here[0]))) * 111000
+            d["time"] = t = max(t, b[3] + int(m / BUS_SPEED))
         if v and v[4] and here and now - v[3] < 120 and d["route"] not in TRAINS:
             nxt = next_stop(db, d["trip"], v)
             mine = db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=? AND stop_id=? AND seq>=?",
