@@ -742,6 +742,7 @@ async function openLiveMap() {
   m.timer = setInterval(placeFleet, 5000);
 }
 async function placeFleet() {
+  if (document.hidden) return; // a map left open in a background tab doesn't keep asking
   try {
     const d = await api("vehicles");
     if (mapState.trip !== "all") return;
@@ -792,6 +793,7 @@ function drawLine() {
 }
 async function placeBus() {
   const m = mapState, s = m.stop, trip = m.trip;
+  if (document.hidden) return;
   try {
     const v = await api(`trips/${encodeURIComponent(trip)}${s ? `?stop=${encodeURIComponent(s.id)}` : ""}`);
     if (m.trip !== trip) return; // another bus was opened meanwhile
@@ -1013,4 +1015,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=98").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=99").catch((e) => console.warn("sw:", e.message));

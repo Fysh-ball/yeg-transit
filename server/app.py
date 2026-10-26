@@ -28,6 +28,31 @@ def fetch(url, timeout):
     return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit/0.1"}), timeout=timeout)
 
 
+class Unchanged(Exception):
+    """ETS answered 304: the feed is the copy we already hold."""
+
+
+SEEN = {}  # feed url -> Last-Modified of the copy we hold
+
+
+def feed_of(url):
+    """A realtime feed, asked for only if it changed since our copy. We poll every 10 s and ETS publishes every 30 s,
+    so two polls in three are a 304 with no body: about 2/3 less download than fetching it whole each time."""
+    h = {"User-Agent": "yeg-transit/0.1"}
+    if SEEN.get(url):
+        h["If-Modified-Since"] = SEEN[url]
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=20) as r:
+            f = gtfs_realtime_pb2.FeedMessage()
+            f.ParseFromString(r.read())
+            SEEN[url] = r.headers.get("Last-Modified")  # only once parsed, so a bad copy is fetched again
+            return f
+    except urllib.error.HTTPError as e:
+        if e.code == 304:
+            raise Unchanged() from None
+        raise
+
+
 def secs(t):
     h, m, s = t.split(":")
     return int(h) * 3600 + int(m) * 60 + int(s)
@@ -117,9 +142,7 @@ class Live:
 
     def poll(self):
         try:
-            with fetch(RT_URL, 20) as r:
-                feed = gtfs_realtime_pb2.FeedMessage()
-                feed.ParseFromString(r.read())
+            feed = feed_of(RT_URL)
             trips, assigned = {}, {}
             for e in feed.entity:
                 tu = e.trip_update
@@ -139,33 +162,35 @@ class Live:
                 if tu.vehicle.id:
                     assigned[tu.trip.trip_id] = tu.vehicle.id
             self.trips, self.assigned, self.ts, self.error = trips, assigned, feed.header.timestamp, None
+        except Unchanged:
+            self.error = None
         except Exception as e:
             self.error = f"{type(e).__name__}: {e}"
             print("live poll failed:", self.error, file=sys.stderr)
         try:
-            with fetch(VP_URL, 20) as r:
-                feed = gtfs_realtime_pb2.FeedMessage()
-                feed.ParseFromString(r.read())
+            feed = feed_of(VP_URL)
             vps = [e.vehicle for e in feed.entity if e.HasField("vehicle") and e.vehicle.trip.trip_id]
             self.vehicles = {v.trip.trip_id: (v.position.latitude, v.position.longitude, v.position.bearing,
                                               v.timestamp or feed.header.timestamp, v.current_stop_sequence,
                                               v.trip.route_id, v.trip.direction_id) for v in vps}
             self.on_trip = {v.vehicle.id: v.trip.trip_id for v in vps if v.vehicle.id}
             self.vp_error, self.vp_ts = None, feed.header.timestamp or int(time.time())
+        except Unchanged:
+            self.vp_error = None
         except Exception as e:
             self.vp_error = f"{type(e).__name__}: {e}"
             print("vehicle poll failed:", self.vp_error, file=sys.stderr)
         if time.time() - self.alerts_at >= 300:
             try:
                 self.alerts, self.alerts_at = self.poll_alerts(), time.time()
+            except Unchanged:
+                self.alerts_at = time.time()
             except Exception as e:
                 print("alerts poll failed:", f"{type(e).__name__}: {e}", file=sys.stderr)
 
     @staticmethod
     def poll_alerts():
-        with fetch(ALERTS_URL, 20) as r:
-            feed = gtfs_realtime_pb2.FeedMessage()
-            feed.ParseFromString(r.read())
+        feed = feed_of(ALERTS_URL)
         now, out = time.time(), {}
         text = lambda t: t.translation[0].text.strip() if t.translation else ""
         for e in feed.entity:

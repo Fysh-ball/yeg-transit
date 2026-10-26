@@ -72,7 +72,7 @@ class LoopTrip(unittest.TestCase):
         last = tu.stop_time_update.add(stop_sequence=34, stop_id="5212")
         last.arrival.time = now + 1980
         live = app.Live()
-        with mock.patch.object(app, "fetch", lambda *a: io.BytesIO(feed.SerializeToString())), \
+        with mock.patch.object(app, "feed_of", lambda *a: feed), \
                 mock.patch("sys.stderr", io.StringIO()):
             live.poll()
         self.assertEqual(live.trips["t"][0]["5212"], now + 480)
@@ -86,7 +86,7 @@ class LoopTrip(unittest.TestCase):
             tu.trip.trip_id, tu.vehicle.id = "t", vehicle
             tu.stop_time_update.add(stop_sequence=1, stop_id="5212").departure.time = at
         live = app.Live()
-        with mock.patch.object(app, "fetch", lambda *a: io.BytesIO(feed.SerializeToString())), \
+        with mock.patch.object(app, "feed_of", lambda *a: feed), \
                 mock.patch("sys.stderr", io.StringIO()):
             live.poll()
         self.assertEqual(live.trips["t"][0]["5212"], now + 600)

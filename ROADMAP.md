@@ -21,3 +21,4 @@ on our box at a public address, and Edmonton Transit Riders has been told about 
 10. [x] "All buses by time" list per stop, next to "Buses to show" (grouped by route stays the default), from a parity check with ETR's Transit Tracker (v97).
 11. [x] Wall board dims at night (10 or 11 pm to 6 am, or off): dark, low-contrast look; the copy says to turn the tablet's brightness down too, since a page can't (v97).
 12. [x] Grandma-easy first-stop setup (ask 144, design sample 6): three big ways in (near me, near an address, stop number), then one question a screen for routes, walk and what the stop is for (v98).
+13. [x] Cheap to host as riders grow (v99): ETS feeds asked for only when changed (304, about 2/3 less download per box); departures, bus map and timetables shared per stop at the Cloudflare edge (10 s, 5 s, 10 min), with the last good copy served if the Pi and TrueNAS are both down; the bus map stops asking in a hidden tab.
