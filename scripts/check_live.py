@@ -1,7 +1,11 @@
 """Do the live times people see match ETS's own feed? Exits 1 and says which bus when they don't.
 
 Run after every release and every 15 min (docs/SETUP.md). Asks the public site, so it checks what a phone gets.
-    .venv/bin/python scripts/check_live.py [https://yegbus.com]
+    .venv/bin/python scripts/check_live.py [--page] [https://yegbus.com]
+
+Exit 1: a wrong time. Exit 3: yegbus.com or ETS didn't answer, twice 20 s apart (a laptop switching networks isn't a
+wrong time; 2026-10-26 11:16). With --page (the 15-min timer), exit 1 only for a stop and route not already paged in
+the last 6 h, and exit 3 at most once an hour; every WRONG line is still printed. Without it, every wrong time fails.
 
 Two ways a time goes wrong, both seen on the 918B loop at WEM on 2026-10-22:
 - far off ETS's own time for that bus at that stop (we showed 33 min, ETS said 8);
@@ -10,23 +14,79 @@ And one ETS agrees with, so only GPS shows it: Due with the bus far away (a 902 
 along its route with ETS still holding it at its first stop, 2026-10-23).
 The server may push a time later than ETS when the bus can't drive there that fast, so only big gaps count.
 """
-import json, math, sys, time, urllib.request
+import json, math, os, sys, time, urllib.request
 
 from google.transit import gtfs_realtime_pb2
 
 RT_URL = "https://gtfs.edmonton.ca/TMGTFSRealTimeWebService/TripUpdate/TripUpdates.pb"
 VP_URL = "https://gtfs.edmonton.ca/TMGTFSRealTimeWebService/Vehicle/VehiclePositions.pb"
-SITE = (sys.argv[1] if len(sys.argv) > 1 else "https://yegbus.com").rstrip("/")
+RETRY = 20  # seconds before the one retry of a failed fetch
+STATE = os.path.expanduser("~/.local/state/yeg-check-paged.json")  # page key -> when it last paged
+QUIET = {"wrong": 6 * 3600, "unreachable": 3600}
 STOPS = 25  # per run: every /api call is a Cloudflare Pages Function request, 100k a day on the free plan
 OFF = 15 * 60  # seconds apart before a time counts as wrong
 FAR = 1500  # metres, straight line: a bus shown 1 min or less away can't be further (8 m/s for 3 min, for stale GPS)
 
 
+class Unreachable(Exception):
+    pass
+
+
 def get(url):
-    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit-check/1"}), timeout=20).read()
+    for wait in (RETRY, None):
+        try:
+            return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit-check/1"}),
+                                          timeout=20).read()
+        except (OSError, ValueError) as e:  # URLError, HTTPError, timeouts and resets are all OSError
+            if wait is None:
+                raise Unreachable(f"no answer from {url.split('/api/')[0]} ({e})") from None
+            time.sleep(wait)
 
 
-def main():
+def due(keys, page):
+    """The page keys to page now: all of them without --page, else those not paged within their quiet time."""
+    if not page:
+        return keys
+    try:
+        with open(STATE) as f:
+            last = json.load(f)
+    except (OSError, ValueError):
+        last = {}
+    now = time.time()
+    new = [k for k in keys if now - last.get(k, 0) >= QUIET[k.split(" ")[0]]]
+    last = {k: t for k, t in last.items() if now - t < max(QUIET.values())}
+    last.update({k: now for k in new})
+    try:
+        os.makedirs(os.path.dirname(STATE), exist_ok=True)
+        with open(STATE, "w") as f:
+            json.dump(last, f)
+    except OSError as e:
+        print("can't save what was paged, so every wrong time pages:", e)
+    return new
+
+
+def main(argv=sys.argv[1:]):
+    page = "--page" in argv
+    site = next((a for a in argv if not a.startswith("--")), "https://yegbus.com").rstrip("/")
+    try:
+        wrong, keys, checked = check(site)
+    except Unreachable as e:  # ETS's own feed: nothing to compare with
+        print(f"UNREACHABLE {e} ({time.strftime('%H:%M')})")
+        return 3 if due(["unreachable"], page) else 0
+    print(f"{site}: {checked} live buses at {STOPS} stops, {len(wrong)} wrong ({time.strftime('%H:%M')})")
+    for w in wrong:
+        print(w)
+    if not checked and not any(k.startswith("unreachable") for k in keys):
+        print("WRONG nothing to check: no live buses came back")  # a check that saw nothing must not pass
+        keys.append("wrong nothing")
+    paging = due(sorted(set(keys)), page)
+    if any(k.startswith("wrong") for k in paging):
+        return 1
+    return 3 if paging else 0
+
+
+def check(SITE):
+    """Returns (lines to print, page keys, live buses checked)."""
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(get(RT_URL))
     ets, delay, firsts = {}, {}, {}  # (trip, stop) -> first-pass time; trip and (trip, stop) -> delay; stop -> trips starting there
@@ -54,13 +114,14 @@ def main():
     for trip, stop in ets:
         seen[stop] = seen.get(stop, 0) + 1
     stops = sorted(seen, key=lambda s: (-len(firsts.get(s, ())), -seen[s]))[:STOPS]
-    wrong, checked = [], 0
+    wrong, keys, checked = [], [], 0
     for stop in stops:
         try:
             d = json.loads(get(f"{SITE}/api/stops/{stop}/departures?n=30"))
-        except Exception as e:
-            wrong.append(f"stop {stop}: no answer from {SITE} ({e})")
-            continue
+        except Unreachable as e:
+            wrong.append(f"UNREACHABLE stop {stop}: {e}")
+            keys.append("unreachable")
+            break  # the rest would each wait out the same retry
         for x in d["departures"]:
             if not x.get("live") or x["trip"] not in delay:
                 continue
@@ -70,22 +131,18 @@ def main():
             bus = f"stop {stop} route {x['route']} trip {x['trip']}: shows {round((mine - d['now']) / 60)} min"
             n = len(wrong)
             if theirs and abs(mine - theirs) > OFF:
-                wrong.append(f"{bus}, ETS says {round((theirs - d['now']) / 60)} min")
+                wrong.append(f"WRONG {bus}, ETS says {round((theirs - d['now']) / 60)} min")
             elif abs(mine - expect) > OFF:
-                wrong.append(f"{bus}, timetable plus its delay says {round((expect - d['now']) / 60)} min")
+                wrong.append(f"WRONG {bus}, timetable plus its delay says {round((expect - d['now']) / 60)} min")
             elif mine - d["now"] <= 60 and not x.get("at") and (v := gps.get(x["trip"])) and d["now"] - v.timestamp < 120:
                 m = math.hypot(v.position.latitude - d["stop"]["lat"],
                                (v.position.longitude - d["stop"]["lon"]) * math.cos(math.radians(d["stop"]["lat"]))) * 111000
                 if m > FAR:
-                    wrong.append(f"{bus}, its GPS is {m / 1000:.1f} km away")
+                    wrong.append(f"WRONG {bus}, its GPS is {m / 1000:.1f} km away")
             if len(wrong) > n:
                 wrong[-1] += "".join(f"\n      ETS {r}" for r in raw[x["trip"]])
-    print(f"{SITE}: {checked} live buses at {len(stops)} stops, {len(wrong)} wrong ({time.strftime('%H:%M')})")
-    for w in wrong:
-        print("WRONG", w)
-    if not checked:
-        print("WRONG nothing to check: no live buses came back")  # a check that saw nothing must not pass
-    return 1 if wrong or not checked else 0
+                keys.append(f"wrong {stop} {x['route']}")
+    return wrong, keys, checked
 
 
 if __name__ == "__main__":
