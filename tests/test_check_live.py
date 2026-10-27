@@ -97,7 +97,11 @@ class CheckLive(unittest.TestCase):
 
     def test_a_trip_not_started_waits_for_its_bus(self):  # 3705/055: ETS due now, its bus 9.6 km off on an earlier trip
         ets = ets_feed(at=0, delay=-43, bus="3135")
-        self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0")))[0], 0)
+        code, out = self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0")), "--page")
+        self.assertEqual(code, 0)  # not paged, but logged with where its bus is, in case ETS put the wrong bus on it
+        self.assertIn("HELD stop 1407 route 002 trip T1: shows 20 min, ETS says 0 min, its bus 3135 on trip T0 is 9.6 km", out)
+        self.assertIn("0 wrong", out)
+        self.assertIn("ETS veh 3135", out)
         self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0", bus="9999")))[0], 1)
 
     def test_the_edges_old_copy_is_unreachable_not_wrong(self):  # 5212/906 shown at -3 min, both origins down

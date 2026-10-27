@@ -74,7 +74,7 @@ def main(argv=sys.argv[1:]):
     except Unreachable as e:  # ETS's own feed: nothing to compare with
         print(f"UNREACHABLE {e} ({time.strftime('%H:%M')})")
         return 3 if due(["unreachable"], page) else 0
-    print(f"{site}: {checked} live buses at {STOPS} stops, {len(wrong)} wrong ({time.strftime('%H:%M')})")
+    print(f"{site}: {checked} live buses at {STOPS} stops, {sum(not w.startswith('HELD') for w in wrong)} wrong ({time.strftime('%H:%M')})")
     for w in wrong:
         print(w)
     if not checked and not any(k.startswith("unreachable") for k in keys):
@@ -150,11 +150,15 @@ def check(SITE):
                     m and mine > max(said) and abs(mine - (v.timestamp + m / 8)) <= OFF):
                 says = f"ETS says {round((theirs - d['now']) / 60)} min, " if theirs else ""
                 wrong.append(f"WRONG {bus}, {says}timetable plus its delay says {round((expect - d['now']) / 60)} min")
+            elif mine > max(said) + OFF:  # taken on the GPS alone: logged, not paged, so a wrong bus on the trip shows
+                wrong.append(f"HELD {bus}, ETS says {round((max(said) - d['now']) / 60)} min, its bus {v.vehicle.id} on trip "
+                             f"{v.trip.trip_id} is {m / 1000:.1f} km away")  # 3705/055 was never checked (2026-10-27)
             elif mine - d["now"] <= 60 and not x.get("at") and m and m > FAR:
                 wrong.append(f"WRONG {bus}, its GPS is {m / 1000:.1f} km away")
             if len(wrong) > n:
+                if not wrong[-1].startswith("HELD"):
+                    keys.append(f"wrong {stop} {x['route']}")
                 wrong[-1] += "".join(f"\n      ETS {r}" for r in raw[x["trip"]])
-                keys.append(f"wrong {stop} {x['route']}")
     return wrong, keys, checked
 
 
