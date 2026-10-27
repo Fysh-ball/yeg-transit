@@ -308,14 +308,23 @@ public class BusWidget extends AppWidgetProvider {
         return head.startsWith(route + " ") ? head.substring(route.length() + 1) : head;
     }
 
-    /** "3 min", "Due", "Go now" (or "Go" on a row), or the clock time past an hour; the "min" small. */
+    /** "3 min", "Due", "Go now" (or "Go" on a row), or the clock time past an hour; the "min" small. With a walk it
+     *  counts to leaving, so it says so: an unlabelled "8 min" read as the bus, where the app said "Bus in 19 min" (2026-10-26). */
     private static CharSequence when(Context c, JSONObject d, long leave, boolean big) {
         long m = Math.round(leave / 60.0);
-        if (d.optBoolean("walking") && leave < 30) return big ? "Go now" : "Go";
+        boolean walking = d.optBoolean("walking");
+        if (walking && leave < 30) return big ? "Go now" : "Go";
         if (m <= 0) return "Due";
-        if (m >= 60) return DateFormat.getTimeFormat(c).format(new java.util.Date((System.currentTimeMillis() / 1000 + leave) * 1000));
-        android.text.SpannableString s = new android.text.SpannableString(m + " min");
-        if (big) s.setSpan(new android.text.style.RelativeSizeSpan(.5f), s.length() - 4, s.length(), 0); // rows: one size
+        if (m >= 60) {
+            String t = DateFormat.getTimeFormat(c).format(new java.util.Date((System.currentTimeMillis() / 1000 + leave) * 1000));
+            return walking ? "Leave at " + t : t;
+        }
+        String pre = walking ? "Leave in " : "";
+        android.text.SpannableString s = new android.text.SpannableString(pre + m + " min");
+        if (big) { // rows: one size
+            s.setSpan(new android.text.style.RelativeSizeSpan(.5f), s.length() - 4, s.length(), 0);
+            if (walking) s.setSpan(new android.text.style.RelativeSizeSpan(.5f), 0, pre.length(), 0);
+        }
         return s;
     }
 
