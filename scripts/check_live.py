@@ -91,8 +91,10 @@ def check(SITE):
     feed.ParseFromString(get(RT_URL))
     ets, delay, firsts = {}, {}, {}  # (trip, stop) -> first-pass time; trip and (trip, stop) -> delay; stop -> trips starting there
     raw = {}  # trip -> each ETS entry for it, printed with a WRONG line (1407/002, 2026-10-24: site 13 min, delay said 48)
+    assigned = {}  # trip -> the bus ETS put on it, which may still be driving an earlier trip
     for e in feed.entity:
         tu = e.trip_update
+        assigned.setdefault(tu.trip.trip_id, tu.vehicle.id)
         raw.setdefault(tu.trip.trip_id, []).append(f"veh {tu.vehicle.id or '-'} seq:delay " + " ".join(
             f"{s.stop_sequence}:{(s.departure if s.HasField('departure') else s.arrival).delay // 60:+d}"
             for s in tu.stop_time_update[:8]))
@@ -109,6 +111,7 @@ def check(SITE):
     vp = gtfs_realtime_pb2.FeedMessage()
     vp.ParseFromString(get(VP_URL))
     gps = {e.vehicle.trip.trip_id: e.vehicle for e in vp.entity if e.vehicle.trip.trip_id}
+    bus_at = {e.vehicle.vehicle.id: e.vehicle for e in vp.entity if e.vehicle.vehicle.id}
     # Where routes start (transit centres, where loops begin and end) first, then the stops most trips pass.
     seen = {}
     for trip, stop in ets:
@@ -122,6 +125,10 @@ def check(SITE):
             wrong.append(f"UNREACHABLE stop {stop}: {e}")
             keys.append("unreachable")
             break  # the rest would each wait out the same retry
+        if (d.get("live_age") or 0) > 120:  # both origins down: the edge's last copy, aged (5212/906 at -3 min, 2026-10-26)
+            wrong.append(f"UNREACHABLE stop {stop}: only the edge's copy answers, live times {d['live_age'] // 60} min old")
+            keys.append("unreachable")
+            break
         for x in d["departures"]:
             if not x.get("live") or x["trip"] not in delay:
                 continue
@@ -130,7 +137,8 @@ def check(SITE):
             expect = x["sched"] + delay.get((x["trip"], stop), delay[x["trip"]])
             bus = f"stop {stop} route {x['route']} trip {x['trip']}: shows {round((mine - d['now']) / 60)} min"
             n = len(wrong)
-            v = gps.get(x["trip"])
+            # Not started: the bus ETS put on it is still on an earlier trip (3705/055 at Meadows TC, 2026-10-26).
+            v = gps.get(x["trip"]) or bus_at.get(assigned.get(x["trip"]) or None)
             m = v and d["now"] - v.timestamp < 120 and math.hypot(v.position.latitude - d["stop"]["lat"], (
                 v.position.longitude - d["stop"]["lon"]) * math.cos(math.radians(d["stop"]["lat"]))) * 111000
             # ETS's time and its own delay can disagree: a 560 at Kingsway kept its timetable start, 19 min gone, while

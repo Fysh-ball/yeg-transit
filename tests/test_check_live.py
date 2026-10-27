@@ -19,25 +19,25 @@ def empty():
     return f
 
 
-def ets_feed(at=45, delay=2):  # ETS's time at stop 1407 and its delay there, in minutes; the timetable says 43
+def ets_feed(at=45, delay=2, bus=""):  # ETS's time at stop 1407 and its delay there, in minutes; the timetable says 43
     f = empty()
     tu = f.entity.add(id="1").trip_update
-    tu.trip.trip_id = "T1"
+    tu.trip.trip_id, tu.vehicle.id = "T1", bus
     s = tu.stop_time_update.add(stop_sequence=5, stop_id="1407")
     s.departure.time, s.departure.delay = NOW + at * 60, delay * 60
     return f.SerializeToString()
 
 
-def gps(metres_north):  # the bus on T1, a fresh fix due north of the stop
+def gps(metres_north, trip="T1", bus="3135"):  # a bus on `trip`, a fresh fix due north of the stop
     f = empty()
     v = f.entity.add(id="1").vehicle
-    v.trip.trip_id, v.timestamp = "T1", NOW
+    v.trip.trip_id, v.vehicle.id, v.timestamp = trip, bus, NOW
     v.position.latitude, v.position.longitude = 53.5 + metres_north / 111000, -113.5
     return f.SerializeToString()
 
 
-def site(shows):  # the site's answer for stop 1407: route 002 at `shows` minutes, timetable says 43
-    return json.dumps({"now": NOW, "stop": {"lat": 53.5, "lon": -113.5}, "departures": [
+def site(shows, live_age=10):  # the site's answer for stop 1407: route 002 at `shows` minutes, timetable says 43
+    return json.dumps({"now": NOW, "live_age": live_age, "stop": {"lat": 53.5, "lon": -113.5}, "departures": [
         {"trip": "T1", "route": "002", "live": True, "time": NOW + shows * 60, "sched": NOW + 43 * 60}]}).encode()
 
 
@@ -94,6 +94,17 @@ class CheckLive(unittest.TestCase):
         self.assertEqual(self.run_check(self.answers(site(9), ets=ets, vp=gps(4300)))[0], 0)
         self.assertEqual(self.run_check(self.answers(site(30), ets=ets, vp=gps(4300)))[0], 1)
         self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(300)))[0], 1)  # 300 m off: due in 1 min, not 20
+
+    def test_a_trip_not_started_waits_for_its_bus(self):  # 3705/055: ETS due now, its bus 9.6 km off on an earlier trip
+        ets = ets_feed(at=0, delay=-43, bus="3135")
+        self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0")))[0], 0)
+        self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0", bus="9999")))[0], 1)
+
+    def test_the_edges_old_copy_is_unreachable_not_wrong(self):  # 5212/906 shown at -3 min, both origins down
+        code, out = self.run_check(self.answers(site(-3, live_age=400)), "--page")
+        self.assertEqual(code, 3)
+        self.assertIn("only the edge's copy", out)
+        self.assertNotIn("WRONG", out)
 
     def test_a_timeout_is_retried_once(self):
         self.assertEqual(self.run_check(self.answers(TimeoutError("The read operation timed out"), site(45)))[0], 0)
