@@ -146,7 +146,12 @@ def check(SITE):
             # 40 min late (2026-10-26). Then anything between them is ETS's word. Later than both is right when the bus's
             # GPS can't get here sooner: 2890/008, ETS said 11 min ago with no delay (2026-10-24; inferred: no GPS was logged).
             said = [t for t in (theirs, expect) if t]
-            if not min(said) - OFF <= mine <= max(said) + OFF and not (
+            # Not started, its bus away from its first stop: it drives there first, then the route, further than the
+            # straight line here (3053 on 004, 16 km from Lewis Farms: site 60 min, ETS's delay 42, 2026-10-27).
+            # ponytail: no stop positions here to add that path up, so it's logged as HELD, not judged; with the
+            # trip's stops (data/gtfs.db) it could be checked like the straight line.
+            start = m and v.current_stop_sequence == 1 and mine > max(said)  # 0: ETS sent none
+            if not min(said) - OFF <= mine <= max(said) + OFF and not start and not (
                     m and mine > max(said) and abs(mine - (v.timestamp + m / 8)) <= OFF):
                 says = f"ETS says {round((theirs - d['now']) / 60)} min, " if theirs else ""
                 wrong.append(f"WRONG {bus}, {says}timetable plus its delay says {round((expect - d['now']) / 60)} min")

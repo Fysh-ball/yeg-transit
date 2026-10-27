@@ -104,6 +104,16 @@ class CheckLive(unittest.TestCase):
         self.assertIn("ETS veh 3135", out)
         self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0", bus="9999")))[0], 1)
 
+    def test_a_bus_yet_to_start_is_held_not_wrong(self):  # 3053/004: at seq 1 per GPS, 16 km from its first stop
+        ets = ets_feed(at=-29, delay=-1, bus="3135")  # timetable plus delay: 42 min
+        vp = gtfs_realtime_pb2.FeedMessage.FromString(gps(6800))
+        vp.entity[0].vehicle.current_stop_sequence = 1
+        code, out = self.run_check(self.answers(site(60), ets=ets, vp=vp.SerializeToString()), "--page")
+        self.assertEqual(code, 0)
+        self.assertIn("HELD", out)
+        vp.entity[0].vehicle.current_stop_sequence = 20  # under way: the straight line holds, 60 min is wrong
+        self.assertEqual(self.run_check(self.answers(site(60), ets=ets, vp=vp.SerializeToString()))[0], 1)
+
     def test_the_edges_old_copy_is_unreachable_not_wrong(self):  # 5212/906 shown at -3 min, both origins down
         code, out = self.run_check(self.answers(site(-3, live_age=400)), "--page")
         self.assertEqual(code, 3)
