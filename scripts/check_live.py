@@ -39,7 +39,8 @@ def get(url):
                                           timeout=20).read()
         except (OSError, ValueError) as e:  # URLError, HTTPError, timeouts and resets are all OSError
             if wait is None:
-                raise Unreachable(f"no answer from {url.split('/api/')[0]} ({e})") from None
+                # No < or >: the popup reads its text as markup and drops "<urlopen error ...>" whole (2026-10-26 00:30).
+                raise Unreachable(f"no answer from {url.split('/api/')[0]} ({str(e).strip('<>')})") from None
             time.sleep(wait)
 
 

@@ -114,6 +114,7 @@ class CheckLive(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertIn("UNREACHABLE", out)
         self.assertNotIn("WRONG", out)
+        self.assertNotIn("<", out)  # the popup reads markup: "<urlopen error" made it fail to show (00:30)
 
     def test_ets_down_is_unreachable(self):
         a = self.answers()
