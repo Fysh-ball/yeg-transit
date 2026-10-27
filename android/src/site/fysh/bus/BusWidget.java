@@ -223,7 +223,8 @@ public class BusWidget extends AppWidgetProvider {
         // Not live (timetable, or ETS's feed stalled): say so on the hero itself, as a small widget has no room for notes.
         if (!d.optBoolean("live")) more = more.isEmpty() ? "Not live" : "Not live \u00b7 " + more;
         v.setTextViewText(R.id.then, glass && !more.isEmpty() ? "\u00b7 " + more : more);
-        v.setTextViewText(R.id.stop, here > 1 ? (group.isEmpty() ? here + " stops" : group) : stop);
+        // Across stops the lead is the bus to leave for first, not the app's first card: say why it's on top (2026-10-27).
+        v.setTextViewText(R.id.stop, here > 1 ? "Catch next \u00b7 " + (group.isEmpty() ? here + " stops" : group) : stop);
         if (tall && !glass) v.setImageViewBitmap(R.id.wave, wave(c, w - 28, fill, chip));
         int rowH = here > 1 ? 50 : 34;
         // Each stop's next bus first, then the soonest of the rest: ten routes at a transit centre used to fill the
