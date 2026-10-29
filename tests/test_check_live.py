@@ -46,6 +46,7 @@ class CheckLive(unittest.TestCase):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
         for p in (mock.patch.object(check_live, "STATE", os.path.join(d.name, "paged.json")),
+                  mock.patch.object(check_live, "HELD_AT", os.path.join(d.name, "held.json")),
                   mock.patch.object(check_live.time, "sleep", lambda s: None)):
             p.start()
             self.addCleanup(p.stop)
@@ -103,6 +104,21 @@ class CheckLive(unittest.TestCase):
         self.assertIn("0 wrong", out)
         self.assertIn("ETS veh 3135", out)
         self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0", bus="9999")))[0], 1)
+
+    def test_a_held_bus_gone_long_before_its_time_pages(self):  # ETS had the wrong bus on it: riders told 20 min
+        ets = ets_feed(at=0, delay=-43, bus="3135")
+        vp = gps(9600, trip="T0")
+        self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=vp))[0], 0)
+        gone = json.dumps({"now": NOW, "live_age": 10, "stop": {"lat": 53.5, "lon": -113.5}, "departures": []}).encode()
+        # (an empty board also fails as "nothing to check"; the HELD line is what's tested here)
+        self.assertIn("WRONG stop 1407 trip T1: gone 20 min before the time we showed", self.run_check(self.answers(gone, ets=ets, vp=vp))[1])
+        self.assertNotIn("gone", self.run_check(self.answers(gone, ets=ets, vp=vp))[1])  # checked once, then forgotten
+
+    def test_a_held_bus_gone_near_its_time_is_right(self):
+        ets = ets_feed(at=0, delay=-43, bus="3135")
+        self.assertEqual(self.run_check(self.answers(site(20), ets=ets, vp=gps(9600, trip="T0")))[0], 0)
+        gone = json.dumps({"now": NOW + 15 * 60, "live_age": 10, "stop": {"lat": 53.5, "lon": -113.5}, "departures": []})
+        self.assertNotIn("gone", self.run_check(self.answers(gone.encode(), ets=ets, vp=gps(9600, trip="T0")))[1])
 
     def test_a_bus_yet_to_start_is_held_not_wrong(self):  # 3053/004: at seq 1 per GPS, 16 km from its first stop
         ets = ets_feed(at=-29, delay=-1, bus="3135")  # timetable plus delay: 42 min

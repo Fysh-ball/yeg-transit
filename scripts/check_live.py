@@ -22,6 +22,7 @@ RT_URL = "https://gtfs.edmonton.ca/TMGTFSRealTimeWebService/TripUpdate/TripUpdat
 VP_URL = "https://gtfs.edmonton.ca/TMGTFSRealTimeWebService/Vehicle/VehiclePositions.pb"
 RETRY = 20  # seconds before the one retry of a failed fetch
 STATE = os.path.expanduser("~/.local/state/yeg-check-paged.json")  # page key -> when it last paged
+HELD_AT = os.path.expanduser("~/.local/state/yeg-check-held.json")  # "trip stop" -> the time the site showed, HELD
 QUIET = {"wrong": 6 * 3600, "unreachable": 3600}
 STOPS = 25  # per run: every /api call is a Cloudflare Pages Function request, 100k a day on the free plan
 OFF = 15 * 60  # seconds apart before a time counts as wrong
@@ -119,6 +120,12 @@ def check(SITE):
         seen[stop] = seen.get(stop, 0) + 1
     stops = sorted(seen, key=lambda s: (-len(firsts.get(s, ())), -seen[s]))[:STOPS]
     wrong, keys, checked = [], [], 0
+    # A HELD time is checked once its bus has gone: gone well before the time we showed is a bus riders missed.
+    try:
+        with open(HELD_AT) as f:
+            held = json.load(f)
+    except (OSError, ValueError):
+        held = {}
     for stop in stops:
         try:
             d = json.loads(get(f"{SITE}/api/stops/{stop}/departures?n=30"))
@@ -130,6 +137,16 @@ def check(SITE):
             wrong.append(f"UNREACHABLE stop {stop}: only the edge's copy answers, live times {d['live_age'] // 60} min old")
             keys.append("unreachable")
             break
+        listed = {x["trip"] for x in d["departures"]}
+        for k, shown in list(held.items()):
+            trip, at = k.split(" ")
+            if at != stop or trip in listed:
+                continue
+            del held[k]
+            if d["now"] < shown - OFF:
+                wrong.append(f"WRONG stop {stop} trip {trip}: gone {round((shown - d['now']) / 60)} min before the time "
+                             f"we showed, HELD on its bus's GPS")
+                keys.append(f"wrong {stop} held")
         for x in d["departures"]:
             if not x.get("live") or x["trip"] not in delay:
                 continue
@@ -158,12 +175,21 @@ def check(SITE):
             elif mine > max(said) + OFF:  # taken on the GPS alone: logged, not paged, so a wrong bus on the trip shows
                 wrong.append(f"HELD {bus}, ETS says {round((max(said) - d['now']) / 60)} min, its bus {v.vehicle.id} on trip "
                              f"{v.trip.trip_id} is {m / 1000:.1f} km away")  # 3705/055 was never checked (2026-10-27)
+                held[f"{x['trip']} {stop}"] = mine
             elif mine - d["now"] <= 60 and not x.get("at") and m and m > FAR:
                 wrong.append(f"WRONG {bus}, its GPS is {m / 1000:.1f} km away")
             if len(wrong) > n:
                 if not wrong[-1].startswith("HELD"):
                     keys.append(f"wrong {stop} {x['route']}")
                 wrong[-1] += "".join(f"\n      ETS {r}" for r in raw[x["trip"]])
+    now = time.time()
+    try:
+        os.makedirs(os.path.dirname(HELD_AT), exist_ok=True)
+        with open(HELD_AT, "w") as f:
+            json.dump({k: t for k, t in held.items() if t > now - OFF}, f)
+    except OSError as e:
+        wrong.append(f"WRONG can't save HELD times, so none can be checked: {e}")
+        keys.append("wrong held-save")
     return wrong, keys, checked
 
 
