@@ -30,7 +30,7 @@ ${DEPLOY_WRAP:-} ssh -n "$H" "cd $D && { $DK tag yeg-transit:latest yeg-transit:
   $DK run --rm --network none -v /tmp/yeg-tests:/app/tests:ro yeg-transit:latest python -m unittest discover -s /app/tests && \
   $DK compose up -d; s=\$?; rm -f /tmp/yeg-tests/*.py; rmdir /tmp/yeg-tests; exit \$s"
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  [ "$(curl -s -m 10 $SITE/sw.js | grep -oE 'yeg-v[0-9]+' | head -1)" = "$V" ] &&
+  [ "$(curl -s -m 10 "$SITE/sw.js?landed=$SHA" | grep -oE 'yeg-v[0-9]+' | head -1)" = "$V" ] &&  # the query skips an edge copy of an older sw.js (v102 read NOT landed while live)
     [ "$(curl -s -m 10 $SITE/api/version | grep -oE '[0-9a-f]{40}')" = "$SHA" ] && { echo "landed: $SHA ($V)"; echo "rollback: $R"; exit 0; }
   sleep 3
 done
