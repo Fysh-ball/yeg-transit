@@ -174,7 +174,8 @@ def check(SITE):
                 wrong.append(f"WRONG {bus}, {says}timetable plus its delay says {round((expect - d['now']) / 60)} min")
             elif mine > max(said) + OFF:  # taken on the GPS alone: logged, not paged, so a wrong bus on the trip shows
                 wrong.append(f"HELD {bus}, ETS says {round((max(said) - d['now']) / 60)} min, its bus {v.vehicle.id} on trip "
-                             f"{v.trip.trip_id} is {m / 1000:.1f} km away")  # 3705/055 was never checked (2026-10-27)
+                             f"{v.trip.trip_id} is {m / 1000:.1f} km away at {v.position.latitude:.5f},{v.position.longitude:.5f} "
+                             f"heading {v.position.bearing:.0f}")  # 3705/055 was never checked (2026-10-27); 004 at 2002 had no position to read (10-29)
                 held[f"{x['trip']} {stop}"] = mine
             elif mine - d["now"] <= 60 and not x.get("at") and m and m > FAR:
                 wrong.append(f"WRONG {bus}, its GPS is {m / 1000:.1f} km away")

@@ -34,6 +34,14 @@ class NextStop(unittest.TestCase):
     def test_left_the_first_stop_while_ets_still_says_it(self):  # 902 at University TC, 2026-10-23: heading along the route
         self.assertEqual(app.next_stop(fixture(), "t", (53.552639, -113.508339, 355, 0, 9)), 11)
 
+    def test_left_long_ago_past_half_its_stops(self):  # 004 past University TC (seq 37 of 71) shown 58 min, 2026-10-29
+        self.assertEqual(app.next_stop(fixture(), "t", (53.56814, -113.528368, 294, 0, 9)), 13)
+
+    def test_driving_in_along_a_loops_last_leg_has_not_left(self):  # a loop ends at its first stop: its tail leads in
+        db = fixture()
+        db.execute("INSERT INTO stop_times VALUES('t','11095',0,'',14)")
+        self.assertEqual(app.next_stop(db, "t", (53.5577, -113.5225, 146, 0, 9)), 9)
+
     def test_at_the_first_stop_it_has_not_left(self):
         self.assertEqual(app.next_stop(fixture(), "t", (53.544996, -113.508267, 0, 0, 9)), 9)
         self.assertEqual(app.next_stop(fixture(), "t", (53.5460, -113.50825, 0, 0, 9)), 9)  # between 9 and 10

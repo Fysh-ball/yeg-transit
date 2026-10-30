@@ -585,10 +585,13 @@ def next_stop(db, trip, v):
     bus = (v[0], v[1])
     off = lambda ab: d(ab[0][1:], bus) + d(bus, ab[1][1:]) - d(ab[0][1:], ab[1][1:])
     if start:
-        # Only its first half: a loop's last legs lead back into its first stop, where a bus may be driving in to start.
+        # A loop's last legs lead back into its first stop, where a bus may be driving in to start: a loop (ending within
+        # 1 km of its start; 42 of 570 stop patterns) looks at its first half only. A one-way trip looks up to its stop
+        # farthest from the start: half its stops held a 004 past University TC (seq 37 of 71) at Lewis Farms (2026-10-29).
         # 150 m slack, as stops are straight lines and roads are not (87 Ave runs on past 120 St before Groat Rd).
         heading = lambda a, b: math.degrees(math.atan2((b[2] - a[2]) * k, b[1] - a[1]))
-        early = rows[:len(rows) // 2 + 1]
+        early = rows[:len(rows) // 2 + 1] if d(rows[0][1:], rows[-1][1:]) * 111000 < 1000 else \
+            rows[:max(range(len(rows)), key=lambda i: d(rows[0][1:], rows[i][1:])) + 1]
         legs = [ab for ab in zip(early[1:], early[2:]) if v[2] and abs((heading(*ab) - v[2] + 180) % 360 - 180) < 60]
         if not legs or min(map(off, legs)) * 111000 >= 150:  # bearing 0 is ETS for "unknown"
             return v[4]  # at layover, or driving in to start: it hasn't left yet
