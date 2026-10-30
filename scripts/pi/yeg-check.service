@@ -1,0 +1,7 @@
+[Unit]
+Description=yegbus live times against ETS (check_live.py --page)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/Apollo/stacks/yeg-transit/scripts/pi/yeg-check.sh run

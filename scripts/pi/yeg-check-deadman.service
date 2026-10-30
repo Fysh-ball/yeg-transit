@@ -1,0 +1,6 @@
+[Unit]
+Description=Page when no yegbus live-times check has landed in 30 min
+
+[Service]
+Type=oneshot
+ExecStart=/home/Apollo/stacks/yeg-transit/scripts/pi/yeg-check.sh deadman

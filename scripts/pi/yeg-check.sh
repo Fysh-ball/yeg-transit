@@ -1,0 +1,48 @@
+#!/bin/bash
+# The Pi's own live-times check, so checking against ETS doesn't need the laptop on (2026-10-30).
+#   yeg-check.sh run       every 15 min: check_live.py --page in the site's image, Telegram on a wrong time
+#   yeg-check.sh deadman   every 5 min: Telegram once if no run has landed in 30 min, once more when one does
+# Telegram goes through dnsguard's bot, as mullvad-exit-watch does. The Pi dying silences both: hc-ping's
+# dead-man for the Pi covers that.
+set -u
+DIR=/home/Apollo/stacks/yeg-transit
+STATE=/var/lib/yeg-check
+STAMP=$STATE/last-run      # touched when check_live.py reached a verdict (exit 0, 1 or 3)
+LATCH=$STATE/deadman.latch # present while the dead-man has paged and no run has landed since
+LOG=$STATE/log
+STALE_MIN=${STALE_MIN:-30}
+
+log(){ echo "[$(date -Is)] $*" >> "$LOG"; echo "$*"; }
+notify(){
+  local tok chat ok
+  tok=$(cat /etc/dnsguard/token 2>/dev/null); chat=$(tr -dc '0-9-' < /etc/dnsguard/chat_id 2>/dev/null)
+  if [ -z "$tok" ] || [ -z "$chat" ]; then log "NOTIFY FAILED (no credentials): $1"; return 1; fi
+  ok=$(curl -s --max-time 15 "https://api.telegram.org/bot${tok}/sendMessage" \
+        --data-urlencode "chat_id=${chat}" --data-urlencode "text=yegbus: ${1:0:3500}" | grep -c '"ok":true')
+  [ "$ok" -gt 0 ] && { log "SENT ${1%%$'\n'*}"; return 0; }
+  log "NOTIFY FAILED (telegram rejected or unreachable): ${1%%$'\n'*}"; return 1
+}
+
+mkdir -p "$STATE/home" && chown 65534:65534 "$STATE/home"
+case "${1:-}" in
+run)
+  out=$(timeout 600 docker run --rm -e HOME=/home -v "$STATE/home:/home" -v "$DIR/scripts:/s:ro" \
+        yeg-transit:latest python -I /s/check_live.py --page 2>&1); s=$?
+  echo "$out"
+  # A traceback also exits 1: that's a broken check, not a wrong time, and must not count as a run.
+  if [[ $s =~ ^[013]$ ]] && ! grep -q '^Traceback' <<< "$out"; then touch "$STAMP"; fi
+  if [ "$s" = 1 ] || [ "$s" = 3 ]; then
+    notify "$(grep -E '^(WRONG|UNREACHABLE)' <<< "$out")"
+  fi
+  exit "$s" ;;
+deadman)
+  last=$(stat -c %Y "$STAMP" 2>/dev/null || echo 0)
+  age=$(( ($(date +%s) - last) / 60 ))
+  if [ "$age" -le "$STALE_MIN" ]; then
+    [ -e "$LATCH" ] && notify "live-times check on the Pi is running again" && rm -f "$LATCH"
+    exit 0
+  fi
+  [ -e "$LATCH" ] || { notify "no live-times check has landed on the Pi in $age min (systemctl status yeg-check)" && touch "$LATCH"; }
+  exit 1 ;;
+*) echo "usage: $0 run|deadman" >&2; exit 2 ;;
+esac

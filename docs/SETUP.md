@@ -82,7 +82,10 @@ Run the tests:
    yegbus.com with ETS's own feed and must end `0 wrong`. It also runs every 15 minutes from a
    systemd user timer (`yeg-check.timer`, as `check_live.py --page`) and pops up a desktop
    notification: "YEG BUS TIMES WRONG" once per stop and route per 6 h, "yegbus.com unreachable"
-   when the site or ETS didn't answer twice.
+   when the site or ETS didn't answer twice. The Pi runs the same check so it doesn't need the laptop on:
+   `scripts/pi/` (deploy.sh copies it; install once with `sudo cp scripts/pi/*.service scripts/pi/*.timer
+   /etc/systemd/system/ && sudo systemctl enable --now yeg-check.timer yeg-check-deadman.timer`). It sends
+   wrong times to Telegram, and its dead-man sends one if no check has landed in 30 min.
 
 Rolling back: every `deploy.sh` run prints a `rollback:` line, which restarts the previous image
 (`yeg-transit:prev`) on that server. For the site, push the previous commit to `release`:

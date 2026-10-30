@@ -1,0 +1,8 @@
+[Unit]
+Description=yegbus live-times dead-man every 5 min
+
+[Timer]
+OnCalendar=*:0/5
+
+[Install]
+WantedBy=timers.target

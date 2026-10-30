@@ -24,6 +24,7 @@ rsync -a server/ "$H:$D/server/"
 # chmod: the pool's inherited ACL makes new files owner-only, and the container runs as nobody
 echo "$SHA" | ssh "$H" "cat > $D/server/VERSION && chmod 644 $D/server/VERSION"
 rsync -a web/ "$H:$D/web/"
+rsync -a --chmod=Da+rx,Fa+r scripts/check_live.py scripts/pi "$H:$D/scripts/"  # the Pi's check timer (scripts/pi)
 rsync -a --exclude __pycache__ tests/ "$H:/tmp/yeg-tests/"
 # Keep the running image as :prev so a bad release rolls back in one command (no auto-rollback).
 ${DEPLOY_WRAP:-} ssh -n "$H" "cd $D && { $DK tag yeg-transit:latest yeg-transit:prev 2>/dev/null || true; } && $DK build -q -t yeg-transit:latest . >/dev/null && \
