@@ -122,7 +122,7 @@ input {
 }
 .settings { display: grid; gap: 10px; padding: 10px 12px 12px; margin: 0 -2px 8px; border-radius: 12px; background: var(--card-2); }
 .settings .label { margin: 0; color: var(--muted); font-size: .8rem; font-weight: 600; }
-.settings label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.settings :is(label, .row) { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .settings > * { min-width: 0; }
 .settings select { min-width: 0; max-width: 100%; }
 .settings label.check { justify-content: flex-start; }
@@ -464,6 +464,9 @@ main > .stop { animation: rise .5s var(--spring) both; }
 [data-look="glass"].native body:not(.board) #add-btn { border-radius: 999px; }
 .native body:not(.board) #add-btn { transition: transform .3s var(--spring); }
 .native body.down:not(.board) #add-btn:not([aria-expanded="true"]) { transform: translateY(calc(100% + 40px)); } /* out of the way while reading down */
+.native body:not(.board) .updated { text-align: left; padding-right: 180px; } /* clear of the add button: it covered "Live times, updated" (owner, 2026-10-29) */
+.settings .order button { min-width: 64px; }
+.settings .order button:disabled { opacity: .35; }
 
 /* Settings is its own page (v53): everything else steps aside, rows are tiles, the licence lives here. */
 body.in-prefs > :is(header, main, #add, #empty, #groups, #tips, #offline, .updated, footer) { display: none !important; }
@@ -516,7 +519,7 @@ body.in-edit main > .stop.editing { background: none !important; color: var(--te
 .stop.editing .settings .note { margin: 0 4px 14px; }
 .stop.editing .settings .label { margin: 0; padding: 14px 18px 4px; background: var(--card); border-radius: 22px 22px 6px 6px; color: var(--muted); }
 .stop.editing .settings .chips { background: var(--card); padding: 6px 14px 14px; margin: 0 0 12px; border-radius: 0 0 22px 22px; }
-.stop.editing .settings label { background: var(--card); padding: 10px 14px 10px 18px; margin: 0 0 3px; border-radius: 6px; min-height: 40px; }
+.stop.editing .settings :is(label, .row) { background: var(--card); padding: 10px 14px 10px 18px; margin: 0 0 3px; border-radius: 6px; min-height: 40px; }
 .stop.editing .settings label:first-of-type { border-radius: 22px 22px 6px 6px; }
 .stop.editing .settings label:last-of-type { border-radius: 6px 6px 22px 22px; margin-bottom: 16px; }
 .stop.editing .settings select, .stop.editing .settings input { background: var(--s3, var(--card-2)); color: var(--text); }

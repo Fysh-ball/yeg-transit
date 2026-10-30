@@ -206,12 +206,15 @@ function settingsPanel(s) {
   if (s.id === firstStop) return setupStep(s, all);
   const chips = all.map((r) => `<button class="chip" aria-pressed="${!s.only || s.only.includes(r)}" data-route="${esc(r)}">${esc(routeLabel(r))}</button>`).join("");
   const opt = (vals, cur, f) => vals.map((v) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${f(v)}</option>`).join("");
+  const shown = stops.filter((x) => !group || x.group === group), at = shown.indexOf(s); // the order on the tab you're on
   return `<div class="settings" data-stop="${esc(s.id)}">
     <div class="prefs-bar"><button class="icon-btn" type="button" data-settings="${esc(s.id)}" aria-label="Back" title="Back"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><h2>${esc(s.name)}<span class="sub">Stop #${esc(s.code)}</span></h2></div>
     ${all.length ? `<p class="label">Pick routes</p><div class="chips">${chips}</div>` : ""}
     <label>Walk to this stop <span><input type="number" data-set="walk" min="0" max="60" step="1" inputmode="numeric" value="${Number(s.walk) || 0}"> min</span></label>
     <label>Group <select data-set="group">${opt(["", ...new Set([...GROUPS, ...groupNames()]), "+"], s.group || "",
       (v) => esc(v === "" ? "None" : v === "+" ? "New group..." : v))}</select></label>
+    ${shown.length > 1 ? `<div class="row">Order <span class="order"><button type="button" data-move="-1"${at ? "" : " disabled"}>Up</button> ${at + 1} of ${shown.length}
+      <button type="button" data-move="1"${at < shown.length - 1 ? "" : " disabled"}>Down</button></span></div>` : ""}
     <label>Buses to show <select data-set="n">${opt([3, 4, 5, 6, 8, 10], s.n || 3, String)}</select></label>
     <label>List <select data-set="list">${opt(["", "time"], s.list || "", (v) => (v ? "All buses by time" : "Grouped by route"))}</select></label>
     ${all.length ? `<label>I change buses: ride <select data-set="ride">${opt(["", ...(s.only || all)], s.xfer?.route || "",
@@ -556,6 +559,18 @@ document.addEventListener("click", (e) => {
     const only = (s.only || all).includes(r) ? (s.only || all).filter((x) => x !== r) : [...s.only, r];
     s.only = only.length && only.length < all.length ? only : null; // none or all picked means show everything
     save(); rerender(s.id);
+  }
+  const mv = e.target.closest("[data-move]");
+  if (mv) { // the top card is the big one: the owner's priority (2026-10-29)
+    const s = stops.find((x) => x.id === mv.closest(".settings").dataset.stop);
+    const shown = stops.filter((x) => !group || x.group === group), o = shown[shown.indexOf(s) + Number(mv.dataset.move)];
+    if (!o) return;
+    const i = stops.indexOf(s), j = stops.indexOf(o);
+    [stops[i], stops[j]] = [o, s];
+    save();
+    const main = $("#stops");
+    stops.forEach((x) => { const el = main.querySelector(`[data-id="${CSS.escape(x.id)}"]`); if (el) main.append(el); });
+    rerender(s.id);
   }
   const rm = e.target.closest("[data-remove]");
   if (rm) {
@@ -1048,4 +1063,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=100").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=101").catch((e) => console.warn("sw:", e.message));
