@@ -524,6 +524,7 @@ document.addEventListener("click", (e) => {
     const s = JSON.parse(add.dataset.add);
     if (!stops.length) { firstStop = s.id; wiz = 0; setEdit(s.id); } // onboarding: straight into its settings
     if (!stops.some((x) => x.id === s.id)) { stops.push(s); save(); }
+    if (add.closest("#map-sheet")) closeMap(); // added from the bus map: show it on the board
     setAdd(false);
     renderAll();
     refreshTimetable(s).catch((err) => console.warn("timetable:", err.message));
@@ -723,7 +724,7 @@ async function sheetMap() {
     const map = L.map("map-box", { zoomControl: false, maxZoom: 19 });
     baseMap(map);
     mapState = { map, layer: L.layerGroup().addTo(map), timer: 0 };
-    map.on("moveend", () => { if (mapState.trip === "all") drawFleet(); });
+    map.on("moveend", () => { if (mapState.trip === "all") { drawFleet(); drawStops(); } });
   }
   clearInterval(mapState.timer);
   return true;
@@ -736,6 +737,7 @@ async function openLiveMap() {
   if (!await sheetMap()) return;
   const m = mapState, home = stops.find((s) => s.lat);
   m.trip = "all"; m.buses = []; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
+  m.stopPins = L.layerGroup().addTo(m.layer); m.stopsAt = null;
   m.map.invalidateSize();
   m.map.setView(home ? [home.lat, home.lon] : [53.5461, -113.4938], 14); // your first stop, or downtown
   await placeFleet();
@@ -764,6 +766,37 @@ function drawFleet() { // only the buses in view: a city of pins at once makes a
   $("#map-title").firstChild.textContent = m.vpAt ? "Every bus, not live" : "Every bus, live";
   $("#map-note").textContent = m.vpAt // ETS's position feed stalled: these are where buses were, not are
     ? `Bus positions from ${clock(m.vpAt)}: ETS isn't sending new ones.` : `${m.buses.length} buses running, ${seen.length} here. ETS updates every 30 s.`;
+}
+// Stops under the buses once zoomed in close enough to tell them apart. Asked for again only after the map moves
+// 300 m: every ask is a Pages Function call (100k a day free). Dots, not pins, so the buses stay on top.
+const STOP_ZOOM = 16, stopDots = () => L.canvas({ tolerance: 12 }); // 12 px of slack: a thumb on a 7 px dot
+async function drawStops() {
+  const m = mapState, c = m.map.getCenter();
+  if (m.map.getZoom() < STOP_ZOOM) { m.stopPins.clearLayers(); m.stopsAt = null; return; }
+  if (m.stopsAt && metres(m.stopsAt, { lat: c.lat, lon: c.lng }) < 300) return;
+  const at = m.stopsAt = { lat: +c.lat.toFixed(4), lon: +c.lng.toFixed(4) };
+  let list;
+  try { list = await api(`stops/near?lat=${at.lat}&lon=${at.lon}&n=60`); }
+  catch (e) { m.stopsAt = null; console.warn("map stops:", e.message); return; }
+  if (m.stopsAt !== at || m.trip !== "all") return; // moved again, or another map opened, while this was asked
+  m.renderer = m.renderer || stopDots();
+  m.stopPins.clearLayers();
+  for (const s of list) L.circleMarker([s.lat, s.lon], { renderer: m.renderer, radius: 7, weight: 2, color: "#fff", fillColor: "#17694a", fillOpacity: 1 })
+    .bindPopup(() => stopCard(s), { closeButton: false, minWidth: 210 }).addTo(m.stopPins);
+}
+// A tapped stop: its name, its next buses, and Add.
+function stopCard(s) {
+  const el = document.createElement("div"), saved = stops.some((x) => x.id === s.id);
+  const routes = s.routes ? ` &middot; ${s.routes.includes(",") ? "Routes" : "Route"} ${esc(s.routes.split(",").map(routeLabel).join(", "))}` : "";
+  const add = { id: s.id, code: s.code, name: s.name, lat: s.lat, lon: s.lon };
+  el.className = "pin-card";
+  el.innerHTML = `<b>${esc(s.name)}</b><span class="sub">Stop #${esc(s.code)}${routes}</span><span class="next sub">Next buses...</span>
+    <button ${saved ? "disabled" : ""} data-add='${esc(JSON.stringify(add))}'>${saved ? "Saved" : "Add this stop"}</button>`;
+  api(`stops/${encodeURIComponent(s.id)}/departures?n=3`).then((d) => {
+    const next = d.departures.map((x) => `${esc(routeLabel(x.route))} ${esc(headLabel(x.headsign, x.route))}: ${mins(x.time, d.now).replace(/<[^>]+>/g, "")}`);
+    el.querySelector(".next").innerHTML = next.length ? next.join("<br>") : "No buses in the next 3 hours.";
+  }).catch((e) => { el.querySelector(".next").textContent = `Can't get times (${e.message}).`; });
+  return el;
 }
 // Slide the bus to its new spot over 2 s instead of jumping, like the big apps do.
 function glide(marker, to) {
@@ -1015,4 +1048,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=99").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=100").catch((e) => console.warn("sw:", e.message));

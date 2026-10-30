@@ -778,7 +778,7 @@ class Handler(SimpleHTTPRequestHandler):
             rows = db.execute(f"SELECT * FROM {STOPS} WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
                               (lat - dlat, lat + dlat, lon - dlon, lon + dlon)).fetchall()
             rows.sort(key=lambda r: (r[3] - lat) ** 2 + ((r[4] - lon) * math.cos(math.radians(lat))) ** 2)
-            return self.json([stop_row(r) for r in rows[:20]])
+            return self.json([stop_row(r) for r in rows[:min(int(q.get("n", 20)), 60)]])  # 60: the bus map zoomed in
         if len(parts) == 3 and parts[0] == "stops":
             stop = db.execute(f"SELECT * FROM {STOPS} WHERE stop_id=?", (parts[1],)).fetchone()
             if not stop:

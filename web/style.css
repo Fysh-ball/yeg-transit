@@ -274,7 +274,7 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
 .stop-pin { width: 30px; height: 30px; font-size: 14px; }
 .pin-card { display: grid; gap: 4px; font: 14px/1.35 system-ui, sans-serif; }
 .pin-card .sub { color: #5b6675; font-size: 12.5px; }
-.pin-card button { margin-top: 6px; min-height: 40px; background: var(--accent); color: var(--accent-text); border: 0; font-weight: 600; }
+.leaflet-popup .pin-card button { margin-top: 6px; /* .leaflet-popup: beats [data-look="material"] button, which hid it */ min-height: 40px; background: var(--accent); color: var(--accent-text); border: 0; font-weight: 600; }
 .pin-card button:disabled { opacity: .6; }
 /* Desktop: the page fills the screen. Stops sit side by side, and a wide card lays its routes out in columns. */
 .mouse { display: none; }
