@@ -220,6 +220,7 @@ public class BusWidget extends AppWidgetProvider {
             next.append(i == 1 ? "then " : ", ").append(Math.max(0, Math.round((later.get(i) - now) / 60.0)));
         String stop = d.optString("stop"), more = later.size() > 1 ? next + " min" : tall ? "" : stop;
         if (here > 1 && !more.equals(stop)) more = more.isEmpty() ? stop : stop + " \u00b7 " + more;
+        if (here > 1 && !tall) more = "Catch next \u00b7 " + more; // a short widget hides the top line that says it
         // Not live (timetable, or ETS's feed stalled): say so on the hero itself, as a small widget has no room for notes.
         if (!d.optBoolean("live")) more = more.isEmpty() ? "Not live" : "Not live \u00b7 " + more;
         v.setTextViewText(R.id.then, glass && !more.isEmpty() ? "\u00b7 " + more : more);
