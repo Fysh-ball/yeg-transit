@@ -771,12 +771,15 @@ async function placeFleet() {
     $("#map-note").textContent = `Can't get bus positions (${e.message}).`;
   }
 }
+// A bus seen from above, nose to its heading, the route number upright on it (owner, 2026-10-29). ETS sends bearing 0
+// for "unknown" (about 1 bus in 9): no windshield then, so it claims no direction.
+const busBody = (b, style = "") => `<i class="bus-body${b ? "" : " still"}" style="--b:${Number(b) || 0}deg;${esc(style)}"></i>`;
 function drawFleet() { // only the buses in view: a city of pins at once makes a phone crawl
   const m = mapState, view = m.map.getBounds().pad(0.2), far = m.map.getZoom() < 13;
   const seen = m.buses.filter(([lat, lon]) => view.contains([lat, lon]));
   m.fleet.clearLayers();
-  for (const [lat, lon, , route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [40, 40],
-    html: `<span class="bus-pin fleet${far ? " far" : ""}">${far ? "" : esc(routeLabel(route))}</span>` }) })
+  for (const [lat, lon, bearing, route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [40, 40],
+    html: `<span class="bus-pin fleet${far ? " far" : ""}">${busBody(bearing)}${far ? "" : `<b>${esc(routeLabel(route))}</b>`}</span>` }) })
     .bindTooltip(`Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}`).addTo(m.fleet);
   $("#map-title").firstChild.textContent = m.vpAt ? "Every bus, not live" : "Every bus, live";
   $("#map-note").textContent = m.vpAt // ETS's position feed stalled: these are where buses were, not are
@@ -847,9 +850,9 @@ async function placeBus() {
     if (m.trip !== trip) return; // another bus was opened meanwhile
     m.at = v;
     drawLine();
-    if (m.bus) glide(m.bus, [v.lat, v.lon]);
+    if (m.bus) { glide(m.bus, [v.lat, v.lon]); const b = m.bus.getElement()?.querySelector(".bus-body"); if (b) b.outerHTML = busBody(v.bearing, m.style); }
     else m.bus = L.marker([v.lat, v.lon], { zIndexOffset: 1000, icon: L.divIcon({ className: "", iconSize: [46, 46],
-      html: `<span class="bus-pin" style="${esc(m.style)}">${esc(m.label)}</span>` }) }).addTo(m.layer);
+      html: `<span class="bus-pin" style="${esc(m.style)}">${busBody(v.bearing, m.style)}<b style="${esc(m.style)}">${esc(m.label)}</b></span>` }) }).addTo(m.layer);
     m.others.clearLayers();
     for (const o of v.others) L.marker(o, { interactive: false, icon: L.divIcon({ className: "", iconSize: [30, 30],
       html: `<span class="bus-pin other" style="${esc(m.style)}">${esc(m.label)}</span>` }) }).addTo(m.others);
@@ -1063,4 +1066,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=101").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=102").catch((e) => console.warn("sw:", e.message));

@@ -227,6 +227,18 @@ html:has(.board.night) { background: #000; }
 .bus-pin.fleet { width: 40px; height: 40px; font-size: 14px; border-width: 2px; background: var(--accent); color: var(--accent-text); box-sizing: border-box; }
 .bus-pin.fleet.far { width: 18px; height: 18px; }
 .bus-pin.other { width: 30px; height: 30px; font-size: 12px; border-width: 2px; opacity: .55; }
+/* Top-down bus (owner, 2026-10-29): the body turns to the heading, the route number stays upright on a chip of its colour. */
+.bus-pin:has(.bus-body) { position: relative; background: none !important; border: 0; box-shadow: none; }
+.bus-body { position: absolute; left: 50%; top: 50%; width: 30px; height: 52px; margin: -26px 0 0 -15px; box-sizing: border-box;
+  border-radius: 10px 10px 6px 6px; background: var(--accent); border: 2px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .45); transform: rotate(var(--b)); }
+.bus-body::before { content: ""; position: absolute; inset: 3px 3px auto; height: 8px; border-radius: 6px 6px 2px 2px; background: rgb(0 0 0 / .5); } /* windshield: the front */
+.bus-body::after { content: ""; position: absolute; inset: auto 5px 3px; height: 3px; border-radius: 2px; background: rgb(0 0 0 / .25); } /* rear */
+.bus-body.still::before { display: none; }
+.bus-pin:has(.bus-body) b { position: relative; padding: 1px 3px; border-radius: 6px; background: var(--accent); font: inherit; line-height: 1.1; }
+.bus-pin.fleet .bus-body { width: 26px; height: 44px; margin: -22px 0 0 -13px; }
+.bus-pin.fleet.far .bus-body { width: 10px; height: 18px; margin: -9px 0 0 -5px; border-width: 1.5px; border-radius: 4px 4px 2px 2px; }
+.bus-pin.fleet.far .bus-body::before { inset: 1px 1px auto; height: 4px; border-radius: 2px; }
+.bus-pin.fleet.far .bus-body::after { display: none; }
 
 /* Route lines: tap to list that route's buses. */
 .grp-head { width: 100%; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; padding: 9px 0;
