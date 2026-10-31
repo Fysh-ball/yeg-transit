@@ -3,6 +3,7 @@
 Run: python3 -I scripts/pi/app-commands/test_app_commands.py
 """
 import base64
+import hashlib
 import importlib.machinery
 import importlib.util
 import json
@@ -31,6 +32,26 @@ def spki(key):
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)).decode()
 
 
+CRED = "Y3JlZGVudGlhbC1pZC0x"
+RP = "pi-commands.fysh.site"
+
+
+def b64u(b):
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def assertion(key, box, action, step, nonce, origin="https://" + RP, rp=RP, flags=0x05, typ="webauthn.get",
+              challenge_of=None):
+    """What a browser + authenticator would send for these signed bytes."""
+    signed = acr.signed_bytes(*(challenge_of or (box, action, step, nonce)))
+    cd = json.dumps({"type": typ, "challenge": b64u(hashlib.sha256(signed).digest()), "origin": origin,
+                     "crossOrigin": False}).encode()
+    ad = hashlib.sha256(rp.encode()).digest() + bytes([flags]) + b"\0\0\0\0"
+    sig = key.sign(ad + hashlib.sha256(cd).digest(), ec.ECDSA(hashes.SHA256()))
+    return {"credentialId": CRED, "authenticatorData": b64u(ad), "clientDataJSON": b64u(cd),
+            "sig": base64.b64encode(sig).decode()}
+
+
 def sign(key, box, action, step, nonce):
     return base64.b64encode(key.sign(acr.signed_bytes(box, action, step, nonce), ec.ECDSA(hashes.SHA256()))).decode()
 
@@ -41,10 +62,11 @@ class Rig:
         self.phone = ec.generate_private_key(ec.SECP256R1())
         self.spare = ec.generate_private_key(ec.SECP256R1())
         self.stranger = ec.generate_private_key(ec.SECP256R1())
+        self.yubikey = ec.generate_private_key(ec.SECP256R1())
         self.keys = os.path.join(self.dir, "keys")
         with open(self.keys, "w") as f:
             f.write(f"# test keys\nphone p256 - {spki(self.phone)}\nspare p256 - {spki(self.spare)}\n"
-                    f"yubikey webauthn Y3JlZA {spki(self.spare)}\n")
+                    f"yubikey webauthn {CRED} {spki(self.yubikey)}\n")
         ksc = os.path.join(self.dir, "ks.json")
         with open(ksc, "w") as f:
             json.dump({"dry_run": ks_dry, "lock_command": ["true"]}, f)
@@ -56,7 +78,7 @@ class Rig:
                    state_dir=self.dir, log_file=None, killswitch_config=ksc, killswitch_state=self.ks_state,
                    defib_command=["true"],
                    probe_command=["sh", "-c", 'echo "$0" > "$1"', "ok", os.path.join(self.dir, "probe.txt")],
-                   probe_result=os.path.join(self.dir, "probe.txt"))
+                   probe_result=os.path.join(self.dir, "probe.txt"), page_dir=os.path.join(HERE, "page"))
         self.rx = acr.Receiver(cfg)
         self.servers = [acr.FreebindServer(("127.0.0.1", 0), acr.make_handler(self.rx)) for _ in range(2)]
         for s in self.servers:
@@ -178,9 +200,6 @@ class Section41(unittest.TestCase):
         self.assertIn("another key", self.refused(
             self.r.confirm("defib-fire", out["n2"], key=self.r.spare, name="spare")))
 
-    def test_webauthn_key_refused_for_now(self):
-        self.assertIn("webauthn", self.refused(self.r.request("defib-fire", key=self.r.spare, name="yubikey")[0]))
-
     def test_uppercase_nonce_refused(self):
         n1 = secrets.token_hex(32).upper()
         self.refused(self.r.request("defib-fire", n1=n1)[0])
@@ -264,6 +283,133 @@ class Section41(unittest.TestCase):
         self.r.rx.cfg["keys_must_be_root"] = True
         if os.getuid() != 0:
             self.assertIn("root-owned", self.refused(self.r.request("defib-fire")[0]))
+
+    def test_undecodable_keys_file_is_a_refusal_not_a_500(self):
+        with open(self.r.keys, "ab") as f:
+            f.write(b"\xff\xfe junk\n")
+        self.assertIn("keys file unreadable", self.refused(self.r.request("defib-fire")[0]))
+
+
+class WebAuthnSpares(unittest.TestCase):
+    def setUp(self):
+        self.r = Rig()
+
+    def tearDown(self):
+        self.r.close()
+
+    def req(self, action="defib-fire", **kw):
+        n1 = secrets.token_hex(32)
+        return self.r.post("/request", {"action": action, "n1": n1,
+                                        **assertion(self.r.yubikey, "pi", action, "request", n1, **kw)})
+
+    def conf(self, n2, action="defib-fire", **kw):
+        return self.r.post("/confirm", {"action": action, "n2": n2,
+                                        **assertion(self.r.yubikey, "pi", action, "confirm", n2, **kw)})
+
+    def result(self, resp):
+        self.assertEqual(resp[0], 200, resp)
+        return resp[1]["result"]
+
+    def test_happy_path(self):
+        code, out = self.req()
+        self.assertEqual(out["result"], "pending")
+        self.assertEqual(self.r.rx.pending["key"], "yubikey")
+        self.assertEqual(self.result(self.conf(out["n2"])), "dry run: would fire")
+
+    def test_wrong_origin(self):
+        self.assertIn("origin", self.result(self.req(origin="https://evil.example")))
+
+    def test_wrong_rp_id(self):
+        self.assertIn("rpIdHash", self.result(self.req(rp="evil.example")))
+
+    def test_needs_presence_and_verification(self):
+        for flags in (0x01, 0x04, 0x00):
+            self.assertIn("presence and verification", self.result(self.req(flags=flags)))
+
+    def test_wrong_type(self):
+        self.assertIn("webauthn.get", self.result(self.req(typ="webauthn.create")))
+
+    def test_request_challenge_reused_for_confirm(self):
+        code, out = self.req()
+        n2 = out["n2"]
+        body = {"action": "defib-fire", "n2": n2,
+                **assertion(self.r.yubikey, "pi", "defib-fire", "confirm", n2,
+                            challenge_of=("pi", "defib-fire", "request", n2))}
+        self.assertIn("challenge", self.result(self.r.post("/confirm", body)))
+        self.assertIsNotNone(self.r.rx.pending)
+
+    def test_challenge_for_another_box(self):
+        self.assertIn("challenge", self.result(self.req(challenge_of=("newpc", "defib-fire", "request", "0" * 64))))
+
+    def test_signed_by_another_key(self):
+        n1 = secrets.token_hex(32)
+        body = {"action": "defib-fire", "n1": n1, **assertion(self.r.stranger, "pi", "defib-fire", "request", n1)}
+        self.assertEqual(self.result(self.r.post("/request", body)), "refused: bad signature")
+
+    def test_unknown_credential(self):
+        n1 = secrets.token_hex(32)
+        body = {"action": "defib-fire", "n1": n1, **assertion(self.r.yubikey, "pi", "defib-fire", "request", n1)}
+        body["credentialId"] = "bm90LWEtcGlubmVkLWNyZWQ"
+        self.assertEqual(self.result(self.r.post("/request", body)), "refused: unknown credential")
+
+    def test_request_by_spare_confirm_by_phone(self):
+        code, out = self.req()
+        self.assertIn("another key", self.result(self.r.confirm("defib-fire", out["n2"])))
+
+    def test_p256_body_naming_a_webauthn_key(self):
+        n1 = secrets.token_hex(32)
+        self.assertIn("WebAuthn page", self.result(self.r.request("defib-fire", key=self.r.yubikey, name="yubikey")[0]))
+
+    def test_non_ascii_fields_are_plain_refusals(self):
+        n1 = secrets.token_hex(32)
+        body = {"action": "defib-fire", "n1": n1, **assertion(self.r.yubikey, "pi", "defib-fire", "request", n1)}
+        self.assertEqual(self.result(self.r.post("/request", dict(body, credentialId="\u00e9"))),
+                         "refused: unknown credential")
+
+    def test_crossorigin_must_be_false_or_absent(self):
+        n1 = secrets.token_hex(32)
+        signed = acr.signed_bytes("pi", "defib-fire", "request", n1)
+        for co in (True, 0, "false"):
+            cd = json.dumps({"type": "webauthn.get", "challenge": b64u(hashlib.sha256(signed).digest()),
+                             "origin": "https://" + RP, "crossOrigin": co}).encode()
+            ad = hashlib.sha256(RP.encode()).digest() + b"\x05\0\0\0\0"
+            sig = self.r.yubikey.sign(ad + hashlib.sha256(cd).digest(), ec.ECDSA(hashes.SHA256()))
+            body = {"action": "defib-fire", "n1": secrets.token_hex(32), "credentialId": CRED,
+                    "authenticatorData": b64u(ad), "clientDataJSON": b64u(cd), "sig": base64.b64encode(sig).decode()}
+            body["n1"] = n1
+            self.assertIn("origin", self.result(self.r.post("/request", body)))
+            n1 = secrets.token_hex(32)
+            signed = acr.signed_bytes("pi", "defib-fire", "request", n1)
+
+    def test_a_third_spare_added_by_file_alone_works_without_restart(self):
+        third = ec.generate_private_key(ec.SECP256R1())
+        cred3 = "dGhpcmQtc3BhcmUta2V5LWlk"
+        with open(self.r.keys, "a") as f:
+            f.write(f"yubikey-2 webauthn {cred3} {spki(third)}\n")
+        n1 = secrets.token_hex(32)
+        body = {"action": "probe", "n1": n1, **assertion(third, "pi", "probe", "request", n1)}
+        body["credentialId"] = cred3
+        code, out = self.r.post("/request", body)
+        self.assertEqual(out["result"], "pending")
+        self.assertEqual(self.r.rx.pending["key"], "yubikey-2")
+        n2 = out["n2"]
+        body = {"action": "probe", "n2": n2, **assertion(third, "pi", "probe", "confirm", n2)}
+        body["credentialId"] = cred3
+        self.assertEqual(self.result(self.r.post("/confirm", body)), "probe ok")
+        # ...and the first spare and the phone still work alongside it.
+        self.assertEqual(self.result(self.conf(self.req()[1]["n2"])), "dry run: would fire")
+        self.assertEqual(self.r.two_step("kill-arm")[1]["result"], "pi: ARMED")
+
+    def test_page_is_served_with_a_strict_policy(self):
+        port = self.r.servers[0].server_address[1]
+        for path, ctype in (("/", "text/html"), ("/app.js", "text/javascript")):
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=10) as r:
+                self.assertTrue(r.headers["Content-Type"].startswith(ctype))
+                self.assertIn("script-src 'self'", r.headers["Content-Security-Policy"])
+                self.assertIn("frame-ancestors 'none'", r.headers["Content-Security-Policy"])
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/../keys", timeout=10)
+        self.assertEqual(e.exception.code, 404)
 
 
 class LiveConfigWithHarmlessActuators(unittest.TestCase):

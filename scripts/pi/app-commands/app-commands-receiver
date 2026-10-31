@@ -16,6 +16,7 @@ Never test by firing: dry_run=true answers "dry run: would ..."; the `probe` act
 checks and stops before any actuator.
 """
 import base64
+import hashlib
 import hmac
 import json
 import logging
@@ -45,6 +46,7 @@ MAX_BODY = 4096
 SEEN_N1_CAP = 4096
 ALERTS_CAP = 64 * 1024
 NONCE_RE = re.compile(r"[0-9a-f]{64}")
+CRED_RE = re.compile(r"[A-Za-z0-9_-]{16,1400}")
 NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", stream=sys.stdout)
@@ -63,6 +65,8 @@ DEFAULTS = {
     "defib_command": ["systemctl", "start", "--no-block", "app-commands-defib.service"],
     "probe_command": ["systemctl", "start", "app-commands-probe.service"],
     "probe_result": "/run/app-commands-probe.txt",
+    "webauthn_rp_id": "pi-commands.fysh.site",
+    "page_dir": "/usr/local/share/app-commands",
 }
 
 
@@ -88,6 +92,12 @@ def load_config(path):
     return cfg
 
 
+def b64url(s):
+    if not re.fullmatch(r"[A-Za-z0-9_-]*", s):
+        raise ValueError("not base64url")
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
 def signed_bytes(box, action, step, nonce):
     return f"{PROTO}\n{box}\n{action}\n{step}\n{nonce}".encode()
 
@@ -98,7 +108,7 @@ def load_keys(path, must_be_root):
         with open(path) as f:
             st = os.fstat(f.fileno())
             lines = f.read().splitlines()
-    except OSError as e:
+    except (OSError, UnicodeDecodeError) as e:
         raise Refused(f"keys file unreadable ({e})", loud=True)
     if must_be_root and (st.st_uid != 0 or st.st_mode & (stat.S_IWGRP | stat.S_IWOTH)):
         raise Refused("keys file not root-owned or writable by others", loud=True)
@@ -111,6 +121,10 @@ def load_keys(path, must_be_root):
         if len(parts) != 4 or not NAME_RE.fullmatch(parts[0]) or parts[1] not in ("p256", "webauthn"):
             raise Refused(f"keys file line {n} malformed", loud=True)
         name, kind, cred, pub = parts
+        if (kind == "p256") != (cred == "-") or (kind == "webauthn" and not CRED_RE.fullmatch(cred)):
+            raise Refused(f"keys file line {n} credential id malformed", loud=True)
+        if kind == "webauthn" and any(c == cred for _, c, _ in keys.values()):
+            raise Refused(f"keys file line {n} repeats a credential id", loud=True)
         try:
             key = load_der_public_key(base64.b64decode(pub, validate=True))
         except Exception as e:
@@ -194,27 +208,67 @@ class Receiver:
 
     # ---- the two steps -----------------------------------------------------
     def verify(self, body, step, nonce_field):
-        if not isinstance(body, dict) or set(body) != {"action", nonce_field, "key", "sig"}:
+        """Check one signed step. Two shapes (design section 6, and B for the WebAuthn spares):
+        p256:     {action, <nonce>, key, sig}
+        webauthn: {action, <nonce>, credentialId, authenticatorData, clientDataJSON, sig}
+        sig is DER ECDSA in standard base64 either way; the WebAuthn fields are base64url."""
+        p256 = {"action", nonce_field, "key", "sig"}
+        wa = {"action", nonce_field, "credentialId", "authenticatorData", "clientDataJSON", "sig"}
+        if not isinstance(body, dict) or set(body) not in (p256, wa) or \
+                not all(isinstance(v, str) for v in body.values()):
             raise Refused("malformed body")
-        action, nonce, name, sig = (body[k] for k in ("action", nonce_field, "key", "sig"))
-        if not all(isinstance(v, str) for v in (action, nonce, name, sig)):
-            raise Refused("malformed body")
+        action, nonce, sig = body["action"], body[nonce_field], body["sig"]
         if action not in ACTIONS:
             raise Refused("unknown action")
         if not NONCE_RE.fullmatch(nonce):
             raise Refused("nonce must be 64 lowercase hex")
         keys = load_keys(self.cfg["keys_file"], self.cfg["keys_must_be_root"])
-        if name not in keys:
-            raise Refused(f"unknown key {name!r}" if NAME_RE.fullmatch(name) else "unknown key", loud=True)
-        kind, _cred, pub = keys[name]
-        if kind != "p256":
-            raise Refused("webauthn keys are not accepted yet")
+        signed = signed_bytes(self.box, action, step, nonce)
+        if set(body) == p256:
+            name = body["key"]
+            if name not in keys:
+                raise Refused(f"unknown key {name!r}" if NAME_RE.fullmatch(name) else "unknown key", loud=True)
+            kind, _cred, pub = keys[name]
+            if kind != "p256":
+                raise Refused("that key signs through the WebAuthn page", loud=True)
+            message = signed
+        else:
+            cred = body["credentialId"]
+            found = [n for n, (k, c, _) in keys.items() if k == "webauthn" and c == cred]  # ids aren't secret
+            if not found:
+                raise Refused("unknown credential", loud=True)
+            name = found[0]
+            pub = keys[name][2]
+            message = self.webauthn_message(signed, body)
         try:
             der = base64.b64decode(sig, validate=True)
-            pub.verify(der, signed_bytes(self.box, action, step, nonce), ec.ECDSA(hashes.SHA256()))
+            pub.verify(der, message, ec.ECDSA(hashes.SHA256()))
         except (InvalidSignature, ValueError, TypeError):
             raise Refused("bad signature", loud=True)
         return action, nonce, name
+
+    def webauthn_message(self, signed, body):
+        """The bytes an ES256 WebAuthn assertion signs, after checking everything it signs over."""
+        rp_id = self.cfg["webauthn_rp_id"]
+        try:
+            auth_data = b64url(body["authenticatorData"])
+            cdj = b64url(body["clientDataJSON"])
+            cd = json.loads(cdj)
+        except ValueError:
+            raise Refused("malformed WebAuthn fields", loud=True)
+        if not isinstance(cd, dict) or cd.get("type") != "webauthn.get":
+            raise Refused("clientData type is not webauthn.get", loud=True)
+        want = base64.urlsafe_b64encode(hashlib.sha256(signed).digest()).rstrip(b"=").decode()
+        if cd.get("challenge") != want:
+            raise Refused("WebAuthn challenge is not these signed bytes", loud=True)
+        if cd.get("origin") != "https://" + rp_id or cd.get("crossOrigin", False) is not False:
+            raise Refused("WebAuthn origin is not the Pi page", loud=True)
+        if len(auth_data) < 37 or not hmac.compare_digest(auth_data[:32], hashlib.sha256(rp_id.encode()).digest()):
+            raise Refused("WebAuthn rpIdHash is not the Pi page", loud=True)
+        if auth_data[32] & 0x05 != 0x05:  # UP (0x01) and UV (0x04): touched AND verified (fingerprint or PIN)
+            raise Refused("WebAuthn assertion lacks user presence and verification", loud=True)
+        # The signature counter is not checked: synced passkeys send 0. Replay is the nonces' job.
+        return auth_data + hashlib.sha256(cdj).digest()
 
     def request(self, body):
         action, n1, name = self.verify(body, "request", "n1")
@@ -356,7 +410,32 @@ def make_handler(rx):
                 LOG.info("reply to %s not delivered: %s", self.client_address[0], e)
 
         def do_GET(self):
-            self.reply(404, {"result": "refused: not found"})
+            # The WebAuthn page (design B): it only signs; every decision is still the POST steps'.
+            page = {"/": ("index.html", "text/html; charset=utf-8"),
+                    "/app.js": ("app.js", "text/javascript; charset=utf-8")}.get(self.path)
+            if page is None:
+                self.reply(404, {"result": "refused: not found"})
+                return
+            try:
+                with open(os.path.join(rx.cfg["page_dir"], page[0]), "rb") as f:
+                    data = f.read()
+            except OSError as e:
+                LOG.error("page %s unavailable: %s", page[0], e)
+                self.reply(404, {"result": "refused: page not installed"})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", page[1])
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'self'; connect-src 'self'; "
+                             "style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+            try:
+                self.end_headers()
+                self.wfile.write(data)
+            except OSError as e:
+                LOG.info("page to %s not delivered: %s", self.client_address[0], e)
 
         def do_POST(self):
             src = self.client_address[0]
@@ -411,6 +490,13 @@ class FreebindServer(ThreadingHTTPServer):
 
 
 def main():
+    if sys.argv[1:2] == ["--check"]:
+        # Run before the mv of a keys drop: one bad line refuses every key, the phone's too.
+        try:
+            print("ok:", " ".join(sorted(load_keys(sys.argv[2], True))))
+        except (Refused, IndexError) as e:
+            sys.exit(f"bad: {e}")
+        return
     cfg = load_config(CONFIG_PATH)
     if cfg.get("log_file"):
         try:
