@@ -1,0 +1,8 @@
+# /etc/systemd/system/app-commands-alert.service
+[Unit]
+Description=Send app-commands refusals to Lumi's app
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/app-commands-alert
+TimeoutStartSec=180

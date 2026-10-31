@@ -1,0 +1,17 @@
+#!/bin/sh
+# app-commands-alert: batch the receiver's refusals into one pi-app-commands row in Lumi's app.
+# Runs as root (the spool relay key is root's), started by app-commands-alert.path while the queue exists.
+# The queue lives in a killswitch-owned dir, so it is moved and read AS killswitch: a symlink planted there can't
+# make root read a file killswitch couldn't. The receiver caps it at 64 KiB; the journal and
+# /var/log/app-commands keep every line.
+sleep 60   # one row per burst, not one per junk request
+cd /var/lib/app-commands || exit 1
+lines=$(runuser -u killswitch -- sh -c 'mv alerts alerts.sending 2>/dev/null && cat alerts.sending; rm -f alerts.sending')
+[ -n "$lines" ] || exit 0
+n=$(printf '%s\n' "$lines" | wc -l)
+loud=$(printf '%s\n' "$lines" | grep -c '^[0-9-]* [0-9:]* LOUD ')
+{ echo "app-commands on pi refused $n command(s), $loud LOUD (bad key or signature). Last ones:"
+  printf '%s\n' "$lines" | tail -n 5; } | /usr/local/bin/spool-notify pi-app-commands failed
+rc=$?
+[ "$rc" = 0 ] || logger -t app-commands-alert "NOTIFY FAILED (rc $rc): $n refusals not shown in the app; see /var/log/app-commands"
+exit 0

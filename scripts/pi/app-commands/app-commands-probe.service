@@ -1,0 +1,9 @@
+# /etc/systemd/system/app-commands-probe.service
+# The `probe` action's live permission check (see app-commands-probe). Started only by app-commands-receiver.
+[Unit]
+Description=app-commands probe: check the receiver's live permissions, act on nothing
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/app-commands-probe
+TimeoutStartSec=60

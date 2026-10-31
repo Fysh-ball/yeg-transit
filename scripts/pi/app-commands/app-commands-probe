@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""app-commands-probe: the `probe` action's live check. Root, started by app-commands-receiver; acts on nothing.
+
+polkit takes `pkcheck --detail` (which unit) only from root, so the receiver can't ask about itself. This asks
+polkit, about the receiver's own running process, the exact question a real start would ask, then stops.
+Writes "ok" or the problems to /run/app-commands-probe.txt for the receiver to read back.
+"""
+import json
+import subprocess
+
+OUT = "/run/app-commands-probe.txt"
+
+
+def sh(argv):
+    r = subprocess.run(argv, capture_output=True, text=True, timeout=15)
+    return r.returncode, (r.stdout + r.stderr).strip()
+
+
+def allowed(pid, action_id, *details):
+    argv = ["pkcheck", "--action-id", action_id, "--process", pid]
+    for k, v in details:
+        argv += ["--detail", k, v]
+    rc, out = sh(argv)
+    return None if rc == 0 else f"pkcheck exit {rc}: {out[:120]}"
+
+
+def problems():
+    rc, pid = sh(["systemctl", "show", "-P", "MainPID", "app-commands-receiver.service"])
+    if rc != 0 or pid in ("", "0"):
+        return ["receiver not running"]
+    with open("/etc/app-commands/config.json") as f:
+        defib = json.load(f).get("defib_command", ["systemctl", "start", "--no-block", "app-commands-defib.service"])
+    with open("/etc/killswitch/config.json") as f:
+        d = json.load(f)
+    lock = d["lock_command"] if "lock_command" in d else ["systemctl", "reboot"]
+    out = []
+    for what, cmd in (("defib", defib), ("lock", lock)):
+        if not cmd:
+            out.append(f"{what}: no actuator configured")
+        elif cmd[0] == "systemctl" and "start" in cmd:
+            unit = cmd[-1]
+            rc, load = sh(["systemctl", "show", "-P", "LoadState", unit])
+            if load != "loaded":
+                out.append(f"{what}: {unit} LoadState={load or '?'}")
+            err = allowed(pid, "org.freedesktop.systemd1.manage-units", ("unit", unit), ("verb", "start"))
+            if err:
+                out.append(f"{what}: polkit refuses the receiver starting {unit} ({err})")
+        elif cmd[:2] == ["systemctl", "reboot"]:
+            err = allowed(pid, "org.freedesktop.login1.reboot")
+            if err:
+                out.append(f"{what}: polkit refuses the receiver a reboot ({err})")
+        else:
+            out.append(f"{what}: can't check {cmd}")
+    # The defib actuator's own preflight: as the identity it fires as, it must read its config, or
+    # defib-tn quietly simulates.
+    rc, _ = sh(["runuser", "-u", "oneadmin", "--", "test", "-r", "/etc/truenas-defib/defib.env"])
+    if rc != 0:
+        out.append("defib: oneadmin can't read its config (defib-tn would only simulate)")
+    return out
+
+
+try:
+    p = problems()
+except Exception as e:
+    p = [f"probe error ({type(e).__name__}: {e})"]
+with open(OUT, "w") as f:
+    f.write("ok\n" if not p else "; ".join(p) + "\n")

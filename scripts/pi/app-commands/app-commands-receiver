@@ -1,0 +1,429 @@
+#!/usr/bin/env python3
+"""app-commands receiver: the owner's defib and kill-switch commands from Lumi's app, off Telegram.
+
+Design: ~/.cache/app-commands/design.md (v4, 2026-10-30), section 3. Two signed steps:
+  POST /request {action, n1, key, sig}  ->  {"result": "pending", "n2": <hex>}
+  POST /confirm {action, n2, key, sig}  ->  {"result": "fired" | "dry run: would fire" | "refused: <why>" ...}
+The signed bytes are b"app-commands/v1\\n<box>\\n<action>\\n<step>\\n<nonce hex>". The signature is the only
+authority: the source address is logged, never trusted.
+
+Keys: /etc/app-commands/keys, root-owned, one credential per line:
+  <name> p256 - <base64 SubjectPublicKeyInfo DER>          (the phone's Keystore key, SHA256withECDSA, DER sig)
+  <name> webauthn <credential id> <base64 SPKI DER>        (spares; parsed, refused until WebAuthn verify lands)
+The file is re-read on every request, so a re-pin needs no restart.
+
+Never test by firing: dry_run=true answers "dry run: would ..."; the `probe` action runs the live permission
+checks and stops before any actuator.
+"""
+import base64
+import hmac
+import json
+import logging
+import os
+import re
+import secrets
+import socket
+import stat
+import subprocess
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import load_der_public_key
+
+CONFIG_PATH = os.environ.get("APP_COMMANDS_CONFIG", "/etc/app-commands/config.json")
+PROTO = "app-commands/v1"
+BOXES = ("pi", "newpc", "truenas")
+ACTIONS = ("defib-fire", "kill-arm", "kill-off", "kill-on", "probe")
+CONFIRM_WINDOW = 90
+DEFIB_COOLDOWN = 600
+MAX_BODY = 4096
+SEEN_N1_CAP = 4096
+ALERTS_CAP = 64 * 1024
+NONCE_RE = re.compile(r"[0-9a-f]{64}")
+NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s", stream=sys.stdout)
+LOG = logging.getLogger("app-commands")
+
+DEFAULTS = {
+    "box": "pi",
+    "dry_run": True,
+    "listen": ["100.64.0.14:7601"],
+    "keys_file": "/etc/app-commands/keys",
+    "keys_must_be_root": True,
+    "state_dir": "/var/lib/app-commands",
+    "log_file": "/var/log/app-commands/receiver.log",
+    "killswitch_config": "/etc/killswitch/config.json",
+    "killswitch_state": "/var/lib/killswitch/state.json",
+    "defib_command": ["systemctl", "start", "--no-block", "app-commands-defib.service"],
+    "probe_command": ["systemctl", "start", "app-commands-probe.service"],
+    "probe_result": "/run/app-commands-probe.txt",
+}
+
+
+class Refused(Exception):
+    """A refusal: the text after "refused: " in the reply."""
+
+    def __init__(self, why, loud=False):
+        super().__init__(why)
+        self.loud = loud
+
+
+def load_config(path):
+    cfg = dict(DEFAULTS)
+    with open(path) as f:
+        cfg.update(json.load(f))
+    if cfg["box"] not in BOXES:
+        raise SystemExit(f"config box {cfg['box']!r} not in {BOXES}")
+    cfg["dry_run"] = cfg["dry_run"] is not False  # anything but an explicit false simulates
+    return cfg
+
+
+def signed_bytes(box, action, step, nonce):
+    return f"{PROTO}\n{box}\n{action}\n{step}\n{nonce}".encode()
+
+
+def load_keys(path, must_be_root):
+    """{name: (kind, credential id, public key)}. Raises Refused when the file can't be trusted."""
+    try:
+        with open(path) as f:
+            st = os.fstat(f.fileno())
+            lines = f.read().splitlines()
+    except OSError as e:
+        raise Refused(f"keys file unreadable ({e})", loud=True)
+    if must_be_root and (st.st_uid != 0 or st.st_mode & (stat.S_IWGRP | stat.S_IWOTH)):
+        raise Refused("keys file not root-owned or writable by others", loud=True)
+    keys = {}
+    for n, raw in enumerate(lines, 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 4 or not NAME_RE.fullmatch(parts[0]) or parts[1] not in ("p256", "webauthn"):
+            raise Refused(f"keys file line {n} malformed", loud=True)
+        name, kind, cred, pub = parts
+        try:
+            key = load_der_public_key(base64.b64decode(pub, validate=True))
+        except Exception as e:
+            raise Refused(f"keys file line {n} bad public key ({e})", loud=True)
+        if not isinstance(key, ec.EllipticCurvePublicKey) or not isinstance(key.curve, ec.SECP256R1):
+            raise Refused(f"keys file line {n} is not a P-256 key", loud=True)
+        if name in keys:
+            raise Refused(f"keys file line {n} repeats name {name}", loud=True)
+        keys[name] = (kind, cred, key)
+    if not keys:
+        raise Refused("keys file holds no key", loud=True)
+    return keys
+
+
+class Receiver:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.box = cfg["box"]
+        self.lock = threading.Lock()  # every request's check-and-act runs under it
+        self.pending = None  # {"n2", "action", "key", "deadline" (monotonic)}
+        self.last_fire_mono = None
+        self.state_path = os.path.join(cfg["state_dir"], "state.json")
+        self.alerts_path = os.path.join(cfg["state_dir"], "alerts")
+        self.state = {"kill_state": "DISARMED", "last_fire": 0, "seen_n1": []}
+        try:
+            with open(self.state_path) as f:
+                d = json.load(f)
+            if not (isinstance(d, dict) and d.get("kill_state", "DISARMED") in ("DISARMED", "ARMED", "LOCKED")
+                    and isinstance(d.get("last_fire", 0), (int, float))
+                    and isinstance(d.get("seen_n1", []), list)
+                    and all(isinstance(x, str) for x in d.get("seen_n1", []))):
+                raise ValueError("wrong shape")
+            self.state.update(d)
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError) as e:
+            # A lost state file must not reopen the cooldown or forget LOCKED silently. LOCKED is saved on the
+            # next write and only the console clears it: stop the unit, delete state.json, start it.
+            LOG.error("state load failed (%s): starting LOCKED with a fresh defib cooldown; console reset only", e)
+            self.state["kill_state"] = "LOCKED"
+            self.state["last_fire"] = time.time()
+        self.seen_n1 = set(self.state["seen_n1"])
+
+    # ---- state -------------------------------------------------------------
+    def save(self):
+        self.state["seen_n1"] = self.state["seen_n1"][-SEEN_N1_CAP:]
+        self.seen_n1 = set(self.state["seen_n1"])
+        tmp = self.state_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(self.state, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, self.state_path)
+
+    def locked(self):
+        if self.state["kill_state"] == "LOCKED":
+            return True
+        # The Telegram receiver keeps its own state until it is retired; LOCKED in either counts.
+        # ponytail: two state files while both channels live; one goes when Telegram is switched off.
+        try:
+            with open(self.cfg["killswitch_state"]) as f:
+                return json.load(f).get("state") == "LOCKED"
+        except FileNotFoundError:
+            return False
+        except (OSError, ValueError) as e:
+            LOG.error("killswitch state unreadable (%s): counting it as LOCKED", e)
+            return True
+
+    def killswitch_config(self):
+        with open(self.cfg["killswitch_config"]) as f:
+            d = json.load(f)
+        return {"dry_run": d.get("dry_run", True) is not False,
+                "lock_command": d["lock_command"] if "lock_command" in d else ["systemctl", "reboot"]}
+
+    def cooling(self):
+        now = time.time()
+        if self.last_fire_mono is not None and time.monotonic() - self.last_fire_mono < DEFIB_COOLDOWN:
+            return True
+        # Wall clock covers a restart; abs() so a clock stepped backwards can't reopen it early.
+        return abs(now - float(self.state.get("last_fire") or 0)) < DEFIB_COOLDOWN
+
+    # ---- the two steps -----------------------------------------------------
+    def verify(self, body, step, nonce_field):
+        if not isinstance(body, dict) or set(body) != {"action", nonce_field, "key", "sig"}:
+            raise Refused("malformed body")
+        action, nonce, name, sig = (body[k] for k in ("action", nonce_field, "key", "sig"))
+        if not all(isinstance(v, str) for v in (action, nonce, name, sig)):
+            raise Refused("malformed body")
+        if action not in ACTIONS:
+            raise Refused("unknown action")
+        if not NONCE_RE.fullmatch(nonce):
+            raise Refused("nonce must be 64 lowercase hex")
+        keys = load_keys(self.cfg["keys_file"], self.cfg["keys_must_be_root"])
+        if name not in keys:
+            raise Refused(f"unknown key {name!r}" if NAME_RE.fullmatch(name) else "unknown key", loud=True)
+        kind, _cred, pub = keys[name]
+        if kind != "p256":
+            raise Refused("webauthn keys are not accepted yet")
+        try:
+            der = base64.b64decode(sig, validate=True)
+            pub.verify(der, signed_bytes(self.box, action, step, nonce), ec.ECDSA(hashes.SHA256()))
+        except (InvalidSignature, ValueError, TypeError):
+            raise Refused("bad signature", loud=True)
+        return action, nonce, name
+
+    def request(self, body):
+        action, n1, name = self.verify(body, "request", "n1")
+        if n1 in self.seen_n1:
+            raise Refused("request replayed", loud=True)
+        self.state["seen_n1"].append(n1)
+        self.save()
+        if action == "defib-fire" and self.cooling():
+            raise Refused("defib cooling down (10 min after a fire)")
+        n2 = secrets.token_hex(32)
+        # ONE pending entry: a newer signed request replaces an older one.
+        self.pending = {"n2": n2, "action": action, "key": name, "deadline": time.monotonic() + CONFIRM_WINDOW}
+        LOG.info("request ok: action=%s key=%s", action, name)
+        return {"result": "pending", "n2": n2}
+
+    def confirm(self, body):
+        action, n2, name = self.verify(body, "confirm", "n2")
+        p = self.pending
+        if p is None:
+            raise Refused("no pending request")
+        if not hmac.compare_digest(p["n2"], n2):
+            raise Refused("confirm does not match the pending request", loud=True)
+        if p["action"] != action:
+            raise Refused("action changed between request and confirm", loud=True)
+        if p["key"] != name:
+            raise Refused("confirm signed by another key than the request", loud=True)
+        if time.monotonic() >= p["deadline"]:
+            self.pending = None
+            raise Refused("confirm too late (over 90 s)")
+        self.pending = None  # consumed: the same n2 can't pass twice
+        LOG.warning("confirm ok: action=%s key=%s", action, name)
+        return {"result": self.act(action)}
+
+    # ---- actions -----------------------------------------------------------
+    def act(self, action):
+        if action == "probe":
+            return self.probe()
+        if action == "defib-fire":
+            if self.cooling():
+                raise Refused("defib cooling down (10 min after a fire)")
+            if self.cfg["dry_run"]:
+                LOG.warning("DRY-RUN: would run %s", self.cfg["defib_command"])
+                return "dry run: would fire"
+            run_actuator(self.cfg["defib_command"])
+            # Only after the start was accepted: a failed start must leave the owner free to retry.
+            self.state["last_fire"] = time.time()
+            self.last_fire_mono = time.monotonic()
+            self.save()
+            return "fired (defib-tn fire started; it still aborts if TrueNAS answers)"
+        if action == "kill-arm":
+            if self.locked():
+                return f"{self.box}: LOCKED; arm ignored"
+            self.state["kill_state"] = "ARMED"
+            self.save()
+            return f"{self.box}: ARMED"
+        if action == "kill-off":
+            if self.locked():
+                # Never remote-unlock from LOCKED; only acknowledge.
+                return f"{self.box}: LOCKED. Disarm acknowledged; recovery is console-only, no remote unlock"
+            self.state["kill_state"] = "DISARMED"
+            self.save()
+            return f"{self.box}: DISARMED"
+        if action == "kill-on":
+            ks = self.killswitch_config()
+            cmd = ks["lock_command"]
+            if self.cfg["dry_run"] or ks["dry_run"]:
+                LOG.warning("DRY-RUN: would run lock_command=%s (state unchanged)", cmd)
+                return f"dry run: would lock {self.box}"
+            if not cmd:
+                raise Refused("no lock actuator configured")
+            self.state["kill_state"] = "LOCKED"
+            self.save()
+            run_actuator(cmd)
+            return f"{self.box}: locking now; recovery is console-only"
+        raise Refused("unknown action")
+
+    def probe(self):
+        """The live permission checks, then stop. app-commands-probe (root) asks polkit about this process."""
+        t0 = time.time() - 1  # the result file is root's; a stale one is told apart by its age, not deleted
+        try:
+            # This start is itself the check that the sandbox can reach systemd over D-Bus through polkit.
+            subprocess.run(self.cfg["probe_command"], check=True, capture_output=True, text=True, timeout=60)
+            with open(self.cfg["probe_result"]) as f:
+                if os.fstat(f.fileno()).st_mtime < t0:
+                    return "probe failed: the probe unit ran but wrote no fresh result"
+                result = f.read().strip()
+        except subprocess.CalledProcessError as e:
+            return f"probe failed: probe unit didn't run ({(e.stderr or '').strip()[:160]})"
+        except Exception as e:
+            return f"probe failed: {type(e).__name__}: {e}"
+        if result != "ok":
+            return "probe failed: " + result[:600]
+        return f"probe ok (dry_run={'on' if self.cfg['dry_run'] else 'off'})"
+
+    # ---- refusals ----------------------------------------------------------
+    def refused(self, step, src, why, loud):
+        line = f"{'LOUD ' if loud else ''}refused {step} from {src}: {why}"
+        (LOG.error if loud else LOG.warning)(line)
+        try:
+            # A root path unit batches this file into one pi-app-commands row in Lumi's app.
+            # Capped: unsigned junk must not fill the disk. The journal and the local log keep every line.
+            if os.path.exists(self.alerts_path) and os.path.getsize(self.alerts_path) > ALERTS_CAP:
+                return
+            with open(self.alerts_path, "a") as f:
+                f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + line + "\n")
+        except OSError as e:
+            LOG.error("alert queue write failed: %s", e)
+
+
+def run_actuator(cmd):
+    try:
+        subprocess.run(cmd, check=True, timeout=30)
+    except (subprocess.SubprocessError, OSError) as e:
+        LOG.error("actuator %s failed: %s", cmd, e)
+        raise Refused(f"actuator failed ({e})", loud=True)
+
+
+def make_handler(rx):
+    class Handler(BaseHTTPRequestHandler):
+        timeout = 5  # a slow client can't hold the listener
+        server_version = "app-commands"
+        sys_version = ""
+
+        def log_message(self, fmt, *args):
+            LOG.info("%s %s", self.client_address[0], fmt % args)
+
+        def reply(self, code, obj):
+            data = json.dumps(obj).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            try:
+                self.end_headers()
+                self.wfile.write(data)
+            except OSError as e:  # the client left; what was decided is already logged
+                LOG.info("reply to %s not delivered: %s", self.client_address[0], e)
+
+        def do_GET(self):
+            self.reply(404, {"result": "refused: not found"})
+
+        def do_POST(self):
+            src = self.client_address[0]
+            step = {"/request": "request", "/confirm": "confirm"}.get(self.path)
+            try:
+                if step is None:
+                    raise Refused("not found")
+                try:
+                    n = int(self.headers.get("Content-Length", ""))
+                except ValueError:
+                    raise Refused("Content-Length required")
+                if not 0 < n <= MAX_BODY:
+                    raise Refused("body too large or empty")
+                raw = self.rfile.read(n)
+                try:
+                    body = json.loads(raw)
+                except ValueError:
+                    raise Refused("body is not JSON")
+                with rx.lock:
+                    out = rx.request(body) if step == "request" else rx.confirm(body)
+                self.reply(200, out)
+            except Refused as r:
+                with rx.lock:
+                    rx.refused(step or self.path[:40], src, str(r), r.loud)
+                self.reply(403, {"result": f"refused: {r}"})
+            except socket.timeout:
+                LOG.warning("timeout reading from %s", src)
+            except Exception as e:
+                LOG.exception("handler error from %s: %s", src, e)
+                with rx.lock:
+                    rx.refused(step or self.path[:40], src, f"internal error ({type(e).__name__}: {e})", True)
+                self.reply(500, {"result": f"refused: internal error ({type(e).__name__})"})
+
+    return Handler
+
+
+class FreebindServer(ThreadingHTTPServer):
+    """Binds the tailnet address even before tailscaled has brought it up. A thread per connection, so one slow
+    client can't hold the owner's confirm past its 90 s; every check-and-act still runs under Receiver.lock."""
+
+    daemon_threads = True
+
+    def server_bind(self):
+        # Python names the constant only from 3.14; the Pi runs 3.13. 15 is Linux's IP_FREEBIND.
+        self.socket.setsockopt(socket.SOL_IP, getattr(socket, "IP_FREEBIND", 15), 1)
+        super().server_bind()
+
+
+def main():
+    cfg = load_config(CONFIG_PATH)
+    if cfg.get("log_file"):
+        try:
+            fh = logging.FileHandler(cfg["log_file"])
+            fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+            LOG.addHandler(fh)
+        except OSError as e:
+            LOG.error("local log %s unavailable: %s", cfg["log_file"], e)
+    rx = Receiver(cfg)
+    try:
+        names = sorted(load_keys(cfg["keys_file"], cfg["keys_must_be_root"]))
+    except Refused as r:
+        names = [f"NONE ({r})"]
+    LOG.info("app-commands up: box=%s dry_run=%s listen=%s keys=%s", cfg["box"], cfg["dry_run"],
+             cfg["listen"], names)
+    servers = []
+    for addr in cfg["listen"]:
+        host, port = addr.rsplit(":", 1)
+        servers.append(FreebindServer((host, int(port)), make_handler(rx)))
+    threads = [threading.Thread(target=s.serve_forever, daemon=True) for s in servers[1:]]
+    for t in threads:
+        t.start()
+    servers[0].serve_forever()
+
+
+if __name__ == "__main__":
+    main()

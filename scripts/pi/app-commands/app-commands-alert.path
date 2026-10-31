@@ -1,0 +1,9 @@
+# /etc/systemd/system/app-commands-alert.path
+[Unit]
+Description=Watch the app-commands refusal queue
+
+[Path]
+PathExists=/var/lib/app-commands/alerts
+
+[Install]
+WantedBy=multi-user.target

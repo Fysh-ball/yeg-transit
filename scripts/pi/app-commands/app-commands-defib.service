@@ -1,0 +1,13 @@
+# /etc/systemd/system/app-commands-defib.service
+# The app's way to run the unchanged defib actuator, exactly as defib-tn-bot runs it (as oneadmin).
+# Started only by app-commands-receiver after a signed request + confirm; never enabled.
+[Unit]
+Description=defib-tn fire, ordered from Lumi's app
+
+[Service]
+Type=oneshot
+User=oneadmin
+# No leading "-": without its config defib-tn quietly simulates, so a missing file must fail the start loudly.
+EnvironmentFile=/etc/truenas-defib/defib.env
+ExecStart=/usr/local/bin/defib-tn fire
+TimeoutStartSec=900

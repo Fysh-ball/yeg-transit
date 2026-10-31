@@ -1,0 +1,39 @@
+# /etc/systemd/system/app-commands-receiver.service
+[Unit]
+Description=app-commands receiver (owner's signed defib and kill-switch commands from Lumi's app)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# The kill-switch service user: polkit already lets it start killswitch-lock.service, and
+# 49-app-commands.rules adds app-commands-defib.service. It can read the Telegram receiver's state.
+User=killswitch
+Group=killswitch
+ExecStart=/usr/local/bin/app-commands-receiver
+StateDirectory=app-commands
+StateDirectoryMode=0700
+LogsDirectory=app-commands
+LogsDirectoryMode=0750
+Restart=always
+RestartSec=5
+OOMScoreAdjust=-900
+
+# Same box as killswitch-receiver: this faces the phone, and later a public tunnel.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

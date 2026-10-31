@@ -1,0 +1,12 @@
+// /etc/polkit-1/rules.d/49-app-commands.rules
+// app-commands-receiver runs as 'killswitch'. 49-killswitch-reboot.rules already lets it reboot and start
+// killswitch-lock.service; this adds exactly two more: starting the defib unit, and the probe that checks it.
+polkit.addRule(function(action, subject) {
+    if (subject.user != "killswitch") return;
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        (action.lookup("unit") == "app-commands-defib.service" ||
+         action.lookup("unit") == "app-commands-probe.service") &&
+        action.lookup("verb") == "start") {
+        return polkit.Result.YES;
+    }
+});
