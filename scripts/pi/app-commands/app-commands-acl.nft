@@ -1,0 +1,17 @@
+#!/usr/sbin/nft -f
+# /etc/app-commands-acl.nft: only the owner's phone reaches the app-commands receiver on :7601.
+# Its own table, like tang_acl: loading it touches no other table. A drop here is final for every table.
+# Instead of a headscale ACL: the tailnet's owner rule is *:*, and headscale ACLs only allow, so a headscale
+# version would mean listing every other node by hand. tailscale0's source address is the WireGuard peer's
+# own, so this refuses every other tailnet node at the same point.
+# ponytail: both S24 nodes (sp1 100.64.0.2, bunker 100.64.0.3) until it's measured which one the app's
+# profile uses; then drop the other.
+table inet app_commands_acl {}
+delete table inet app_commands_acl
+table inet app_commands_acl {
+	chain input {
+		type filter hook input priority -100; policy accept;
+		iifname "tailscale0" tcp dport 7601 ip saddr { 100.64.0.2, 100.64.0.3 } accept
+		tcp dport 7601 counter drop
+	}
+}

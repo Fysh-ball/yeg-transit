@@ -1,0 +1,14 @@
+# /etc/systemd/system/app-commands-acl.service
+[Unit]
+Description=app-commands source ACL: only the phone reaches :7601 (isolated nft table)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+Before=app-commands-receiver.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/app-commands-acl.nft
+
+[Install]
+WantedBy=multi-user.target
