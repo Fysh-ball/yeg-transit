@@ -360,6 +360,10 @@ def make_handler(rx):
 
         def do_POST(self):
             src = self.client_address[0]
+            if src == "127.0.0.1":
+                # The cloudflared tunnel (design C). Logged only, never trusted: the signature is the authority.
+                src = "tunnel:" + (re.sub(r"[^0-9a-fA-F:.]", "", self.headers.get("CF-Connecting-IP", ""))[:45]
+                                   or "unknown")
             step = {"/request": "request", "/confirm": "confirm"}.get(self.path)
             try:
                 if step is None:

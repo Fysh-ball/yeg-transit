@@ -205,7 +205,17 @@ class Section41(unittest.TestCase):
     def test_refusals_reach_the_alert_queue(self):
         self.r.request("defib-fire", key=self.r.stranger)
         with open(self.r.rx.alerts_path) as f:
-            self.assertIn("LOUD refused request from 127.0.0.1: bad signature", f.read())
+            self.assertIn("LOUD refused request from tunnel:unknown: bad signature", f.read())
+
+    def test_tunnel_source_is_logged_not_trusted(self):
+        n1 = secrets.token_hex(32)
+        req = urllib.request.Request(f"http://127.0.0.1:{self.r.servers[0].server_address[1]}/request",
+                                     json.dumps({"action": "probe", "n1": n1, "key": "phone", "sig": "AA=="}).encode(),
+                                     {"CF-Connecting-IP": "203.0.113.9<x>"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            self.assertEqual(json.loads(r.read())["result"], "refused: bad signature")
+        with open(self.r.rx.alerts_path) as f:
+            self.assertIn("from tunnel:203.0.113.9: bad signature", f.read())
 
     def test_probe_stops_before_acting(self):
         self.assertEqual(self.r.two_step("probe"), (200, {"result": "probe ok"}))

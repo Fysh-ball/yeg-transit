@@ -1,0 +1,23 @@
+# /etc/systemd/system/app-commands-tunnel.service
+# Design C: the public way in to the receiver, pi-commands.fysh.site -> 127.0.0.1:7601, for when the phone is off
+# the tailnet. Same signed protocol; the signature stays the only authority. Remotely managed tunnel
+# "pi-app-commands" (ingress set by the Cloudflare API). Token: root 0600, handed in as a credential, never argv.
+[Unit]
+Description=cloudflared tunnel for the app-commands receiver (pi-commands.fysh.site)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+LoadCredential=token:/etc/cloudflared/pi-app-commands.token
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run --token-file ${CREDENTIALS_DIRECTORY}/token
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target

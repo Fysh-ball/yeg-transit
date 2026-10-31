@@ -12,6 +12,8 @@ table inet app_commands_acl {
 	chain input {
 		type filter hook input priority -100; policy accept;
 		iifname "tailscale0" tcp dport 7601 ip saddr { 100.64.0.2, 100.64.0.3 } accept
+		# The cloudflared tunnel on this box connects to 127.0.0.1:7601 (design C).
+		iifname "lo" ip daddr 127.0.0.1 tcp dport 7601 accept
 		tcp dport 7601 counter drop
 	}
 }
