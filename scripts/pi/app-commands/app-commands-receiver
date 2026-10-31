@@ -74,6 +74,10 @@ class Refused(Exception):
         self.loud = loud
 
 
+class Unparseable(Refused):
+    """A body the receiver couldn't parse: the only refusal answered 400 (design section 6.5)."""
+
+
 def load_config(path):
     cfg = dict(DEFAULTS)
     with open(path) as f:
@@ -259,7 +263,8 @@ class Receiver:
             self.state["last_fire"] = time.time()
             self.last_fire_mono = time.monotonic()
             self.save()
-            return "fired (defib-tn fire started; it still aborts if TrueNAS answers)"
+            # defib-tn itself still aborts unless TrueNAS is confirmed down.
+            return "fired"
         if action == "kill-arm":
             if self.locked():
                 return f"{self.box}: LOCKED; arm ignored"
@@ -303,7 +308,8 @@ class Receiver:
             return f"probe failed: {type(e).__name__}: {e}"
         if result != "ok":
             return "probe failed: " + result[:600]
-        return f"probe ok (dry_run={'on' if self.cfg['dry_run'] else 'off'})"
+        LOG.info("probe ok (dry_run=%s)", self.cfg["dry_run"])
+        return "probe ok"
 
     # ---- refusals ----------------------------------------------------------
     def refused(self, step, src, why, loud):
@@ -361,21 +367,22 @@ def make_handler(rx):
                 try:
                     n = int(self.headers.get("Content-Length", ""))
                 except ValueError:
-                    raise Refused("Content-Length required")
+                    raise Unparseable("Content-Length required")
                 if not 0 < n <= MAX_BODY:
-                    raise Refused("body too large or empty")
+                    raise Unparseable("body too large or empty")
                 raw = self.rfile.read(n)
                 try:
                     body = json.loads(raw)
                 except ValueError:
-                    raise Refused("body is not JSON")
+                    raise Unparseable("body is not JSON")
                 with rx.lock:
                     out = rx.request(body) if step == "request" else rx.confirm(body)
                 self.reply(200, out)
             except Refused as r:
                 with rx.lock:
                     rx.refused(step or self.path[:40], src, str(r), r.loud)
-                self.reply(403, {"result": f"refused: {r}"})
+                # Section 6.5: every decision is 200 and the app shows `result` as it is.
+                self.reply(400 if isinstance(r, Unparseable) else 200, {"result": f"refused: {r}"})
             except socket.timeout:
                 LOG.warning("timeout reading from %s", src)
             except Exception as e:

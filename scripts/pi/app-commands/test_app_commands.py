@@ -102,9 +102,9 @@ class Section41(unittest.TestCase):
     def tearDown(self):
         self.r.close()
 
-    def refused(self, resp):
-        code, out = resp
-        self.assertEqual(code, 403, out)
+    def refused(self, resp, code=200):
+        got, out = resp
+        self.assertEqual(got, code, out)
         self.assertTrue(out["result"].startswith("refused: "), out)
         return out["result"]
 
@@ -123,7 +123,7 @@ class Section41(unittest.TestCase):
         n1 = secrets.token_hex(32)
         self.refused(self.r.post("/request", {"action": "defib-fire", "n1": n1, "key": "phone"}))
         self.refused(self.r.post("/request", {"action": "defib-fire", "n1": n1, "key": "phone", "sig": ""}))
-        self.refused(self.r.post("/request", b"not json"))
+        self.refused(self.r.post("/request", b"not json"), code=400)
         self.assertIsNone(self.r.rx.pending)
 
     def test_replayed_n1(self):
@@ -193,14 +193,14 @@ class Section41(unittest.TestCase):
 
             def go(server):
                 barrier.wait()
-                results.append(self.r.confirm("defib-fire", out["n2"], server=server)[0])
+                results.append(self.r.confirm("defib-fire", out["n2"], server=server)[1]["result"])
 
             ts = [threading.Thread(target=go, args=(i,)) for i in (0, 1)]
             for t in ts:
                 t.start()
             for t in ts:
                 t.join()
-            self.assertEqual(sorted(results), [200, 403])
+            self.assertEqual(sorted(results), ["dry run: would fire", "refused: no pending request"])
 
     def test_refusals_reach_the_alert_queue(self):
         self.r.request("defib-fire", key=self.r.stranger)
@@ -208,7 +208,7 @@ class Section41(unittest.TestCase):
             self.assertIn("LOUD refused request from 127.0.0.1: bad signature", f.read())
 
     def test_probe_stops_before_acting(self):
-        self.assertEqual(self.r.two_step("probe"), (200, {"result": "probe ok (dry_run=on)"}))
+        self.assertEqual(self.r.two_step("probe"), (200, {"result": "probe ok"}))
         self.assertEqual(self.r.rx.state["last_fire"], 0)
 
     def test_probe_reports_what_the_root_check_found(self):
@@ -262,10 +262,9 @@ class LiveConfigWithHarmlessActuators(unittest.TestCase):
 
     def test_defib_cooldown(self):
         self.r = Rig(dry_run=False)
-        self.assertEqual(self.r.two_step("defib-fire")[0], 200)
+        self.assertEqual(self.r.two_step("defib-fire"), (200, {"result": "fired"}))
         (code, out), _ = self.r.request("defib-fire")
-        self.assertEqual(code, 403)
-        self.assertIn("cooling", out["result"])
+        self.assertEqual((code, out), (200, {"result": "refused: defib cooling down (10 min after a fire)"}))
         self.r.rx.__init__(self.r.rx.cfg)  # a restart keeps the cooldown
         self.assertIn("cooling", self.r.request("defib-fire")[0][1]["result"])
 
