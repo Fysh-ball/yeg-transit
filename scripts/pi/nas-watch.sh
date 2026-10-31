@@ -29,8 +29,11 @@ notify() {
   log "NOTIFY FAILED http=$code: $1"; return 1
 }
 
-last=$(timeout 30 ssh -n -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 "$PI" \
-  'stat -c %Y /var/lib/yeg-check/last-run' 2>&1); s=$?
+stamp() { timeout 30 ssh -n -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 "$PI" \
+  'stat -c %Y /var/lib/yeg-check/last-run' 2>&1; }
+last=$(stamp); s=$?
+# Once more 3 min later: a night kernel reboot (kernel-cve-patch, hermes 03:15) is down about 2 min, not a dead Pi.
+[ "$s" = 0 ] || { sleep "${RETRY-180}"; last=$(stamp); s=$?; }
 case "$last" in
   ''|*[!0-9]*) bad="TrueNAS can't read the Pi's live-times check (ssh exit $s: $(echo "$last" | tail -n1 | cut -c1-200))" ;;
   *) age=$(( ($(date +%s) - last) / 60 ))
