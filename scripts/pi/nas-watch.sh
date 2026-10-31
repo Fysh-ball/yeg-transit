@@ -3,30 +3,25 @@
 # with it. TrueNAS dying is caught by the hc-ping it already sends every 5 min (owner's choice, 2026-10-30).
 # Every 15 min from a TrueNAS cron job (midclt, as Apollo: survives updates, unlike /etc on the boot environment).
 #   nas-watch.sh [--dry-run]
-# Telegram once when the last run is over 30 min old or hermes doesn't answer, once more when it recovers.
+# One alert when the last run is over 30 min old or hermes doesn't answer, one more when it recovers. Alerts go to
+# Lumi's app through the alert spool (the owner stopped reading Telegram, 2026-10-30).
 DIR=$(cd "$(dirname "$0")/../.." && pwd)
 STATE=$DIR/.pi-watch
 LATCH=$STATE/latch  # present while paged and not yet recovered
 LOG=$STATE/log
 KEY=/mnt/Playground/Apollo-home/.ssh/claude_agent_truenas  # the key cron job 43 uses to reach hermes
 PI=${PI-Apollo@100.64.0.10}
-TOK=/run/sodium/jarvis/holypi_bot_token
-CHAT=/run/sodium/jarvis/allowed_chat_ids
 STALE_MIN=${STALE_MIN-30}
 DRY=0; [ "$1" = "--dry-run" ] && DRY=1
 
 mkdir -p "$STATE"
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; echo "$*"; }
-# The token goes in the URL only, and curl's body to /dev/null (as backup-stamp-watch does).
+# $1: the line; $2: ok for a recovery, failed for a fault.
 notify() {
   [ "$DRY" = 1 ] && { echo "WOULD SEND: $1"; return 0; }
-  if [ ! -r "$TOK" ] || [ ! -r "$CHAT" ]; then log "NOTIFY FAILED (no credentials): $1"; return 1; fi
-  tok=$(cat "$TOK"); chat=$(head -n1 "$CHAT" | tr -d '[:space:]')
-  code=$(curl -s --max-time 15 -o /dev/null -w '%{http_code}' "https://api.telegram.org/bot$tok/sendMessage" \
-    --data-urlencode "chat_id=$chat" --data-urlencode "text=yegbus: $1" 2>/dev/null)
-  tok=
-  [ "$code" = 200 ] && { log "SENT $1"; return 0; }
-  log "NOTIFY FAILED http=$code: $1"; return 1
+  out=$(printf '%s' "yegbus: $1" | /mnt/Playground/enforcement/spool-notify "${COND-nas-watch}" "$2" 2>&1) \
+    && { log "SENT $1"; return 0; }
+  log "NOTIFY FAILED ($(echo "$out" | tail -n1)): $1"; return 1
 }
 
 stamp() { timeout 30 ssh -n -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 "$PI" \
@@ -40,10 +35,10 @@ case "$last" in
      [ "$age" -gt "$STALE_MIN" ] && bad="the Pi's live-times check last landed $age min ago, seen from TrueNAS" ;;
 esac
 if [ -z "$bad" ]; then
-  [ -e "$LATCH" ] && notify "the Pi's live-times check is landing again, seen from TrueNAS" && { [ "$DRY" = 1 ] || rm -f "$LATCH"; }
+  [ -e "$LATCH" ] && notify "the Pi's live-times check is landing again, seen from TrueNAS" ok && { [ "$DRY" = 1 ] || rm -f "$LATCH"; }
   log "OK ${age} min"
   exit 0
 fi
 log "BAD $bad"
-[ -e "$LATCH" ] || { notify "$bad" && [ "$DRY" = 0 ] && touch "$LATCH"; }
+[ -e "$LATCH" ] || { notify "$bad" failed && [ "$DRY" = 0 ] && touch "$LATCH"; }
 exit 1

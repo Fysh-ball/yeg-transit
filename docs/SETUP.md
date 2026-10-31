@@ -85,7 +85,7 @@ Run the tests:
    when the site or ETS didn't answer twice. The Pi runs the same check so it doesn't need the laptop on:
    `scripts/pi/` (deploy.sh copies it; install once with `sudo cp scripts/pi/*.service scripts/pi/*.timer
    /etc/systemd/system/ && sudo systemctl enable --now yeg-check.timer yeg-check-deadman.timer`). It sends
-   wrong times to Telegram, and its dead-man sends one if no check has landed in 30 min. TrueNAS sends the
+   wrong times to Lumi's app (the alert spool, via `scripts/pi/spool-notify`), and its dead-man sends one if no check has landed in 30 min. TrueNAS sends the
    same if the Pi itself is down: `scripts/pi/nas-watch.sh`, from TrueNAS cron job 57 (as Apollo, every 15 min).
 
 Rolling back: every `deploy.sh` run prints a `rollback:` line, which restarts the previous image

@@ -1,0 +1,23 @@
+#!/bin/sh
+# spool-notify <condition> <ok|failed|partial>, the line on stdin: one alert into Lumi's app, through the alert
+# spool on TrueNAS. The owner stopped reading Telegram (2026-10-30), so dnsguard, dns-soak, mullvad-exit-watch,
+# yeg-check and nas-watch send here instead. Installed as /usr/local/bin/spool-notify on hermes and
+# /mnt/Playground/enforcement/ on TrueNAS.
+# Exit 0: in the app. Anything else: nobody was told, and the caller logs NOTIFY FAILED as it did for Telegram.
+NODE=/mnt/Playground/prometheus-hands/release/current/node
+case "$2" in ok|failed|partial) ;; *) echo "usage: spool-notify <condition> <ok|failed|partial> < line" >&2; exit 2 ;; esac
+body=$(head -c 2000)
+if [ -x "$NODE" ]; then
+  # On TrueNAS. Rows are 600 Apollo: a root caller writing them would leave rows (or a seq file) the door can't read.
+  run=; [ "$(id -u)" = 0 ] && run="runuser -u Apollo --"
+  # --opt=value: a body starting with '-' would otherwise be refused as a flag. timeout: callers hold locks.
+  out=$(timeout 30 $run "$NODE" /mnt/Playground/enforcement/spool-alert.ts --spool=/mnt/Playground/Apollo-home/jarvis/alert-spool \
+    --condition="$1" --result="$2" --body="$body" 2>&1); rc=$?
+  printf '%s\n' "$out" >&2
+  # A lone intent already shows in the app as a lost-event alarm. Count it as told, or the caller re-sends every tick.
+  case "$out" in *"ALERT INCOMPLETE: intent"*) exit 0 ;; esac
+  exit "$rc"
+fi
+# On hermes: TrueNAS's key for this runs only spool-relay, which takes conditions starting hermes-.
+printf '%s' "$body" | timeout 40 ssh -i /root/.ssh/spool-relay -o IdentitiesOnly=yes -o BatchMode=yes \
+  -o ConnectTimeout=10 -o ServerAliveInterval=10 -o ServerAliveCountMax=2 Apollo@100.64.0.5 "$1 $2"
