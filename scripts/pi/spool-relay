@@ -2,11 +2,13 @@
 # spool-relay: hermes's way onto the alert spool, which lives on TrueNAS (2026-10-30: the owner reads alerts in
 # Lumi's app now, not Telegram). The forced command of hermes's key in Apollo's authorized_keys on TrueNAS, so
 # that key can do nothing else. hermes runs:  ssh Apollo@truenas "<condition> <ok|failed|partial>" < body
-# The condition must start hermes- (or test-hermes-), so hermes can't write under another alerter's name.
+# pi has its own key whose forced command is "spool-relay pi". The condition must start with that host's name
+# (or test-<host>-), so one Pi can't write under another alerter's name.
+host=${1:-hermes}
 set -f
 set -- $SSH_ORIGINAL_COMMAND
 # printf, not echo: dash's echo expands \n, which let a second line past grep -x.
-printf '%s\n' "$1" | grep -qxE '(test-)?hermes-[a-z0-9-]{1,40}' || { echo "spool-relay: bad condition '$1'" >&2; exit 2; }
+printf '%s\n' "$1" | grep -qxE "(test-)?$host-[a-z0-9-]{1,40}" || { echo "spool-relay: bad condition '$1'" >&2; exit 2; }
 case "$2" in ok|failed|partial) ;; *) echo "spool-relay: bad result '$2'" >&2; exit 2 ;; esac
 body=$(head -c 2000)
 [ -n "$body" ] || { echo "spool-relay: empty body" >&2; exit 2; }
