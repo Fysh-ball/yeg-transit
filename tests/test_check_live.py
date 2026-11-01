@@ -90,6 +90,11 @@ class CheckLive(unittest.TestCase):
         self.assertEqual(self.run_check(self.answers(site(60), ets=ets))[0], 0)
         self.assertEqual(self.run_check(self.answers(site(110), ets=ets))[0], 1)
 
+    def test_ets_clock_an_hour_off_its_delay_is_not_the_right_time(self):  # 2026-11-01: ETS 1 h on, every site time too
+        ets = ets_feed(at=45 + 60, delay=2)
+        self.assertEqual(self.run_check(self.answers(site(45), ets=ets))[0], 0)
+        self.assertEqual(self.run_check(self.answers(site(105), ets=ets))[0], 1)
+
     def test_later_than_ets_is_right_only_where_the_gps_says(self):  # 2890/008: ETS said 11 min ago, the bus 4.3 km off
         ets = ets_feed(at=-11, delay=-54)
         self.assertEqual(self.run_check(self.answers(site(9), ets=ets, vp=gps(4300)))[0], 0)

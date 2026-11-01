@@ -163,6 +163,8 @@ def check(SITE):
             # 40 min late (2026-10-26). Then anything between them is ETS's word. Later than both is right when the bus's
             # GPS can't get here sooner: 2890/008, ETS said 11 min ago with no delay (2026-10-24; inferred: no GPS was logged).
             said = [t for t in (theirs, expect) if t]
+            if theirs and abs(abs(theirs - expect) - 3600) <= 300:  # ETS's clock an hour off its own delay: the delay
+                said = [expect]  # and the GPS were right, every site time an hour late (2026-11-01 from ~01:00)
             # Not started, its bus away from its first stop: it drives there first, then the route, further than the
             # straight line here (3053 on 004, 16 km from Lewis Farms: site 60 min, ETS's delay 42, 2026-10-27).
             # ponytail: no stop positions here to add that path up, so it's logged as HELD, not judged; with the
