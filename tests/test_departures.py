@@ -56,6 +56,15 @@ class Departures(unittest.TestCase):
             out = app.departures(fixture(), "1797", 8)
         self.assertEqual((out[0]["time"] - now, out[0]["live"]), (720, True))
 
+    def test_ets_clock_an_hour_off_its_own_delay_is_put_back(self):  # 2026-11-01: ETS 1 h on, delay and GPS right
+        now = int(time.time())
+        for ets, want in ((3600 + 120, 120), (-3600 + 120, 120), (2400 + 120, 2520), (120, 120)):
+            trips = {"t": ({"1797": now + ets}, 120, {"1797": 11})}
+            with mock.patch.object(app, "scheduled", lambda *a: [{"trip": "t", "seq": 11, "sched": now, "route": "201"}]), \
+                    mock.patch.object(app.LIVE, "trips", trips), mock.patch.object(app.LIVE, "vehicles", {}), \
+                    mock.patch.object(app.LIVE, "ts", now):
+                self.assertEqual(app.departures(fixture(), "1797", 8)[0]["time"] - now, want, ets)
+
     def test_a_trip_not_started_waits_for_its_bus(self):  # 560 at Kingsway, 2026-10-26: ETS's start 19 min gone, bus 12.7 km off
         now = int(time.time())
         def first_stop(pos, eta, seqs={"11095": 9}, delay=2400):

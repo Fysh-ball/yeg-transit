@@ -131,6 +131,7 @@ class Live:
 
     def __init__(self):
         self.trips, self.ts, self.error = {}, 0, None
+        self.stop_delay = {}  # (trip_id, stop_id) -> ETS's delay at that stop
         self.vehicles, self.vp_error, self.vp_ts = {}, None, 0
         self.assigned, self.on_trip = {}, {}  # trip_id -> vehicle id ETS has put on it; vehicle id -> trip it is driving now
         self.alerts, self.alerts_at = {}, 0
@@ -143,7 +144,7 @@ class Live:
     def poll(self):
         try:
             feed = feed_of(RT_URL)
-            trips, assigned = {}, {}
+            trips, assigned, stop_delay = {}, {}, {}
             for e in feed.entity:
                 tu = e.trip_update
                 # ETS lists some trips twice: its prediction for the bus, then the bare timetable (delay 0), up to 11 min apart
@@ -158,10 +159,12 @@ class Live:
                     if s.stop_id not in stops:
                         stops[s.stop_id] = None if s.schedule_relationship == SKIPPED else ev.time  # 0: a delay but no time
                         seqs[s.stop_id] = s.stop_sequence
+                        stop_delay[tu.trip.trip_id, s.stop_id] = ev.delay
                 trips[tu.trip.trip_id] = (stops, delay, seqs)
                 if tu.vehicle.id:
                     assigned[tu.trip.trip_id] = tu.vehicle.id
             self.trips, self.assigned, self.ts, self.error = trips, assigned, feed.header.timestamp, None
+            self.stop_delay = stop_delay
         except Unchanged:
             self.error = None
         except Exception as e:
@@ -262,7 +265,14 @@ def departures(db, stop_id, n):
             if stop_id in stops and seqs[stop_id] in (0, seq):
                 if stops[stop_id] is None:
                     continue
-                t = stops[stop_id] or t + delay
+                ets = stops[stop_id]
+                # From 2026-11-01 ~01:00 ETS's clock times ran an hour after its own timetable plus delay (37,722 of
+                # 38,436 at 03:21), as if it fell back while Alberta stays on -06:00; its delay and the buses' GPS did
+                # not (a 2 at 5070: ETS 02:11, timetable 00:58 +14, bus 1 km out at 01:15). An hour off is ETS's clock.
+                off = ets - t - LIVE.stop_delay.get((d["trip"], stop_id), delay) if ets else 0
+                if abs(abs(off) - 3600) <= 300:
+                    ets -= 3600 if off > 0 else -3600
+                t = ets or t + delay
             else:
                 t += delay
         d["time"], d["live"] = t, bool(live)
