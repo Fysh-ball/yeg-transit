@@ -133,6 +133,7 @@ class Live:
         self.trips, self.ts, self.error = {}, 0, None
         self.stop_delay = {}  # (trip_id, stop_id) -> ETS's delay at that stop
         self.vehicles, self.vp_error, self.vp_ts = {}, None, 0
+        self.vp_more = {}  # trip_id -> what else ETS says about its bus (fleet number, speed, how full), for a tapped bus
         self.assigned, self.on_trip = {}, {}  # trip_id -> vehicle id ETS has put on it; vehicle id -> trip it is driving now
         self.alerts, self.alerts_at = {}, 0
 
@@ -177,6 +178,14 @@ class Live:
                                               v.timestamp or feed.header.timestamp, v.current_stop_sequence,
                                               v.trip.route_id, v.trip.direction_id) for v in vps}
             self.on_trip = {v.vehicle.id: v.trip.trip_id for v in vps if v.vehicle.id}
+            self.vp_more = {v.trip.trip_id: {
+                "id": v.vehicle.id, "label": v.vehicle.label,
+                "speed": v.position.speed if v.position.HasField("speed") else None,  # m/s; about 2 in 3 buses send it
+                "odometer": v.position.odometer if v.position.HasField("odometer") else None,
+                "occupancy": v.occupancy_status if v.HasField("occupancy_status") else None,  # about half send it
+                "occupancy_pct": v.occupancy_percentage if v.HasField("occupancy_percentage") else None,
+                "status": gtfs_realtime_pb2.VehiclePosition.VehicleStopStatus.Name(v.current_status)
+                if v.HasField("current_status") else None, "stop_id": v.stop_id} for v in vps}
             self.vp_error, self.vp_ts = None, feed.header.timestamp or int(time.time())
         except Unchanged:
             self.vp_error = None
@@ -327,6 +336,43 @@ def fleet(db):
                 out.append([round(v[0], 5), round(v[1], 5), round(v[2] or 0), r[0], r[1] or "", trip])
         FLEET[:] = [vehicles, out]
     return FLEET[1]
+
+
+# GTFS-realtime OccupancyStatus, in riders' words; 7 is ETS's "no data", left out like a bus that sends nothing.
+OCCUPANCY = {0: "Empty", 1: "Lots of seats", 2: "A few seats", 3: "Standing room", 4: "Crowded", 5: "Full",
+             6: "Not taking riders", 8: "Not taking riders"}
+
+
+def bus_info(db, trip):
+    """A tapped bus on the map: how full, how late, its next stop and fleet number, plus everything ETS sent (nerd stats)."""
+    v, more = LIVE.vehicles.get(trip), LIVE.vp_more.get(trip, {})
+    if not v:
+        return None
+    now, out = int(time.time()), {}
+    r = db.execute("SELECT r.short, t.headsign, t.block_id FROM trips t JOIN routes r USING(route_id) WHERE t.trip_id=?",
+                   (trip,)).fetchone()
+    if r:
+        out.update(route=r[0], headsign=r[1] or "")
+    if more.get("occupancy") in OCCUPANCY:
+        out["full"] = OCCUPANCY[more["occupancy"]]
+    if more.get("label"):
+        out["bus"] = more["label"]
+    seq = next_stop(db, trip, v) if v[4] else 0
+    nxt = seq and db.execute("SELECT s.stop_id, s.name, s.code FROM stop_times st JOIN stops s USING(stop_id) "
+                             "WHERE st.trip_id=? AND st.seq>=? ORDER BY st.seq LIMIT 1", (trip, seq)).fetchone()
+    if nxt:
+        out["next"] = {"name": nxt[1], "code": nxt[2]}
+    if t := LIVE.trip(trip):  # ETS's delay, not its clock time: the clock ran an hour off on 2026-11-01 while the delay held
+        out["delay"] = LIVE.stop_delay.get((trip, nxt[0]), t[1]) if nxt else t[1]
+    speed = more.get("speed")
+    out["nerd"] = {"Fleet id": more.get("id"), "Trip": trip, "Block": r and r[2], "Route id": v[5], "Direction": v[6],
+                   "Speed": None if speed is None else f"{speed * 3.6:.0f} km/h", "Heading": f"{v[2]:.0f}\u00b0" if v[2] else None,
+                   "Odometer": None if more.get("odometer") is None else f"{more['odometer'] / 1000:.1f} km",
+                   "Occupancy": None if more.get("occupancy_pct") is None else f"{more['occupancy_pct']}%",
+                   "ETS stop": f"#{more.get('stop_id')} (seq {v[4]})" if more.get("stop_id") else None,
+                   "Status": more.get("status"), "Position": f"{v[0]:.5f}, {v[1]:.5f}", "Seen": f"{max(0, now - v[3])} s ago"}
+    out["nerd"] = {k: x for k, x in out["nerd"].items() if x not in (None, "")}
+    return out
 
 
 def stop_alerts(db, stop_id, code):
@@ -685,6 +731,9 @@ class Handler(SimpleHTTPRequestHandler):
             # age: how old the positions are; a failing ETS feed leaves the last ones in place, so the map must say so
             return self.json({"now": int(time.time()), "age": int(time.time()) - LIVE.vp_ts if LIVE.vp_ts else None,
                               "buses": fleet(db)}, cache=5)
+        if len(parts) == 2 and parts[0] == "vehicles":
+            info = bus_info(db, parts[1])
+            return self.json(info, cache=5) if info else self.json({"error": "no position for this bus now"}, 404)
         if parts == ["weather"]:
             return self.json(walk_weather(), cache=600)
         if len(parts) == 3 and parts[0] == "trips" and parts[2] == "shape":

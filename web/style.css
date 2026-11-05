@@ -224,7 +224,7 @@ html:has(.board.night) { background: #000; }
 .you-pin { display: grid; place-items: center; }
 .you-pin span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #17694a; color: #fff;
   border: 3px solid #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .4); }
-.bus-pin.fleet { width: 40px; height: 40px; font-size: 14px; border-width: 2px; background: var(--accent); color: var(--accent-text); box-sizing: border-box; }
+.bus-pin.fleet { width: 36px; height: 36px; font-size: 13px; border-width: 2px; background: var(--accent); color: var(--accent-text); box-sizing: border-box; }
 .bus-pin.fleet.far { width: 18px; height: 18px; }
 .bus-pin.other { width: 30px; height: 30px; font-size: 12px; border-width: 2px; opacity: .55; }
 /* Top-down bus (owner, 2026-10-29): the body turns to the heading, the route number stays upright on a chip of its colour. */
@@ -235,7 +235,7 @@ html:has(.board.night) { background: #000; }
 .bus-body::after { content: ""; position: absolute; inset: auto 5px 3px; height: 3px; border-radius: 2px; background: rgb(0 0 0 / .25); } /* rear */
 .bus-body.still::before { display: none; }
 .bus-pin:has(.bus-body) b { position: relative; padding: 1px 3px; border-radius: 6px; background: var(--accent); font: inherit; line-height: 1.1; }
-.bus-pin.fleet .bus-body { width: 26px; height: 44px; margin: -22px 0 0 -13px; }
+.bus-pin.fleet .bus-body { width: 23px; height: 40px; margin: -20px 0 0 -11.5px; } /* 10% under the old 26x44 (owner, 2026-11-04) */
 .bus-pin.fleet.far .bus-body { width: 10px; height: 18px; margin: -9px 0 0 -5px; border-width: 1.5px; border-radius: 4px 4px 2px 2px; }
 .bus-pin.fleet.far .bus-body::before { inset: 1px 1px auto; height: 4px; border-radius: 2px; }
 .bus-pin.fleet.far .bus-body::after { display: none; }
@@ -287,6 +287,11 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
 .pin-card .sub { color: #5b6675; font-size: 12.5px; }
 .leaflet-popup .pin-card button { margin-top: 6px; /* .leaflet-popup: beats [data-look="material"] button, which hid it */ min-height: 40px; background: var(--accent); color: var(--accent-text); border: 0; font-weight: 600; }
 .pin-card button:disabled { opacity: .6; }
+.pin-card details { font-size: 12.5px; color: #5b6675; }
+.pin-card summary { cursor: pointer; padding: 8px 0; }
+.pin-card details table { border-collapse: collapse; }
+.pin-card details th { text-align: left; font-weight: 500; padding: 1px 10px 1px 0; white-space: nowrap; }
+.pin-card details td { word-break: break-all; }
 /* Desktop: the page fills the screen. Stops sit side by side, and a wide card lays its routes out in columns. */
 .mouse { display: none; }
 @media (hover: hover) and (pointer: fine) { .mouse { display: inline; } .touch { display: none; } }

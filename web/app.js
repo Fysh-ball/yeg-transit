@@ -751,7 +751,7 @@ async function openLiveMap() {
   $("#map-sheet").showModal();
   if (!await sheetMap()) return;
   const m = mapState, home = stops.find((s) => s.lat);
-  m.trip = "all"; m.buses = []; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
+  m.trip = "all"; m.buses = []; m.busOpen = false; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
   m.stopPins = L.layerGroup().addTo(m.layer); m.stopsAt = null;
   m.map.invalidateSize();
   m.map.setView(home ? [home.lat, home.lon] : [53.5461, -113.4938], 14); // your first stop, or downtown
@@ -777,17 +777,21 @@ const busBody = (b, style = "") => `<i class="bus-body${b ? "" : " still"}" styl
 function drawFleet() { // only the buses in view: a city of pins at once makes a phone crawl
   const m = mapState, view = m.map.getBounds().pad(0.2), far = m.map.getZoom() < 13;
   const seen = m.buses.filter(([lat, lon]) => view.contains([lat, lon]));
+  if (m.busOpen) return; // redrawing would close the bus card being read; the next move or poll after it closes redraws
   m.fleet.clearLayers();
-  for (const [lat, lon, bearing, route, head] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [40, 40],
+  for (const [lat, lon, bearing, route, head, trip] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [36, 36],
     html: `<span class="bus-pin fleet${far ? " far" : ""}">${busBody(bearing)}${far ? "" : `<b>${esc(routeLabel(route))}</b>`}</span>` }) })
-    .bindTooltip(`Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}`).addTo(m.fleet);
+    .bindPopup("", { closeButton: false, minWidth: 210 }).addTo(m.fleet) // a function body here would re-run, and re-ask, on every update()
+    .on("popupopen", (e) => { m.busOpen = true; e.popup.setContent(busCard(e.target, trip, route, head)); })
+    .on("popupclose", () => { m.busOpen = false; });
   $("#map-title").firstChild.textContent = m.vpAt ? "Every bus, not live" : "Every bus, live";
   $("#map-note").textContent = m.vpAt // ETS's position feed stalled: these are where buses were, not are
     ? `Bus positions from ${clock(m.vpAt)}: ETS isn't sending new ones.` : `${m.buses.length} buses running, ${seen.length} here. ETS updates every 30 s.`;
 }
 // Stops under the buses once zoomed in close enough to tell them apart. Asked for again only after the map moves
 // 300 m: every ask is a Pages Function call (100k a day free). Dots, not pins, so the buses stay on top.
-const STOP_ZOOM = 16, stopDots = () => L.canvas({ tolerance: 12 }); // 12 px of slack: a thumb on a 7 px dot
+// ponytail: at 15 a tall phone sees past stops/near's 650 m box; widen that box on the server if the edges look bare.
+const STOP_ZOOM = 15, stopDots = () => L.canvas({ tolerance: 12 }); // 12 px of slack: a thumb on a 7 px dot
 async function drawStops() {
   const m = mapState, c = m.map.getCenter();
   if (m.map.getZoom() < STOP_ZOOM) { m.stopPins.clearLayers(); m.stopsAt = null; return; }
@@ -801,6 +805,24 @@ async function drawStops() {
   m.stopPins.clearLayers();
   for (const s of list) L.circleMarker([s.lat, s.lon], { renderer: m.renderer, radius: 7, weight: 2, color: "#fff", fillColor: "#17694a", fillOpacity: 1 })
     .bindPopup(() => stopCard(s), { closeButton: false, minWidth: 210 }).addTo(m.stopPins);
+}
+// A tapped bus: how full, how late, where next, its fleet number, and the rest of what ETS sends under Nerd stats.
+function busCard(pin, trip, route, head) {
+  const el = document.createElement("div");
+  el.className = "pin-card";
+  el.innerHTML = `<b>Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}</b><span class="sub">Asking ETS...</span>`;
+  api(`vehicles/${encodeURIComponent(trip)}`).then((b) => {
+    const late = b.delay == null ? "" : Math.abs(b.delay) < 60 ? "On time"
+      : `${Math.round(Math.abs(b.delay) / 60)} min ${b.delay > 0 ? "late" : "early"}`;
+    const lines = [late, b.full, b.next && `Next: ${esc(b.next.name)}${b.next.code ? ` (#${esc(b.next.code)})` : ""}`,
+      b.bus && `Bus ${esc(b.bus)}`].filter(Boolean);
+    const nerd = Object.entries(b.nerd || {}).map(([k, x]) => `<tr><th>${esc(k)}</th><td>${esc(String(x))}</td></tr>`).join("");
+    el.querySelector(".sub").outerHTML = lines.map((x) => `<span>${x}</span>`).join("")
+      + (nerd ? `<details><summary>Nerd stats</summary><table>${nerd}</table></details>` : "");
+  }).catch((e) => { el.querySelector(".sub").textContent = `No more on this bus right now (${e.message}).`; })
+    .finally(() => pin.getPopup()?.update());
+  el.addEventListener("toggle", () => pin.getPopup()?.update(), true); // the open dropdown grows the popup
+  return el;
 }
 // A tapped stop: its name, its next buses, and Add.
 function stopCard(s) {
@@ -1046,4 +1068,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=106").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=107").catch((e) => console.warn("sw:", e.message));
