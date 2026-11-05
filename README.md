@@ -11,6 +11,12 @@ Live Edmonton Transit Service (ETS) bus and LRT arrivals to your stops. Live at 
 
 Not an official ETS app.
 
+<p>
+  <img src="docs/screenshots/app.jpg" width="250" alt="Android app: next buses at West Edmonton Mall Transit Centre">
+  <img src="docs/screenshots/web.jpg" width="250" alt="yegbus.com in a phone browser">
+</p>
+<img src="docs/screenshots/widget.jpg" width="510" alt="Android home-screen widget showing the next 54, 917 and 907">
+
 ## How it fits together
 
 | Part | What it does |
