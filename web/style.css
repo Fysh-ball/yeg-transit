@@ -281,7 +281,6 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
 #board-exit { display: none; }
 .board #board-exit { display: inline-grid; border-color: transparent; background: none; opacity: .5; }
 .board :is(#prefs-btn, #live-map) { display: none; }
-.board .adsbygoogle { display: none !important; } /* board switched on after ads loaded */
 /* Map pin card */
 .stop-pin { width: 30px; height: 30px; font-size: 14px; }
 .pin-card { display: grid; gap: 4px; font: 14px/1.35 system-ui, sans-serif; }

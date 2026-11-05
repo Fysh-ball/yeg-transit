@@ -1036,26 +1036,6 @@ $("#board-mode").onchange = (e) => {
 window.addEventListener("hashchange", applyBoard);
 applyBoard();
 
-// Google auto ads: side rails on computers, a bottom banner on phones (formats are set in the AdSense dashboard).
-// Never in the Android app (AdSense in a plain WebView breaks Google's rules) or on the wall board.
-// Interest-based ads only after a yes in Settings (Alberta PIPA, PIPEDA): until then Google is asked for
-// non-personalized ads. Changing it reloads, because AdSense reads the flag once when it starts.
-if (!window.YegApp && !isBoard()) {
-  let adsMode = "off";
-  try { adsMode = localStorage.getItem("yeg.ads") === "on" ? "on" : "off"; } catch (err) { console.warn("ads:", err.message); }
-  (window.adsbygoogle = window.adsbygoogle || []).requestNonPersonalizedAds = adsMode === "on" ? 0 : 1;
-  $("#ads-row").hidden = false; $("#ads-mode").value = adsMode;
-  $("#ads-mode").onchange = (e) => {
-    try { localStorage.setItem("yeg.ads", e.target.value); } catch (err) { console.warn("ads:", err.message); }
-    location.reload();
-  };
-  const ad = document.createElement("script");
-  ad.async = true; ad.crossOrigin = "anonymous";
-  ad.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7605167409778469";
-  ad.onerror = () => console.warn("ads: script blocked or offline");
-  document.head.append(ad);
-}
-
 renderAll();
 loadWeather().then(() => wx.extra && renderAll());
 nearestGroup();
@@ -1066,4 +1046,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=104").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=105").catch((e) => console.warn("sw:", e.message));
