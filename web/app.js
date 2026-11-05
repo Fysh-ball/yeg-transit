@@ -416,7 +416,7 @@ function showMixed(list, places, q = "") {
   // A bare number could be a stop or a house: say what else to type instead of looking broken.
   const more = /^\d+[a-z]?$/i.test(q) ? `<li class="note-row">House number? Keep typing the street, like ${esc(q)} 103 St.</li>` : "";
   $("#results").innerHTML = (list.length ? `<li class="group">Stops</li>` + stopItems(list.slice(0, 8), here) : "") +
-    (p ? `<li class="group">${more ? "Nearest addresses with this number" : "Addresses and places"}</li>` + p : "") + more || "<li>Nothing found yet. Try a street, a place, or the stop number.</li>";
+    (p ? `<li class="group">${more ? "Nearest addresses with this number" : "Places: tap one for stops around it"}</li>` + p : "") + more || "<li>Nothing found yet. Try a street, a place, or the stop number.</li>";
 }
 
 // Suggestions as you type: stop names and numbers from GTFS, places from OpenStreetMap.
@@ -1046,4 +1046,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=105").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=106").catch((e) => console.warn("sw:", e.message));
