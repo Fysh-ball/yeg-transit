@@ -136,6 +136,15 @@ class Live:
         self.vp_more = {}  # trip_id -> what else ETS says about its bus (fleet number, speed, how full), for a tapped bus
         self.assigned, self.on_trip = {}, {}  # trip_id -> vehicle id ETS has put on it; vehicle id -> trip it is driving now
         self.alerts, self.alerts_at = {}, 0
+        self.wait, self.next_at = {}, {}  # feed -> seconds it is backed off, epoch it may be asked again
+
+    def due(self, feed):
+        return time.time() >= self.next_at.get(feed, 0)
+
+    def done(self, feed, ok):
+        """Through an ETS outage, ask a failing feed after 10 s, 20, 40 ... up to 5 min, not every 10 s. Ok resets."""
+        self.wait[feed] = 0 if ok else min(300, max(10, self.wait.get(feed, 0) * 2))
+        self.next_at[feed] = time.time() + self.wait[feed]
 
     def trip(self, trip_id):
         """ETS's prediction for a trip, or None if ETS's feed has stalled: its last predictions shown as scheduled
@@ -143,6 +152,20 @@ class Live:
         return self.trips.get(trip_id) if self.ts and time.time() - self.ts <= 120 else None
 
     def poll(self):
+        if self.due("rt"):
+            self.poll_rt()
+        if self.due("vp"):
+            self.poll_vp()
+        if time.time() - self.alerts_at >= 300:
+            self.alerts_at = time.time()  # on every attempt: a failing feed waits 5 min too, not 10 s
+            try:
+                self.alerts = self.poll_alerts()
+            except Unchanged:
+                pass
+            except Exception as e:
+                print("alerts poll failed:", f"{type(e).__name__}: {e}", file=sys.stderr)
+
+    def poll_rt(self):
         try:
             feed = feed_of(RT_URL)
             trips, assigned, stop_delay = {}, {}, {}
@@ -171,6 +194,9 @@ class Live:
         except Exception as e:
             self.error = f"{type(e).__name__}: {e}"
             print("live poll failed:", self.error, file=sys.stderr)
+        self.done("rt", self.error is None)
+
+    def poll_vp(self):
         try:
             feed = feed_of(VP_URL)
             vps = [e.vehicle for e in feed.entity if e.HasField("vehicle") and e.vehicle.trip.trip_id]
@@ -192,13 +218,7 @@ class Live:
         except Exception as e:
             self.vp_error = f"{type(e).__name__}: {e}"
             print("vehicle poll failed:", self.vp_error, file=sys.stderr)
-        if time.time() - self.alerts_at >= 300:
-            try:
-                self.alerts, self.alerts_at = self.poll_alerts(), time.time()
-            except Unchanged:
-                self.alerts_at = time.time()
-            except Exception as e:
-                print("alerts poll failed:", f"{type(e).__name__}: {e}", file=sys.stderr)
+        self.done("vp", self.vp_error is None)
 
     @staticmethod
     def poll_alerts():
