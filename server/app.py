@@ -1,5 +1,5 @@
 """yeg-transit server: ETS GTFS in SQLite, live TripUpdates in memory, small JSON API, static web app."""
-import csv, difflib, io, json, math, re, os, sqlite3, sys, threading, time, urllib.request, zipfile
+import csv, difflib, io, json, math, random, re, os, sqlite3, sys, threading, time, urllib.request, zipfile
 from datetime import datetime, timedelta
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, urlencode
@@ -50,6 +50,8 @@ def feed_of(url):
     except urllib.error.HTTPError as e:
         if e.code == 304:
             raise Unchanged() from None
+        ra = (e.headers.get("Retry-After") or "") if e.headers else ""
+        e.retry_after = int(ra) if ra.isdigit() else 0  # a 429/503's own wait; Live.done() never asks sooner
         raise
 
 
@@ -141,10 +143,11 @@ class Live:
     def due(self, feed):
         return time.time() >= self.next_at.get(feed, 0)
 
-    def done(self, feed, ok):
-        """Through an ETS outage, ask a failing feed after 10 s, 20, 40 ... up to 5 min, not every 10 s. Ok resets."""
+    def done(self, feed, ok, retry_after=0):
+        """Through an ETS outage, ask a failing feed after 10 s, 20, 40 ... up to 5 min (+-20% jitter), or after ETS's own
+        Retry-After if longer, not every 10 s. Ok resets. ETS publishes no rate limit (unknown): 1 ask per feed per 10 s."""
         self.wait[feed] = 0 if ok else min(300, max(10, self.wait.get(feed, 0) * 2))
-        self.next_at[feed] = time.time() + self.wait[feed]
+        self.next_at[feed] = time.time() + max(self.wait[feed] * random.uniform(0.8, 1.2), retry_after)
 
     def trip(self, trip_id):
         """ETS's prediction for a trip, or None if ETS's feed has stalled: its last predictions shown as scheduled
@@ -194,7 +197,8 @@ class Live:
         except Exception as e:
             self.error = f"{type(e).__name__}: {e}"
             print("live poll failed:", self.error, file=sys.stderr)
-        self.done("rt", self.error is None)
+            return self.done("rt", False, getattr(e, "retry_after", 0))
+        self.done("rt", True)
 
     def poll_vp(self):
         try:
@@ -218,7 +222,8 @@ class Live:
         except Exception as e:
             self.vp_error = f"{type(e).__name__}: {e}"
             print("vehicle poll failed:", self.vp_error, file=sys.stderr)
-        self.done("vp", self.vp_error is None)
+            return self.done("vp", False, getattr(e, "retry_after", 0))
+        self.done("vp", True)
 
     @staticmethod
     def poll_alerts():

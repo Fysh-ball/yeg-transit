@@ -26,6 +26,12 @@ class Backoff(unittest.TestCase):
             self.assertEqual(live.wait["rt"], 0)
             self.assertTrue(live.due("rt"))
 
+    def test_retry_after_is_honoured(self):  # a 429 saying 15 min waits 15 min, not the 10 s backoff step
+        live = app.Live()
+        with mock.patch.object(app.time, "time", lambda: 1000.0):
+            live.done("vp", False, 900)
+        self.assertEqual(live.next_at["vp"], 1900.0)
+
     def test_failing_alerts_wait_five_minutes(self):
         live, clock = app.Live(), [1000.0]
         live.next_at = {"rt": 1e12, "vp": 1e12}  # only the alerts feed in play
