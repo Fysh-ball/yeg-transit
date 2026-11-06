@@ -200,10 +200,10 @@ function drawWaves() {
 }
 requestAnimationFrame(drawWaves);
 const editing = new Set();
-let firstStop = null, wiz = 0;
+let setupStop = null, wiz = 0;
 function settingsPanel(s) {
   const all = s.allRoutes || [];
-  if (s.id === firstStop) return setupStep(s, all);
+  if (s.id === setupStop) return setupStep(s, all);
   const chips = all.map((r) => `<button class="chip" aria-pressed="${!s.only || s.only.includes(r)}" data-route="${esc(r)}">${esc(routeLabel(r))}</button>`).join("");
   const opt = (vals, cur, f) => vals.map((v) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${f(v)}</option>`).join("");
   const shown = stops.filter((x) => !group || x.group === group), at = shown.indexOf(s); // the order on the tab you're on
@@ -222,7 +222,7 @@ function settingsPanel(s) {
     <button class="primary" data-settings="${esc(s.id)}">Done</button></div>`;
 }
 
-// First stop: one plain question a screen, big buttons (ask 144). Steps: routes, walk, what it's for, done.
+// A new stop: one plain question a screen, big buttons (ask 144). Steps: routes, walk, what it's for, done.
 function setupStep(s, all) {
   if (wiz === 0 && !all.length) wiz = 1;
   const id = esc(s.id), back = wiz > (all.length ? 0 : 1) ? `data-wiz="-1"` : `data-settings="${id}"`;
@@ -490,7 +490,7 @@ function setEdit(id) {
   editing.clear();
   if (id) editing.add(id);
   document.body.classList.toggle("in-edit", !!id);
-  if (was) { if (was === firstStop) { firstStop = null; showTips(); } rerender(was); }
+  if (was) { if (was === setupStop) { setupStop = null; showTips(); } rerender(was); }
   if (id) { history.pushState({ edit: id }, ""); scrollTo(0, 0); rerender(id); }
 }
 $("#results").onkeydown = (e) => { if (e.key === "Enter" && e.target.matches(".pick")) e.target.click(); };
@@ -525,7 +525,7 @@ document.addEventListener("click", (e) => {
   const add = e.target.closest("[data-add]");
   if (add) {
     const s = JSON.parse(add.dataset.add);
-    if (!stops.length) { firstStop = s.id; wiz = 0; setEdit(s.id); } // onboarding: straight into its settings
+    if (!stops.some((x) => x.id === s.id)) { setupStop = s.id; wiz = 0; setEdit(s.id); } // every new stop asks the same questions (owner, 2026-11-05)
     if (!stops.some((x) => x.id === s.id)) { stops.push(s); save(); }
     if (add.closest("#map-sheet")) closeMap(); // added from the bus map: show it on the board
     setAdd(false);
@@ -586,7 +586,7 @@ document.addEventListener("click", (e) => {
   }
   const step = e.target.closest("[data-wiz],[data-walk],[data-wiz-group],[data-wiz-add]");
   if (step) {
-    const s = stops.find((x) => x.id === firstStop), d = step.dataset;
+    const s = stops.find((x) => x.id === setupStop), d = step.dataset;
     if (!s) return;
     if (d.walk === "0") { s.walk = 0; wiz++; }
     else if (d.walk) s.walk = Math.min(30, Math.max(0, (Number(s.walk) || 0) + Number(d.walk)));
@@ -710,7 +710,7 @@ async function openMap(dep) {
   const label = g.querySelector(".route"), head = g.querySelector(".head").firstChild.textContent;
   $("#map-title").innerHTML = `Route ${esc(label.textContent)} to ${esc(head)}<span class="sub">${esc(s ? s.name : "")}</span>`;
   $("#map-note").textContent = "Finding the bus...";
-  $("#map-sheet").showModal();
+  $("#map-sheet").showModal(); fitMapBox();
   if (!await sheetMap()) return;
   const m = mapState;
   m.trip = dep.dataset.trip; m.stop = s; m.style = label.getAttribute("style"); m.fitted = false;
@@ -748,7 +748,7 @@ async function sheetMap() {
 async function openLiveMap() {
   $("#map-title").innerHTML = `Every bus, live<span class="sub">Tap a bus to see where it's going</span>`;
   $("#map-note").textContent = "Finding buses...";
-  $("#map-sheet").showModal();
+  $("#map-sheet").showModal(); fitMapBox();
   if (!await sheetMap()) return;
   const m = mapState, home = stops.find((s) => s.lat);
   m.trip = "all"; m.buses = []; m.busOpen = false; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
@@ -892,6 +892,40 @@ async function placeBus() {
     $("#map-note").textContent = e.message.startsWith("404") ? "This bus hasn't sent its position yet. It may not have started its trip." : `Can't get the bus position (${e.message}).`;
   }
 }
+// The map sheet's height: drag its handle, or tap it for full height and back (owner, 2026-11-05: "a small pop up
+// that cannot be adjusted"). Kept for next time.
+let fitMapBox;
+(() => {
+  const grab = $("#map-grab"), box = $("#map-box"), sheet = $("#map-sheet");
+  const most = () => Math.round(innerHeight * 0.9) - (sheet.offsetHeight - box.offsetHeight); // the sheet tops out at 90dvh
+  const set = (h, keep = true) => {
+    h = Math.max(160, Math.min(most(), Math.round(h)));
+    box.style.height = h + "px";
+    mapState?.map?.invalidateSize();
+    if (keep) try { localStorage.setItem("yeg.mapH", String(h)); } catch (e) { console.warn("map height:", e.message); }
+  };
+  let from = null;
+  grab.addEventListener("pointerdown", (e) => { from = { y: e.clientY, h: box.offsetHeight, moved: false }; grab.setPointerCapture(e.pointerId); });
+  grab.addEventListener("pointermove", (e) => {
+    if (!from) return;
+    if (Math.abs(e.clientY - from.y) > 4) from.moved = true;
+    if (from.moved) set(from.h + from.y - e.clientY, false); // the handle is on top: up is taller
+  });
+  grab.addEventListener("pointerup", () => {
+    if (!from) return;
+    const { moved, h } = from; from = null;
+    set(moved ? box.offsetHeight : h < most() - 8 ? most() : 0.6 * innerHeight); // a tap: full height, or back
+  });
+  grab.addEventListener("keydown", (e) => {
+    const d = { ArrowUp: 40, ArrowDown: -40 }[e.key];
+    if (d) { e.preventDefault(); set(box.offsetHeight + d); }
+  });
+  fitMapBox = () => { // on open: the height you left it at, fitted to this screen
+    let h = 0;
+    try { h = Number(localStorage.getItem("yeg.mapH")); } catch (e) { console.warn("map height:", e.message); }
+    if (h) set(h, false);
+  };
+})();
 function closeMap() { if (mapState) clearInterval(mapState.timer); $("#map-sheet").close(); }
 $("#map-close").onclick = closeMap;
 $("#live-map").onclick = openLiveMap;
@@ -1068,4 +1102,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=107").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=108").catch((e) => console.warn("sw:", e.message));
