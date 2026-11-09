@@ -27,6 +27,12 @@ rsync -a server/ "$H:$D/server/"
 echo "$SHA" | ssh "$H" "cat > $D/server/VERSION && chmod 644 $D/server/VERSION"
 rsync -a web/ "$H:$D/web/"
 rsync -a --chmod=Da+rx,Fa+r scripts/check_live.py scripts/pi "$H:$D/scripts/"  # the Pi's check timer (scripts/pi)
+# The Pi's own copies (self-heal, check timers, spool-notify) run from system paths, so a deploy must install them
+# or they drift from the repo (audit 2026-11-08). DEPLOY_PI_INSTALL=1 in scripts/deploy-hermes.conf.
+[ -z "${DEPLOY_PI_INSTALL:-}" ] || ssh -n "$H" "cd $D/scripts/pi && sudo -n install -m 755 selfheal/hermes-selfheal /usr/local/sbin/ && \
+  sudo -n install -m 755 spool-notify /usr/local/bin/ && sudo -n install -m 644 selfheal/99hermes-selfheal /etc/apt/apt.conf.d/ && \
+  sudo -n install -m 644 selfheal/*.service selfheal/*.timer yeg-check*.service yeg-check*.timer /etc/systemd/system/ && \
+  sudo -n systemctl daemon-reload && echo 'Pi scripts installed'"
 rsync -a --exclude __pycache__ tests/ "$H:/tmp/yeg-tests/"
 # Build and test as :candidate; only an image that passed becomes :latest, and the running one :prev, so a bad release
 # rolls back in one command (no auto-rollback) and a failed one never becomes :latest or later :prev.

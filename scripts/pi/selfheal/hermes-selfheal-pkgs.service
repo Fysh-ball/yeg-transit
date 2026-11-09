@@ -1,6 +1,6 @@
 [Unit]
 Description=hermes self-heal: verify critical packages, reinstall damaged ones from the local cache
-Before=containerd.service docker.service tailscaled.service headscale.service
+Before=containerd.service docker.service tailscaled.service headscale.service ssh.service unbound.service cloudflared.service crowdsec.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/hermes-selfheal pkgs

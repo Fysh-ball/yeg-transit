@@ -24,7 +24,7 @@ notify(){
 mkdir -p "$STATE/home" && chown 65534:65534 "$STATE/home"
 case "${1:-}" in
 run)
-  out=$(timeout 600 docker run --rm -e HOME=/home -v "$STATE/home:/home" -v "$DIR/scripts:/s:ro" \
+  out=$(timeout 600 docker run --rm --name yeg-check-run -e HOME=/home -v "$STATE/home:/home" -v "$DIR/scripts:/s:ro" \
         yeg-transit:latest python -I /s/check_live.py --page 2>&1); s=$?
   echo "$out"
   # A traceback also exits 1: that's a broken check, not a wrong time, and must not count as a run.
@@ -43,7 +43,7 @@ deadman)
   fi
   # Say why (2026-11-08: "no check has landed" hid that docker couldn't start any container for 9.5 h).
   why=$(grep -E '^(docker|Error|error)' <(journalctl -u yeg-check.service -n 30 -o cat 2>/dev/null) | tail -n1 | cut -c1-200)
-  down=$(docker ps --format '{{.Names}}' 2>/dev/null | sort | comm -23 /var/lib/hermes-selfheal/expected - 2>/dev/null | tr '\n' ' ')
+  down=$(timeout 20 docker ps --format '{{.Names}}' 2>/dev/null | sort | comm -23 /var/lib/hermes-selfheal/expected - 2>/dev/null | tr '\n' ' ')
   [ -e "$LATCH" ] || { notify "no live-times check has landed on the Pi in $age min. Last error: ${why:-none logged}. Expected but down: ${down:-none}" failed && touch "$LATCH"; }
   exit 1 ;;
 *) echo "usage: $0 run|deadman" >&2; exit 2 ;;

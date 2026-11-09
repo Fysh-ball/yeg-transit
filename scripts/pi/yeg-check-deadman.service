@@ -4,3 +4,5 @@ Description=Page when no yegbus live-times check has landed in 30 min
 [Service]
 Type=oneshot
 ExecStart=/home/Apollo/stacks/yeg-transit/scripts/pi/yeg-check.sh deadman
+# a wedged dockerd must not hold the dead-man forever: then it never pages
+TimeoutStartSec=120
