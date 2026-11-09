@@ -1,0 +1,107 @@
+#!/bin/bash
+# hermes self-heal after an unclean power loss (2026-11-08: power-on reset, rsts=0x1000, corrupted
+# containerd-shim-runc-v2 on the SD card, every container down 9.5 h).
+#   hermes-selfheal pkgs        boot, before docker/tailscaled/headscale: verify the critical packages' files against
+#                               dpkg's md5sums; reinstall a damaged one from the LOCAL .deb cache (no internet needed)
+#   hermes-selfheal containers  boot, after docker: every container that was running at the last snapshot must be Up
+#                               within WAIT s; one that isn't gets one `docker start`, then a loud FAIL
+#   hermes-selfheal snapshot    timer: record which containers are running now (the boot check's expected set)
+#   hermes-selfheal cache       timer + after every apt run: keep the installed version's .deb of each critical package
+# Never blocks boot: every failure is logged and the next step still runs.
+# Log line, one per finding (Lumi Web's custodian check parses it), in the journal (tag hermes-selfheal) and $LOG:
+#   SELFHEAL <iso time> <OK|FIXED|FAIL> <pkg|container|unit> <name> <detail>
+# FIXED and FAIL also go to Lumi's app through spool-notify, like yeg-check.
+# Test without touching anything: SELFHEAL_INFO=<dir of *.md5sums> SELFHEAL_DRY=1 hermes-selfheal pkgs
+set -u
+PKGS=${SELFHEAL_PKGS:-"containerd runc docker.io systemd libc6 openssh-server headscale tailscale unbound cloudflared crowdsec"}
+UNITS="docker headscale tailscaled derper AdGuardHome unbound cloudflared ssh"
+INFO=${SELFHEAL_INFO:-/var/lib/dpkg/info}
+CACHE=/var/cache/hermes-selfheal
+STATE=/var/lib/hermes-selfheal
+LOG=$STATE/log
+WAIT=${SELFHEAL_WAIT:-300}
+DRY=${SELFHEAL_DRY:-}
+mkdir -p "$CACHE" "$STATE"
+
+say(){ # level kind name detail
+  local line="SELFHEAL $(date -Is) $1 $2 $3 $4"
+  echo "$line" >> "$LOG"; logger -t hermes-selfheal -- "$line"; echo "$line"
+  if [ "$1" != OK ] && [ -z "$DRY" ] && [ -x /usr/local/bin/spool-notify ]; then
+    printf 'hermes: %s %s %s: %s' "$1" "$2" "$3" "$4" | /usr/local/bin/spool-notify hermes-selfheal \
+      "$([ "$1" = FIXED ] && echo ok || echo failed)" >/dev/null 2>&1 || echo "notify failed" >> "$LOG"
+  fi
+}
+
+# Files of $1 whose md5 doesn't match dpkg's record, conffiles left out: a deliberate config edit is not damage.
+# Debian keeps conffiles out of md5sums, but some outside .debs (headscale's) list them there too (2026-11-08: the
+# first live run flagged /etc/headscale/config.yaml and reinstalled headscale; dpkg kept the config).
+bad_files(){
+  local f c
+  for f in "$INFO/$1.md5sums" "$INFO/$1":*.md5sums; do
+    [ -e "$f" ] || continue
+    c=${f%.md5sums}.conffiles
+    (cd / && md5sum --quiet -c "$f" 2>/dev/null) | sed -n 's/: FAILED.*//p' \
+      | { if [ -e "$c" ]; then sed 's|^|/|' | grep -vxF -f "$c" | sed 's|^/||'; else cat; fi; }
+  done
+}
+
+pkgs(){
+  local p bad deb
+  for p in $PKGS; do
+    bad=$(bad_files "$p")
+    if [ -z "$bad" ]; then say OK pkg "$p" "verified"; continue; fi
+    deb=$(ls "$CACHE/${p}_"*.deb 2>/dev/null | head -1)
+    if [ -z "$deb" ]; then say FAIL pkg "$p" "damaged ($(echo $bad)), no cached .deb"; continue; fi
+    if [ -n "$DRY" ]; then say FIXED pkg "$p" "DRY RUN: would dpkg -i $deb for $(echo $bad)"; continue; fi
+    # The repair runs before the services it repairs: a postinst restarting containerd would wait on this unit forever.
+    # policy-rc.d (exit 101) tells deb-systemd-invoke not to start or restart anything; boot starts them after us.
+    local rc=/usr/sbin/policy-rc.d made=
+    [ -e "$rc" ] || { printf '#!/bin/sh\nexit 101\n' > "$rc" && chmod 755 "$rc" && made=1; }
+    dpkg -i "$deb" >>"$LOG" 2>&1; [ -n "$made" ] && rm -f "$rc"
+    if [ -z "$(bad_files "$p")" ]; then
+      say FIXED pkg "$p" "reinstalled from $deb ($(echo $bad))"
+    else say FAIL pkg "$p" "reinstall from $deb did not fix $(echo $bad)"; fi
+  done
+}
+
+containers(){
+  local want n st t=0 u
+  want=$(cat "$STATE/expected" 2>/dev/null)
+  [ -n "$want" ] || { say FAIL container - "no snapshot of expected containers"; return; }
+  until [ "$t" -ge "$WAIT" ]; do
+    n=0; for c in $want; do docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$c" || n=$((n+1)); done
+    [ "$n" = 0 ] && break; sleep 10; t=$((t+10))
+  done
+  for c in $want; do
+    if docker ps --format '{{.Names}}' | grep -qx "$c"; then say OK container "$c" "up"; continue; fi
+    err=$(docker start "$c" 2>&1 | tr '\n' ' ' | cut -c1-200); sleep 20
+    if docker ps --format '{{.Names}}' | grep -qx "$c"; then say FIXED container "$c" "started on retry"
+    else st=$(docker ps -a --filter "name=^$c\$" --format '{{.Status}}'); say FAIL container "$c" "$st; start: ${err:-no error text}"; fi
+  done
+  for u in $UNITS; do
+    systemctl is-active -q "$u" && { say OK unit "$u" "active"; continue; }
+    systemctl restart "$u" 2>/dev/null; sleep 5
+    systemctl is-active -q "$u" && say FIXED unit "$u" "restarted" || say FAIL unit "$u" "$(systemctl is-active "$u")"
+  done
+}
+
+snapshot(){
+  local now; now=$(docker ps --format '{{.Names}}' 2>/dev/null | sort)
+  [ -n "$now" ] && echo "$now" > "$STATE/expected.tmp" && mv "$STATE/expected.tmp" "$STATE/expected"
+}
+
+cache(){
+  local p v d
+  cd "$CACHE" || return
+  for p in $PKGS; do
+    v=$(dpkg-query -W -f='${Version}' "$p" 2>/dev/null) || continue
+    [ "$(cat "$p.ver" 2>/dev/null)" = "$v" ] && ls "${p}_"*.deb >/dev/null 2>&1 && continue
+    d=$(mktemp -d) && (cd "$d" && apt-get download "$p=$v" >/dev/null 2>&1) && ls "$d"/*.deb >/dev/null 2>&1 \
+      && rm -f "${p}_"*.deb && mv "$d"/*.deb . && echo "$v" > "$p.ver" && say OK pkg "$p" "cached $v" \
+      || { [ -e "$STATE/nocache.$p.$v" ] || { touch "$STATE/nocache.$p.$v"; say FAIL pkg "$p" "could not cache $v (not in apt: put its .deb in $CACHE and $v in $CACHE/$p.ver)"; }; }
+    rm -rf "$d"
+  done
+}
+
+case "${1:-}" in pkgs|containers|snapshot|cache) "$1" ;; *) echo "usage: $0 pkgs|containers|snapshot|cache" >&2; exit 2 ;; esac
+exit 0

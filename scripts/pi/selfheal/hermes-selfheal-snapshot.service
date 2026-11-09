@@ -1,0 +1,6 @@
+[Unit]
+Description=hermes self-heal: record running containers; keep the critical packages' .debs cached
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-selfheal snapshot
+ExecStart=/usr/local/sbin/hermes-selfheal cache

@@ -1,0 +1,9 @@
+[Unit]
+Description=hermes self-heal: verify critical packages, reinstall damaged ones from the local cache
+Before=containerd.service docker.service tailscaled.service headscale.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/hermes-selfheal pkgs
+TimeoutStartSec=900
+[Install]
+WantedBy=multi-user.target

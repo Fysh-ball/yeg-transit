@@ -1,0 +1,7 @@
+[Unit]
+Description=hermes self-heal snapshot every 15 min (first run 20 min after boot, after the boot check)
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=15min
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,2 @@
+// After every apt/dpkg run, cache the new versions so a boot repair never needs the internet.
+DPkg::Post-Invoke { "[ -x /usr/local/sbin/hermes-selfheal ] && /usr/local/sbin/hermes-selfheal cache >/dev/null 2>&1 || true"; };
