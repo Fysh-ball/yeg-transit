@@ -13,6 +13,9 @@ lines=$(runuser -u oneadmin -- sh -c '{ [ -e alerts.sending ] || mv alerts alert
 [ -n "$lines" ] || exit 0
 result=ok
 printf '%s\n' "$lines" | grep -qE 'ABORT|FAILED|CRITICAL|STILL unreachable|WARNING|ALERT' && result=failed
+# The lines that matter while TrueNAS is down also go by email, which needs no TrueNAS; it mails each line once,
+# so a put-back and retry below never sends it twice. Its result never changes the spool send.
+printf '%s\n' "$lines" | timeout 120 "${DEFIB_MAIL:-/usr/local/bin/defib-tn-mail}" || logger -t defib-tn-alert "defib-tn-mail rc $?"
 printf '%s\n' "$lines" | tail -c 1900 | "$NOTIFY" pi-defib-tn "$result" && exit 0
 rc=$?
 # Not delivered: put the lines back in front of anything queued meanwhile.
