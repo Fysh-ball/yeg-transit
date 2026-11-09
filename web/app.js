@@ -339,7 +339,7 @@ async function renderStop(s, el) {
     else el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
   } catch (e) {
-    if (e.message.startsWith("404")) { // dropped from the ETS schedule: old saved times would send people to a dead stop
+    if (e.message.startsWith("404 no such stop")) { // dropped by ETS: old saved times would send people to a dead stop (not any 404: an edge or proxy one is just down)
       body = `<div class="alert"><b>ETS no longer lists this stop.</b> It may have closed or been renumbered.
         ${s.lat ? `<button data-near-stop="${esc(s.id)}">Stops near here</button>` : ""}</div>`;
       el.innerHTML = stopHead(s) + body;
@@ -733,7 +733,9 @@ async function openMap(dep) {
   if (s && s.lat) L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "you-pin", iconSize: [52, 52],
     html: `<span><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 2h12v10h-5v10h-2V12H6z"/></svg></span>` }) })
     .bindTooltip("Your stop").addTo(m.layer);
+  const trip = m.trip;
   await placeBus();
+  if (!$("#map-sheet").open || m.trip !== trip) return; // closed, or another bus opened, while it loaded: no orphan timer
   clearInterval(m.timer);
   m.timer = setInterval(placeBus, 5000);
 }
@@ -760,6 +762,8 @@ async function openLiveMap() {
   m.map.invalidateSize();
   m.map.setView(home ? [home.lat, home.lon] : [53.5461, -113.4938], 14); // your first stop, or downtown
   await placeFleet();
+  if (!$("#map-sheet").open || m.trip !== "all") return; // closed, or a bus opened, while it loaded: no orphan timer
+  clearInterval(m.timer);
   m.timer = setInterval(placeFleet, 5000);
 }
 async function placeFleet() {
@@ -1027,18 +1031,21 @@ function tick() {
 }
 // A tab left open can fall behind (a sleeping laptop, a frozen tab, a stop's settings left open, a new release):
 // say so where it shows, the wall board included, instead of passing old times off as live.
-let newVersion = false, firstSha = null, undoTimer;
+let newVersion = false, undoTimer;
 function checkStale() {
   const at = [...$("#stops").children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live);
   const old = at.length && $("#offline").hidden && Date.now() / 1000 - Math.min(...at) > 90;
   $("#stale").hidden = !old && !newVersion;
-  $("#stale span").textContent = newVersion ? "New version ready" : old ? `Times may be out of date (last live ${clock(Math.min(...at))}).` : "";
+  $("#stale span").textContent = old ? `Times may be out of date (last live ${clock(Math.min(...at))}).` : newVersion ? "New version ready" : "";
 }
 async function checkVersion() {
   try {
-    const { sha } = await api("version");
-    firstSha ??= sha;
-    if (sha === firstSha) return;
+    // This page's own release, from the static site: the API's sha differs between the Pi and TrueNAS, so a
+    // failover read as "New version ready" (and a server release changes nothing a reload would fetch).
+    const r = await fetch("sw.js", { cache: "no-store" });
+    if (!r.ok) throw new Error(`sw.js ${r.status}`);
+    const live = (await r.text()).match(/yeg-v(\d+)/)?.[1], mine = new URL($('script[src^="app.js"]').src).searchParams.get("v");
+    if (!live || !mine || live === mine) return;
     if (isBoard()) return location.reload(); // nobody is there to tap Refresh on a wall board
     newVersion = true; checkStale();
   } catch (e) { console.warn("version:", e.message); }
