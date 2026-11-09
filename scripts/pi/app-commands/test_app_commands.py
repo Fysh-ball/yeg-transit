@@ -444,14 +444,21 @@ class LiveConfigWithHarmlessActuators(unittest.TestCase):
         self.assertIn("no remote unlock", self.r.two_step("kill-off")[1]["result"])
         self.assertEqual(self.r.rx.state["kill_state"], "DISARMED")
 
-    def test_failed_lock_command_puts_the_old_state_back(self):
+    def test_a_lock_command_that_never_started_puts_the_old_state_back(self):
         self.r = Rig(dry_run=False, ks_dry=False)
         self.r.two_step("kill-arm")
         with open(self.r.rx.cfg["killswitch_config"], "w") as f:
-            json.dump({"dry_run": False, "lock_command": ["false"]}, f)
-        self.assertIn("actuator failed", self.r.two_step("kill-on")[1]["result"])
+            json.dump({"dry_run": False, "lock_command": ["/nonexistent/lock"]}, f)
+        self.assertIn("failed to start", self.r.two_step("kill-on")[1]["result"])
         self.assertEqual(self.r.rx.state["kill_state"], "ARMED")  # it never locked: still remote-disarmable
         self.assertEqual(self.r.two_step("kill-off")[1]["result"], "pi: DISARMED")
+
+    def test_a_lock_command_that_ran_and_failed_stays_locked(self):  # it may have half-locked
+        self.r = Rig(dry_run=False, ks_dry=False)
+        with open(self.r.rx.cfg["killswitch_config"], "w") as f:
+            json.dump({"dry_run": False, "lock_command": ["false"]}, f)
+        self.assertIn("actuator failed", self.r.two_step("kill-on")[1]["result"])
+        self.assertEqual(self.r.rx.state["kill_state"], "LOCKED")
 
     def test_timed_out_actuators_are_treated_as_acted(self):
         self.r = Rig(dry_run=False, ks_dry=False)

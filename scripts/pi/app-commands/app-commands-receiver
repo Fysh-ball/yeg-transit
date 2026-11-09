@@ -92,6 +92,10 @@ class ActuatorTimeout(Refused):
     """The actuator didn't return in time: it may still have acted, so the receipt must not say it didn't."""
 
 
+class ActuatorNotStarted(Refused):
+    """The actuator could not even be started (no such command): the one failure known to have acted on nothing."""
+
+
 def load_config(path):
     cfg = dict(DEFAULTS)
     with open(path) as f:
@@ -154,6 +158,7 @@ class Receiver:
         self.cfg = cfg
         self.box = cfg["box"]
         self.lock = threading.Lock()  # every request's check-and-act runs under it
+        self.probe_lock = threading.Lock()  # one probe at a time: two would share one result file
         self.pending = None  # {"n2", "action", "key", "deadline" (monotonic)}
         self.last_fire_mono = None
         self.state_path = os.path.join(cfg["state_dir"], "state.json")
@@ -357,8 +362,9 @@ class Receiver:
                 return f"dry run: would lock {self.box}"
             if not cmd:
                 raise Refused("no lock actuator configured")
-            # LOCKED is saved first: a reboot can kill this process before a later save. A lock command that
-            # failed puts the old state back, so the owner can retry or disarm a box that never locked.
+            # LOCKED is saved first: a reboot can kill this process before a later save. Only a lock command that
+            # never started puts the old state back (the owner can retry or disarm a box that never locked); one
+            # that ran and exited non-zero may have half-locked, so it stays LOCKED (checker, 2026-11-08).
             before = self.state["kill_state"]
             self.state["kill_state"] = "LOCKED"
             self.save()
@@ -366,7 +372,7 @@ class Receiver:
                 run_actuator(cmd)
             except ActuatorTimeout:
                 return f"{self.box}: the lock command timed out after {ACTUATOR_TIMEOUT} s and may be locking; treated as LOCKED"
-            except Refused:
+            except ActuatorNotStarted:
                 self.state["kill_state"] = before
                 self.save()
                 raise
@@ -375,6 +381,10 @@ class Receiver:
 
     def probe(self):
         """The live permission checks, then stop. app-commands-probe (root) asks polkit about this process."""
+        with self.probe_lock:
+            return self._probe()
+
+    def _probe(self):
         t0 = time.time() - 1  # the result file is root's; a stale one is told apart by its age, not deleted
         try:
             # This start is itself the check that the sandbox can reach systemd over D-Bus through polkit.
@@ -413,7 +423,10 @@ def run_actuator(cmd):
     except subprocess.TimeoutExpired as e:
         LOG.error("actuator %s timed out: %s", cmd, e)
         raise ActuatorTimeout(f"actuator timed out ({e})", loud=True)
-    except (subprocess.SubprocessError, OSError) as e:
+    except OSError as e:
+        LOG.error("actuator %s could not start: %s", cmd, e)
+        raise ActuatorNotStarted(f"actuator failed to start ({e})", loud=True)
+    except subprocess.SubprocessError as e:
         LOG.error("actuator %s failed: %s", cmd, e)
         raise Refused(f"actuator failed ({e})", loud=True)
 
@@ -574,9 +587,13 @@ def main():
         return
     # Not dumpable: another process of the killswitch uid (the Telegram receiver) can't ptrace this one or read
     # its memory to borrow its polkit grant. The Pi has no Yama, so same-uid ptrace is otherwise open.
-    if ctypes.CDLL(None, use_errno=True).prctl(4, 0, 0, 0, 0) != 0:  # PR_SET_DUMPABLE, 0
-        LOG.error("prctl(PR_SET_DUMPABLE, 0) failed (errno %d): a same-uid process could ptrace this one",
-                  ctypes.get_errno())
+    # Never fatal: a receiver that won't start is worse than one a same-uid process could ptrace.
+    try:
+        if ctypes.CDLL(None, use_errno=True).prctl(4, 0, 0, 0, 0) != 0:  # PR_SET_DUMPABLE, 0
+            LOG.error("prctl(PR_SET_DUMPABLE, 0) failed (errno %d): a same-uid process could ptrace this one",
+                      ctypes.get_errno())
+    except Exception as e:
+        LOG.error("prctl(PR_SET_DUMPABLE, 0) unavailable (%s): a same-uid process could ptrace this one", e)
     cfg = load_config(CONFIG_PATH)
     if cfg.get("log_file"):
         try:
