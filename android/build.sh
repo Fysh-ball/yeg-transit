@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 SDK=$HOME/Android/Sdk  # ANDROID_HOME here points at /opt/android-sdk, which has no build-tools
 BT=$SDK/build-tools/35.0.0
 JAR=$SDK/platforms/android-35/android.jar
-VERSION=${VERSION:-1}
+VERSION=${VERSION:-28}  # the last one installed on his phone (1.28, 2026-11-09): raise it each build, or install -r refuses a downgrade
 rm -rf build && mkdir -p build/classes build/gen
 
 "$BT/aapt2" compile --dir res -o build/res.zip
