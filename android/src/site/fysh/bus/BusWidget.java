@@ -136,7 +136,7 @@ public class BusWidget extends AppWidgetProvider {
             android.util.Log.w("yeg", "saved stops unreadable: " + e);
         }
         if (stops.isEmpty()) {
-            v.addView(R.id.rows, alone(note(c, "Open the app and save a stop to see it here.", fg)));
+            v.addView(R.id.rows, alone(v, note(c, "Open the app and save a stop to see it here.", fg), w, h));
             return v;
         }
 
@@ -199,9 +199,9 @@ public class BusWidget extends AppWidgetProvider {
             room -= 34;
         }
         if (order.isEmpty()) { // the same words as the page, plus the walk: a bus you can't reach isn't shown
-            if (!failed && !(offline && !blocked.isEmpty())) v.addView(R.id.rows, alone(note(c, walking
+            if (!failed && !(offline && !blocked.isEmpty())) v.addView(R.id.rows, alone(v, note(c, walking
                 ? "No bus you can still walk to in the next 3 hours." : picked ? "No buses on your routes in the next 3 hours."
-                : "No buses in the next 3 hours.", fg)));
+                : "No buses in the next 3 hours.", fg), w, h));
             return v;
         }
         long now = System.currentTimeMillis() / 1000;
@@ -534,8 +534,18 @@ public class BusWidget extends AppWidgetProvider {
         return nc != null && nc.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }
 
-    private static RemoteViews alone(RemoteViews note) { // the only thing on the widget: in the middle
+    /**
+     * The only thing on the widget: in the middle both ways, and sized to the widget (owner, 2026-11-09:
+     * "This should be centered and bigger"). Up to two lines; a bold glyph is about 0.55 em wide.
+     */
+    private static RemoteViews alone(RemoteViews v, RemoteViews note, int w, int h) {
+        v.setInt(R.id.root, "setGravity", android.view.Gravity.CENTER);
+        // 50: the longest message, so they all get one size that fits on two lines
+        float sp = Math.max(13, Math.min(28, Math.min((w - 32) * 2 / (0.55f * 50), h / 5f)));
         note.setInt(R.id.text, "setGravity", android.view.Gravity.CENTER);
+        note.setBoolean(R.id.text, "setSingleLine", false);
+        note.setInt(R.id.text, "setMaxLines", 2);
+        note.setTextViewTextSize(R.id.text, TypedValue.COMPLEX_UNIT_SP, sp);
         return note;
     }
 
