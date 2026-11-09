@@ -797,6 +797,8 @@ class Handler(SimpleHTTPRequestHandler):
         if not u.path.startswith("/api/"):
             return super().do_GET()
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if "q" in q:  # typed search text: no stop, street or place name is longer, and fuzzy matching costs per word
+            q["q"] = q["q"][:80]
         parts = u.path.split("/")[2:]
         try:
             db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
