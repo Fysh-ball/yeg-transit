@@ -96,14 +96,15 @@ async function confirmIt() {
   if (!pending) return;
   const { action, n2 } = pending;
   const code = TOTP[action] ? $("code").value.trim() : undefined;
-  if (code !== undefined && !/^[0-9]{6}$/.test(code)) {
+  // LOCK may go empty: the Pi takes it on the passkey alone only while its clock isn't synced (after a power cut).
+  if (code !== undefined && !/^[0-9]{6}$/.test(code) && !(action === "kill-on" && code === "")) {
     say(`Type the 6-digit code from Aegis entry "kill-switch ${TOTP[action]}".`, "bad");
     return;
   }
   busy(true);
   try {
     say("Unlock your key again to confirm.");
-    const out = await post("/confirm", { action, n2, ...(code ? { totp: code } : {}), ...(await sign(action, "confirm", n2, code)) });
+    const out = await post("/confirm", { action, n2, ...(code ? { totp: code } : {}), ...(await sign(action, "confirm", n2, code || undefined)) });
     say(out.result, out.result.startsWith("refused") || out.result.startsWith("probe failed") ? "bad" : "good");
     reset();
   } catch (e) {

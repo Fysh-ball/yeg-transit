@@ -641,12 +641,21 @@ class SecondFactor(unittest.TestCase):
     def test_unsynced_clock_refuses_without_counting(self):
         self.r.rx.cfg["clock_check"] = ["echo", "no"]
         for _ in range(acr.TOTP_FAILS + 1):
-            self.assertIn("clock isn't synced", self.result("kill-on"))
+            self.assertIn("clock isn't synced", self.result("kill-off"))
         self.r.rx.cfg["clock_check"] = ["false"]
-        self.assertIn("clock isn't synced", self.result("kill-on"))
+        self.assertIn("clock isn't synced", self.result("kill-off"))
         self.r.rx.cfg["clock_check"] = ["echo", "yes"]
-        self.assertEqual(self.result("kill-on"), "dry run: would lock pi")
-        self.assertEqual(self.r.rx.state["totp_fails"].get("kill-on", []), [])
+        self.assertEqual(self.result("kill-off"), "pi: DISARMED")
+        self.assertEqual(self.r.rx.state["totp_fails"].get("kill-off", []), [])
+
+    def test_unsynced_clock_lock_takes_the_passkey_alone(self):  # option A
+        self.assertIn("6-digit code", self.result("kill-on", code=None))  # synced: LOCK needs its code
+        self.r.rx.cfg["clock_check"] = ["echo", "no"]
+        self.assertEqual(self.result("kill-on", code=None), "dry run: would lock pi")
+        with open(self.r.rx.alerts_path) as f:
+            self.assertIn("LOUD passkey-only LOCK", f.read())
+        self.assertIn("clock isn't synced", self.result("kill-arm"))  # a valid code, still refused
+        self.assertEqual(self.r.rx.state["kill_state"], "DISARMED")
 
     def test_no_secret_enrolled(self):
         os.unlink(os.path.join(self.r.dir, "kill-off"))

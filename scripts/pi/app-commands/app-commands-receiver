@@ -282,7 +282,8 @@ class Receiver:
         if not NONCE_RE.fullmatch(nonce):
             raise Refused("nonce must be 64 lowercase hex")
         if step == "confirm" and action in TOTP_ACTIONS:
-            if not isinstance(code, str) or not TOTP_RE.fullmatch(code):
+            # LOCK may come without a code: check_totp lets that through only while the clock can't check one.
+            if not (code is None and action == "kill-on") and (not isinstance(code, str) or not TOTP_RE.fullmatch(code)):
                 raise Refused(f"this command needs the 6-digit code from Aegis entry kill-switch {TOTP_ACTIONS[action]}")
         elif code is not None:
             raise Refused("malformed body")
@@ -388,8 +389,15 @@ class Receiver:
         if len(fails) >= TOTP_FAILS and action != "kill-on":
             raise Refused(f"{TOTP_FAILS} wrong codes for {action} this hour: refused until {time.strftime('%H:%M', time.localtime(min(fails) + 3600))}", loud=True)
         # After a power cut the clock may be days off until NTP answers: say so, and don't count it as a wrong code.
+        # LOCK then goes on the passkey alone (SS for the owner, 2026-11-08, option A): it only protects, and the
+        # moment after a power cut is when he may need it most. Arm and disarm wait for the clock.
         if not self.clock_synced():
+            if action == "kill-on":
+                self.queue("LOUD passkey-only LOCK: the Pi's clock isn't synced, so the code was not checked")
+                return
             raise Refused("the Pi's clock isn't synced yet, so codes can't be checked; try again in a minute", loud=True)
+        if code is None:
+            raise Refused(f"this command needs the 6-digit code from Aegis entry kill-switch {TOTP_ACTIONS[action]}")
         secret = load_totp_secret(os.path.join(self.cfg["totp_dir"], action), self.cfg["keys_must_be_root"])
         t = int(now // 30)
         good = [s for s in (t - 1, t, t + 1) if hmac.compare_digest(totp(secret, s), code)]
@@ -497,6 +505,11 @@ class Receiver:
     def refused(self, step, src, why, loud):
         line = f"{'LOUD ' if loud else ''}refused {step} from {src}: {why}"
         (LOG.error if loud else LOG.warning)(line)
+        self.queue(line, logged=True)
+
+    def queue(self, line, logged=False):
+        if not logged:
+            LOG.error(line)
         try:
             # A root path unit batches this file into one pi-app-commands row in Lumi's app.
             # Capped: unsigned junk must not fill the disk. The journal and the local log keep every line.
