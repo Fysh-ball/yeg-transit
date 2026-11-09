@@ -1,5 +1,6 @@
 #!/usr/sbin/nft -f
 # /etc/app-commands-acl.nft: only the owner's phone reaches the app-commands receiver on :7601.
+# pi-ts ONLY. Never install on hermes: its drop on 443 would cut headscale. hermes has its own copy (Hermes owns it).
 # Its own table, like tang_acl: loading it touches no other table. A drop here is final for every table.
 # Instead of a headscale ACL: the tailnet's owner rule is *:*, and headscale ACLs only allow, so a headscale
 # version would mean listing every other node by hand. tailscale0's source address is the WireGuard peer's
