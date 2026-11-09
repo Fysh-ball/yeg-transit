@@ -5,22 +5,50 @@ const ORIGINS = [["https://bus-pi.fysh.site", 4000], ["https://bus.fysh.site", 6
 // Answers with nothing about the rider in them are shared at this edge: every rider at a stop costs the Pi one call
 // per FRESH seconds (the server polls ETS every 10 s). If both copies fail, the last good one (up to KEEP s old)
 // is served, aged so its countdowns and the stale pill stay true. Search, transfer and the rest always go through.
-const FRESH = [[/^\/api\/stops\/[^/]+\/departures$/, 10], [/^\/api\/vehicles$/, 5], [/^\/api\/stops\/[^/]+\/timetable$/, 600]];
+// The shared URL keeps only the one parameter the server reads there, clamped as the server clamps it: a cache-buster
+// or n=29 can't make every request a miss that reaches the Pi.
+const FRESH = [[/^\/api\/stops\/[^/]+\/departures$/, 10, "n", 8, 30], [/^\/api\/vehicles$/, 5],
+  [/^\/api\/stops\/[^/]+\/timetable$/, 600, "hours", 30, 48]];
 const KEEP = 600;
+const FLYING = new Map(); // shared URL -> its origin call in progress, so a crowd at one stop makes one call (per isolate)
 
 export async function onRequest({ request, waitUntil }) {
-  const url = new URL(request.url);
-  const fresh = request.method === "GET" && FRESH.find(([re]) => re.test(url.pathname))?.[1];
-  const hit = fresh ? await caches.default.match(request) : null;
+  let url = new URL(request.url);
+  const rule = request.method === "GET" && FRESH.find(([re]) => re.test(url.pathname));
+  const fresh = rule?.[1];
+  if (rule) {
+    const [, , name, def, max] = rule, key = new URL(url.origin + url.pathname);
+    if (name) key.searchParams.set(name, String(Math.min(parseInt(url.searchParams.get(name), 10) || def, max)));
+    url = key;
+  }
+  const hit = fresh ? await caches.default.match(url.href) : null;
   const age = hit ? Date.now() / 1000 - Number(hit.headers.get("x-stored")) : 0;
   if (hit && age < fresh) return aged(hit, age);
-  const r = await origin(request, url);
-  if (fresh && r.ok) {
-    const copy = new Response(r.clone().body, r);
-    copy.headers.set("cache-control", `max-age=${KEEP}`);
-    copy.headers.set("x-stored", String(Date.now() / 1000));
-    waitUntil(caches.default.put(request, copy).catch((e) => console.log("edge cache put", e.message)));
-  }
+  let r;
+  if (fresh) {
+    let p = FLYING.get(url.href);
+    if (!p) {
+      // text, not the Response: a Worker can't read one request's stream from another request
+      // text() undoes any compression, so its encoding and length headers no longer describe the body
+      p = origin(request, url).then(async (o) => ({ status: o.status, body: await o.text(),
+        headers: [...o.headers].filter(([k]) => k !== "content-encoding" && k !== "content-length") }))
+        .catch((e) => ({ status: 503, body: JSON.stringify({ error: "live times are down" }),
+          headers: [["content-type", "application/json"], ["cache-control", "no-store"], ["x-edge-error", String(e.message).replace(/[\r\n]/g, " ").slice(0, 100)]] }))
+        .then(async (o) => {
+          if (o.status >= 200 && o.status < 300) {
+            const copy = new Response(o.body, { status: o.status, headers: o.headers });
+            copy.headers.set("cache-control", `max-age=${KEEP}`);
+            copy.headers.set("x-stored", String(Date.now() / 1000));
+            await caches.default.put(url.href, copy).catch((e) => console.log("edge cache put", e.message));
+          }
+          return o;
+        }).finally(() => FLYING.delete(url.href));
+      FLYING.set(url.href, p);
+      waitUntil(p);
+    }
+    const o = await p;
+    r = new Response(o.body, { status: o.status, headers: o.headers }); // each waiter its own copy of the one answer
+  } else r = await origin(request, url);
   if (r.status >= 500 && hit) return aged(hit, age);
   return r;
 }
