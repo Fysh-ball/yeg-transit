@@ -1,0 +1,20 @@
+# /etc/nginx/sites-enabled/pi-commands: HTTPS for the app-commands receiver, tailnet only (owner, 2026-11-09).
+# No public record: pi-commands.fysh.site resolves to 100.64.0.14 only in the tailnet's own DNS.
+# The cert comes by DNS-01 (certbot dns-cloudflare), so nothing listens publicly. The name stays the passkey's rp_id.
+# Listens on every address so boot order with tailscaled can't stop it; the allow list and
+# app-commands-acl.nft keep it to the owner's phones.
+server {
+	listen 443 ssl;
+	server_name pi-commands.fysh.site;
+	ssl_certificate /etc/letsencrypt/live/pi-commands.fysh.site/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/pi-commands.fysh.site/privkey.pem;
+	allow 100.64.0.2;
+	allow 100.64.0.3;
+	allow 127.0.0.1;
+	deny all;
+	location / {
+		proxy_pass http://127.0.0.1:7601;
+		# The receiver logs this header as the source (it was cloudflared's); logged only, never trusted.
+		proxy_set_header CF-Connecting-IP $remote_addr;
+	}
+}

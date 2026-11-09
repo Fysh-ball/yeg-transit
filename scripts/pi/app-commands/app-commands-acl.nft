@@ -11,9 +11,9 @@ delete table inet app_commands_acl
 table inet app_commands_acl {
 	chain input {
 		type filter hook input priority -100; policy accept;
-		iifname "tailscale0" tcp dport 7601 ip saddr { 100.64.0.2, 100.64.0.3 } accept
-		# The cloudflared tunnel on this box connects to 127.0.0.1:7601 (design C).
-		iifname "lo" ip daddr 127.0.0.1 tcp dport 7601 accept
-		tcp dport 7601 counter drop
+		iifname "tailscale0" tcp dport { 443, 7601 } ip saddr { 100.64.0.2, 100.64.0.3 } accept
+		# nginx on this box (pi-commands.nginx) connects to 127.0.0.1:7601; tested from the box itself on lo.
+		iifname "lo" tcp dport { 443, 7601 } accept
+		tcp dport { 443, 7601 } counter drop
 	}
 }
