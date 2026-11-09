@@ -818,7 +818,7 @@ async function drawStops() {
 function busCard(pin, trip, route, head) {
   const el = document.createElement("div");
   el.className = "pin-card";
-  el.innerHTML = `<b>Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}</b><span class="sub">Asking ETS...</span>`;
+  el.innerHTML = `<b>Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}</b><span class="sub">Loading...</span>`;
   api(`vehicles/${encodeURIComponent(trip)}`).then((b) => {
     const late = b.delay == null ? "" : Math.abs(b.delay) < 60 ? "On time"
       : `${Math.round(Math.abs(b.delay) / 60)} min ${b.delay > 0 ? "late" : "early"}`;
