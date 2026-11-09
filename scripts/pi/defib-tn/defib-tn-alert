@@ -7,6 +7,8 @@
 # path unit starts it again, about once a minute, until TrueNAS answers. Nothing is dropped.
 Q=${DEFIB_ALERT_DIR:-/var/spool/defib-tn}
 NOTIFY=${SPOOL_NOTIFY:-/usr/local/bin/spool-notify}  # both overridable for the stub test only
+# The relay on each host accepts only its own prefix: hermes sets hermes-defib-tn in a unit drop-in.
+COND=${SPOOL_CONDITION:-pi-defib-tn}
 sleep "${DEFIB_ALERT_BATCH:-60}"   # one row per burst: a fire queues several lines over minutes
 cd "$Q" || exit 1
 lines=$(runuser -u oneadmin -- sh -c '{ [ -e alerts.sending ] || mv alerts alerts.sending; } 2>/dev/null && cat alerts.sending && rm -f alerts.sending')
@@ -16,7 +18,7 @@ printf '%s\n' "$lines" | grep -qE 'ABORT|FAILED|CRITICAL|STILL unreachable|WARNI
 # The lines that matter while TrueNAS is down also go by email, which needs no TrueNAS; it mails each line once,
 # so a put-back and retry below never sends it twice. Its result never changes the spool send.
 printf '%s\n' "$lines" | timeout 120 "${DEFIB_MAIL:-/usr/local/bin/defib-tn-mail}" || logger -t defib-tn-alert "defib-tn-mail rc $?"
-printf '%s\n' "$lines" | tail -c 1900 | "$NOTIFY" pi-defib-tn "$result" && exit 0
+printf '%s\n' "$lines" | tail -c 1900 | "$NOTIFY" "$COND" "$result" && exit 0
 rc=$?
 # Not delivered: put the lines back in front of anything queued meanwhile.
 printf '%s\n' "$lines" | runuser -u oneadmin -- sh -c '{ cat - && { cat alerts 2>/dev/null || true; }; } > alerts.new && mv alerts.new alerts'

@@ -16,6 +16,7 @@ Exit 0 sent or nothing to send, 1 not sent (kept for the next run), 2 cap hit.
 import hashlib
 import os
 import random
+import socket
 import subprocess
 import sys
 import tempfile
@@ -167,7 +168,7 @@ def main(argv):
     os.makedirs(STATE, mode=0o700, exist_ok=True)
     if argv[1:] == ["--test"]:
         picked, subject = [], "defib email path test, ignore"
-        text = "Test from pi-ts defib-tn-mail. No action needed."
+        text = f"Test from {socket.gethostname()} defib-tn-mail. No action needed."
     else:
         sent = set(read("sent").split())
         pending = entries(read("pending"))
@@ -183,7 +184,7 @@ def main(argv):
         write("pending", "\n".join(picked) + "\n")
         subject = "TrueNAS defib: needs a human" if any("CRITICAL" not in e for e in picked) \
             else "TrueNAS defib: CRITICAL"
-        text = "\n".join(picked) + "\n\nFrom pi-ts defib-tn. The app gets these lines too once TrueNAS is back."
+        text = "\n".join(picked) + f"\n\nFrom {socket.gethostname()} defib-tn. The app gets these lines too once TrueNAS is back."
     if day_count() >= DAILY_CAP:
         log(f"DAILY CAP of {DAILY_CAP} defib mails reached; NOT mailing (kept for tomorrow). "
             "Read the defib log.", crit=True)

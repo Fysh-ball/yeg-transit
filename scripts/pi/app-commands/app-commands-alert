@@ -4,14 +4,16 @@
 # The queue lives in a killswitch-owned dir, so it is moved and read AS killswitch: a symlink planted there can't
 # make root read a file killswitch couldn't. The receiver caps it at 64 KiB; the journal and
 # /var/log/app-commands keep every line.
+# The relay on each host accepts only its own prefix: hermes sets hermes-app-commands in a unit drop-in.
+COND=${SPOOL_CONDITION:-pi-app-commands}
 sleep 60   # one row per burst, not one per junk request
 cd /var/lib/app-commands || exit 1
 lines=$(runuser -u killswitch -- sh -c 'mv alerts alerts.sending 2>/dev/null && cat alerts.sending; rm -f alerts.sending')
 [ -n "$lines" ] || exit 0
 n=$(printf '%s\n' "$lines" | wc -l)
 loud=$(printf '%s\n' "$lines" | grep -c '^[0-9-]* [0-9:]* LOUD ')
-{ echo "app-commands on pi refused $n command(s), $loud LOUD (bad key or signature). Last ones:"
-  printf '%s\n' "$lines" | tail -n 5; } | /usr/local/bin/spool-notify pi-app-commands failed
+{ echo "app-commands on $(hostname -s) refused $n command(s), $loud LOUD (bad key or signature). Last ones:"
+  printf '%s\n' "$lines" | tail -n 5; } | /usr/local/bin/spool-notify "$COND" failed
 rc=$?
 [ "$rc" = 0 ] || logger -t app-commands-alert "NOTIFY FAILED (rc $rc): $n refusals not shown in the app; see /var/log/app-commands"
 exit 0
