@@ -28,6 +28,57 @@ def fetch(url, timeout):
     return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit/0.1"}), timeout=timeout)
 
 
+class Busy(Exception):
+    """An outside host we hold back from: cooling down after an error, inside its per-call gap, or at its daily cap."""
+
+
+class Host:
+    """An outside host we must never hammer (a host has temp-banned us before): one call per `gap` s from this box,
+    at most `daily` a day (then stop and say so loudly), and after an error a cooldown of 2, 4, 8 ... 300 s (+-20%
+    jitter), or the host's own Retry-After if that is longer. A refused call raises Busy and never reaches the host."""
+
+    def __init__(self, name, gap, daily):
+        self.name, self.gap, self.daily = name, gap, daily
+        self.lock, self.at, self.wait, self.until, self.day, self.count = threading.Lock(), 0.0, 0, 0.0, "", 0
+
+    def get_json(self, url, timeout):
+        with self.lock:
+            now = time.time()
+            today = time.strftime("%Y%m%d", time.localtime(now))
+            if today != self.day:
+                self.day, self.count = today, 0
+            if now < self.until:
+                raise Busy(f"{self.name} cooling down {int(self.until - now)} s")
+            if now - self.at < self.gap:
+                raise Busy(f"{self.name}: one call per {self.gap} s")
+            if self.count >= self.daily:
+                if self.count == self.daily:
+                    print(f"DAILY CAP: {self.name} hit {self.daily} calls today; no more until midnight", file=sys.stderr, flush=True)
+                    self.count += 1
+                raise Busy(f"{self.name} daily cap")
+            self.at, self.count = now, self.count + 1
+        try:
+            with fetch(url, timeout) as r:
+                body = json.load(r)
+        except Exception as e:
+            code = getattr(e, "code", 0)
+            ra = (e.headers.get("Retry-After") or "") if code and e.headers else ""
+            if code not in (400, 404):  # our own bad query is not the host struggling
+                with self.lock:
+                    self.wait = min(300, max(2, self.wait * 2))
+                    self.until = time.time() + max(self.wait * random.uniform(0.8, 1.2), int(ra) if ra.isdigit() else 0)
+            raise
+        with self.lock:
+            self.wait = 0
+        return body
+
+
+# Limits: data.edmonton.ca (Socrata) publishes no number for calls without an app token (unknown), so 2 a second and
+# 5,000 a day; Photon's public API is fair-use with no number (unknown), so 1 a second and 5,000 a day; Open-Meteo's
+# free tier is 600 a minute and 10,000 a day (open-meteo.com/en/terms), we need 1 per 15 min, capped at 1 a minute.
+SOCRATA, PHOTON_HOST, OPEN_METEO = Host("data.edmonton.ca", 0.5, 5000), Host("photon.komoot.io", 1, 5000), Host("api.open-meteo.com", 60, 500)
+
+
 class Unchanged(Exception):
     """ETS answered 304: the feed is the copy we already hold."""
 
@@ -496,6 +547,9 @@ STREET_TYPES = {"st": "street", "str": "street", "ave": "avenue", "av": "avenue"
                 "pt": "point", "pk": "park", "gr": "grove", "hts": "heights", "lk": "link", "sq": "square"}
 
 
+ADDR_CACHE, ADDR_LOCK = {}, threading.Lock()  # Socrata URL -> rows (process lifetime, newest 500)
+
+
 def city_addresses(text, near=None):
     """'10220 103 St' -> [{name, sub, lat, lon}] from the city's address list; [] when it isn't a house address.
     Half-typed streets match too ('10220 10' -> 101 Ave, 102 St...), nearest first when we know where you are.
@@ -513,7 +567,14 @@ def city_addresses(text, near=None):
     url = ADDRESSES + "?" + urlencode({"$select": "house_number,street_name,neighbourhood_name,avg(latitude) as lat,avg(longitude) as lon",
                                        "$where": where, "$group": "house_number,street_name,neighbourhood_name",
                                        "$order": "street_name", "$limit": 40 if words else 300})
-    rows = json.load(fetch(url, 4))
+    with ADDR_LOCK:
+        rows = ADDR_CACHE.get(url)
+    if rows is None:
+        rows = SOCRATA.get_json(url, 4)
+        with ADDR_LOCK:  # addresses don't move: a day's cache, newest 500
+            ADDR_CACHE[url] = rows
+            if len(ADDR_CACHE) > 500:
+                del ADDR_CACHE[next(iter(ADDR_CACHE))]
     if near:
         k = math.cos(math.radians(near[0]))
         rows.sort(key=lambda r: (float(r["lat"]) - near[0]) ** 2 + ((float(r["lon"]) - near[1]) * k) ** 2)
@@ -581,7 +642,7 @@ def stop_where(db, stop):
 
 
 WEATHER = {"at": 0, "good": 0, "value": {"extra": 0, "why": "", "soon": "", "temp": None}}
-PHOTON, PHOTON_LOCK = {"at": 0, "cache": {}}, threading.Lock()  # cache: Photon URL -> answer, newest 500
+PHOTON, PHOTON_LOCK = {"cache": {}}, threading.Lock()  # cache: Photon URL -> answer, newest 500
 
 
 def walk_weather():
@@ -593,7 +654,7 @@ def walk_weather():
           "temperature_2m,apparent_temperature,rain,showers,snowfall,snow_depth", "hourly": "precipitation_probability,snowfall",
           "forecast_hours": 12, "timezone": "America/Edmonton"})
     try:
-        r = json.load(fetch(url, 5))
+        r = OPEN_METEO.get_json(url, 5)
         c, hr = r["current"], r.get("hourly") or {}
     except Exception as e:
         print("weather lookup failed:", repr(e), file=sys.stderr)
@@ -693,10 +754,12 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=WEB, **kw)
 
-    def json(self, obj, status=200, cache=0):
+    def json(self, obj, status=200, cache=0, headers=None):
         body = json.dumps(obj, separators=(",", ":")).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
         self.send_header("Cache-Control", f"max-age={cache}" if cache else "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -825,9 +888,13 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 homes = city_addresses(q["q"], (float(q["lat"]), float(q["lon"])) if "lat" in q else None)
             except Exception as e:
-                homes = []
-                print(f"city address lookup failed, using Photon: {e}", flush=True)
-            if homes or q["q"].strip().isdigit():  # a bare number means nothing to Photon
+                homes = None
+                print(f"city address lookup failed, using Photon: {e!r}", flush=True)
+            if q["q"].strip().isdigit():  # a bare number means nothing to Photon
+                if homes is None:  # the city's list failed: say so, never a day-cached "no such address"
+                    return self.json({"error": "address search is down"}, 502, headers={"X-No-Failover": "1"})
+                return self.json(homes, cache=86400)
+            if homes:
                 return self.json(homes, cache=86400)
             # Photon is fair-use: at most 2 calls a second from this server, whoever asks; the page shows our own places meanwhile.
             # A flood starves Photon search for everyone (our own places still answer); repeats come from the cache.
@@ -838,14 +905,13 @@ class Handler(SimpleHTTPRequestHandler):
             with PHOTON_LOCK:
                 if url in PHOTON["cache"]:
                     return self.json(PHOTON["cache"][url], cache=86400)
-                if time.time() - PHOTON["at"] < 0.5:
-                    return self.json({"error": "busy, try again"}, 503)
-                PHOTON["at"] = time.time()
             try:
-                feats = json.load(fetch(url, 6))["features"]
+                feats = PHOTON_HOST.get_json(url, 6)["features"]
+            except Busy as e:  # ours, not an outage: the edge must not ask the other box's Photon instead
+                return self.json({"error": f"busy, try again ({e})"}, 429, headers={"Retry-After": "2", "X-No-Failover": "1"})
             except Exception as e:
                 print("photon:", repr(e), file=sys.stderr)
-                return self.json({"error": "place search failed"}, 502)
+                return self.json({"error": "place search failed"}, 502, headers={"X-No-Failover": "1"})
             out = []
             for f in feats:
                 pr = f["properties"]

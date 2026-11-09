@@ -33,8 +33,9 @@ async function origin(request, url) {
         headers: { "user-agent": request.headers.get("user-agent") || "" },
         signal: AbortSignal.timeout(ms),
       });
-      // 5xx (52x is Cloudflare saying the tunnel or server is unreachable): try the next copy.
-      if (r.status < 500) return r;
+      // 5xx (52x is Cloudflare saying the tunnel or server is unreachable): try the next copy. Not when the server
+      // marks it X-No-Failover (an outside host failed or is held back): the other copy would only ask it again.
+      if (r.status < 500 || r.headers.get("x-no-failover")) return r;
       console.log("api origin", origin, r.status);
     } catch (e) {
       console.log("api origin", origin, e.message);
