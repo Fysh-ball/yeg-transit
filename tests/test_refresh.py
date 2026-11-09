@@ -18,6 +18,17 @@ class Refresh(unittest.TestCase):
             self.assertEqual(f.read(), b"the last good zip")
         self.assertFalse(os.path.exists(db))
 
+    def test_a_failed_first_import_backs_off_instead_of_exiting(self):
+        calls, slept = [], []
+        def load():
+            calls.append(1)
+            if len(calls) < 9:
+                raise OSError("ETS down")
+            return "ok"
+        with mock.patch.object(app.random, "uniform", lambda a, b: 1):
+            self.assertEqual(app.first_import(load, slept.append), "ok")
+        self.assertEqual(slept, [60, 120, 240, 480, 960, 1920, 3600, 3600])
+
 
 if __name__ == "__main__":
     unittest.main()

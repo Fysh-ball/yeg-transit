@@ -959,6 +959,19 @@ class Handler(SimpleHTTPRequestHandler):
         pass
 
 
+def first_import(load, sleep=time.sleep):
+    """No database yet: nothing to serve until an import works. Retry here, not by exiting: a crash loop re-downloads
+    ETS's 18 MB zip every restart. 1 min, 2, 4 ... up to 1 h (+-20% jitter). ETS publishes no limit for it (unknown)."""
+    wait = 60
+    while True:
+        try:
+            return load()
+        except Exception as e:
+            print(f"first GTFS import failed, retrying in about {wait} s:", repr(e), file=sys.stderr, flush=True)
+            sleep(wait * random.uniform(0.8, 1.2))
+            wait = min(3600, wait * 2)
+
+
 def main():
     os.makedirs(DATA, exist_ok=True)
     if not os.path.exists(DB) or not sqlite3.connect(DB).execute(
@@ -967,7 +980,7 @@ def main():
         zpath = os.path.join(DATA, "GTFS.zip")
         load = lambda: import_gtfs(zpath, DB) if os.path.exists(zpath) else refresh_gtfs()
         # a new schema: keep serving the old database (older features degrade) while the import runs
-        threading.Thread(target=load, daemon=True).start() if os.path.exists(DB) else load()
+        threading.Thread(target=load, daemon=True).start() if os.path.exists(DB) else first_import(load)
 
     def nightly():
         while True:
