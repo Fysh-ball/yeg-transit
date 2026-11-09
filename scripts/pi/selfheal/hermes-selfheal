@@ -25,7 +25,7 @@ mkdir -p "$CACHE" "$STATE"
 
 say(){ # level kind name detail
   local line="SELFHEAL $(date -Is) $1 $2 $3 $4"
-  echo "$line" >> "$LOG"; logger -t hermes-selfheal -- "$line"; echo "$line"
+  echo "$line" >> "$LOG"; logger -t hermes-selfheal -- "$line"; [ -t 1 ] && echo "$line"
   if [ "$1" != OK ] && [ -z "$DRY" ] && [ -x /usr/local/bin/spool-notify ]; then
     printf 'hermes: %s %s %s: %s' "$1" "$2" "$3" "$4" | /usr/local/bin/spool-notify hermes-selfheal \
       "$([ "$1" = FIXED ] && echo ok || echo failed)" >/dev/null 2>&1 || echo "notify failed" >> "$LOG"
