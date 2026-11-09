@@ -7,7 +7,7 @@
 set -u
 DIR=/home/Apollo/stacks/yeg-transit
 STATE=/var/lib/yeg-check
-STAMP=$STATE/last-run      # touched when check_live.py reached a verdict (exit 0, 1 or 3)
+STAMP=$STATE/last-run      # touched when check_live.py reached a verdict (exit 0, 1, 3, or 4: still wrong, paged already)
 LATCH=$STATE/deadman.latch # present while the dead-man has paged and no run has landed since
 LOG=$STATE/log
 STALE_MIN=${STALE_MIN:-30}
@@ -28,9 +28,10 @@ run)
         yeg-transit:latest python -I /s/check_live.py --page 2>&1); s=$?
   echo "$out"
   # A traceback also exits 1: that's a broken check, not a wrong time, and must not count as a run.
-  if [[ $s =~ ^[013]$ ]] && ! grep -q '^Traceback' <<< "$out"; then touch "$STAMP"; fi
+  if [[ $s =~ ^[0134]$ ]] && ! grep -q '^Traceback' <<< "$out"; then touch "$STAMP"; fi
   if [ "$s" = 1 ] || [ "$s" = 3 ]; then
-    notify "$(grep -E '^(WRONG|UNREACHABLE)' <<< "$out")" failed
+    # check_live marked it paged before we deliver: undelivered, forget that so the next run pages again
+    notify "$(grep -E '^(WRONG|UNREACHABLE)' <<< "$out")" failed || rm -f "$STATE/home/.local/state/yeg-check-paged.json"
   fi
   exit "$s" ;;
 deadman)

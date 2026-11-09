@@ -77,7 +77,7 @@ class CheckLive(unittest.TestCase):
     def test_a_wrong_time_pages_once_per_6h_and_always_fails_without_page(self):
         self.assertEqual(self.run_check(self.answers(site(12)), "--page")[0], 1)
         code, out = self.run_check(self.answers(site(12)), "--page")
-        self.assertEqual(code, 0)
+        self.assertEqual(code, 4)  # not paged again, but the timer still fails: a fault that lasts isn't green
         self.assertIn("WRONG stop 1407 route 002", out)  # still in the journal
         self.assertEqual(self.run_check(self.answers(site(12)))[0], 1)  # a release check is never quiet
         later = time.time() + 6 * 3600 + 1

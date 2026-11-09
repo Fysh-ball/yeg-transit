@@ -5,7 +5,8 @@ Run after every release and every 15 min (docs/SETUP.md). Asks the public site, 
 
 Exit 1: a wrong time. Exit 3: yegbus.com or ETS didn't answer, twice 20 s apart (a laptop switching networks isn't a
 wrong time; 2026-10-26 11:16). With --page (the 15-min timer), exit 1 only for a stop and route not already paged in
-the last 6 h, and exit 3 at most once an hour; every WRONG line is still printed. Without it, every wrong time fails.
+the last 6 h, and exit 3 at most once an hour; every WRONG line is still printed, and a fault already paged exits 4,
+so a timer that keeps failing never reads as green. Without it, every wrong time fails.
 
 Two ways a time goes wrong, both seen on the 918B loop at WEM on 2026-10-22:
 - far off ETS's own time for that bus at that stop (we showed 33 min, ETS said 8);
@@ -74,7 +75,7 @@ def main(argv=sys.argv[1:]):
         wrong, keys, checked = check(site)
     except Unreachable as e:  # ETS's own feed: nothing to compare with
         print(f"UNREACHABLE {e} ({time.strftime('%H:%M')})")
-        return 3 if due(["unreachable"], page) else 0
+        return 3 if due(["unreachable"], page) else 4
     print(f"{site}: {checked} live buses at {STOPS} stops, {sum(not w.startswith('HELD') for w in wrong)} wrong ({time.strftime('%H:%M')})")
     for w in wrong:
         print(w)
@@ -84,7 +85,7 @@ def main(argv=sys.argv[1:]):
     paging = due(sorted(set(keys)), page)
     if any(k.startswith("wrong") for k in paging):
         return 1
-    return 3 if paging else 0
+    return 3 if paging else 4 if keys else 0
 
 
 def check(SITE):
