@@ -812,9 +812,13 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route(self, db, parts, q):
         if parts == ["health"]:
-            return self.json({"live_ts": LIVE.ts, "live_age": int(time.time()) - LIVE.ts if LIVE.ts else None,
+            # 503 when what riders see is stale: live times over 5 min old, or a timetable the nightly refresh hasn't renewed in 3 days
+            live_age = int(time.time()) - LIVE.ts if LIVE.ts else None
+            gtfs_age = int(time.time() - os.path.getmtime(DB)) if os.path.exists(DB) else None
+            ok = live_age is not None and live_age <= 300 and gtfs_age is not None and gtfs_age <= 3 * 86400
+            return self.json({"ok": ok, "live_ts": LIVE.ts, "live_age": live_age, "gtfs_age": gtfs_age,
                               "live_trips": len(LIVE.trips), "live_error": LIVE.error,
-                              "vehicles": len(LIVE.vehicles), "vehicle_error": LIVE.vp_error})
+                              "vehicles": len(LIVE.vehicles), "vehicle_error": LIVE.vp_error}, 200 if ok else 503)
         if parts == ["version"]:
             return self.json({"sha": SHA})
         if parts == ["vehicles"]:

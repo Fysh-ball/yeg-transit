@@ -9,5 +9,11 @@ services:
     volumes: ["yeg-data:/data"]
     mem_limit: 512m
     cpus: 1
+    # unhealthy = /api/health's 503: live times or the timetable stale. Shown in docker ps; nothing restarts on it.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8792/api/health', timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      start_period: 300s
 volumes:
   yeg-data:
