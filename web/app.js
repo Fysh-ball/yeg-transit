@@ -15,6 +15,13 @@ try {
     localStorage.setItem("yeg.n10", "1");
   }
 } catch (e) { console.warn("n10:", e.message); }
+// Just moved here from yegbus.com (index.html's #move): say so once, with the home-screen hint.
+try {
+  if (localStorage.getItem("yeg.moved") === "1") {
+    $("#moved").hidden = false;
+    $("#moved button").onclick = () => { $("#moved").hidden = true; try { localStorage.setItem("yeg.moved", "2"); } catch {} };
+  }
+} catch (e) { console.warn("moved:", e.message); }
 
 function load() {
   try { return clean(JSON.parse(localStorage.getItem(KEY))); } catch { return []; }

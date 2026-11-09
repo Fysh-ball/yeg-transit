@@ -12,19 +12,25 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="google-adsense-account" content="ca-pub-7605167409778469">
 <script>
-// Moved to yegbus.com. Saved stops live per domain, so bus.fysh.site hands them over in the URL fragment,
-// which browsers never send to a server. The old Android app (v14) stays put: it opens other hosts in the browser.
-if (location.hostname === "bus.fysh.site" && !window.YegApp) {
+// Moved to canadabus.org (2026-11; before that bus.fysh.site to yegbus.com). Saved stops live per domain, so an old
+// host hands them over in the URL fragment, which browsers never send to a server. yegbus.com stays ours for good
+// (a forward, never sold). The Android app stays put: old builds load yegbus.com and open other hosts in the browser.
+const MOVE_KEYS = ["yeg.stops", "yeg.theme", "yeg.board", "yeg.tips", "yeg.look", "yeg.night", "yeg.widget"];
+if (["bus.fysh.site", "yegbus.com", "www.yegbus.com"].includes(location.hostname) && !window.YegApp) {
   const m = { hash: location.hash };
   try {
-    for (const k of ["yeg.stops", "yeg.theme", "yeg.board", "yeg.tips"]) { const v = localStorage.getItem(k); if (v != null) m[k] = v; }
+    for (const k of MOVE_KEYS) { const v = localStorage.getItem(k); if (v != null) m[k] = v; }
     if (m["yeg.stops"]) m["yeg.stops"] = JSON.stringify(JSON.parse(m["yeg.stops"]).map(({ tt, ...s }) => s)); // timetables refetch
   } catch (e) { console.warn("move:", e.message); }
-  location.replace("https://yegbus.com/" + location.search + "#move=" + encodeURIComponent(JSON.stringify(m)));
+  location.replace("https://canadabus.org/" + location.search + "#move=" + encodeURIComponent(JSON.stringify(m)));
 } else if (location.hash.startsWith("#move=")) {
   try {
     const m = JSON.parse(decodeURIComponent(location.hash.slice(6)));
-    if (!(JSON.parse(localStorage.getItem("yeg.stops")) || []).length) for (const k of ["yeg.stops", "yeg.theme", "yeg.board", "yeg.tips"]) if (typeof m[k] === "string") localStorage.setItem(k, m[k]);
+    // Only into an empty phone: a #move link can come from anyone, so it never replaces stops already here.
+    if (!(JSON.parse(localStorage.getItem("yeg.stops")) || []).length) {
+      for (const k of MOVE_KEYS) if (typeof m[k] === "string") localStorage.setItem(k, m[k]);
+      if (m["yeg.stops"]) localStorage.setItem("yeg.moved", "1"); // app.js says so once
+    }
     history.replaceState(null, "", location.pathname + location.search + (m.hash || ""));
   } catch (e) { console.warn("move:", e.message); history.replaceState(null, "", location.pathname + location.search); }
 }
@@ -97,6 +103,7 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
 <div id="nosave" role="alert" hidden><b>Your stops can't be saved.</b> This browser is blocking site data for yegbus.com, so they're gone when you close it. iPhone: Settings &rarr; Apps &rarr; Safari &rarr; turn off <b>Block All Cookies</b>. Android Chrome: tap the icon left of the address &rarr; <b>Cookies and site data</b> &rarr; allow.</div>
 <div id="stale" role="status" hidden><span></span><button type="button" id="stale-reload">Refresh</button></div>
 <div id="undo" role="status" hidden><span></span><button type="button">Undo</button></div>
+<div id="moved" role="status" hidden><span>Your stops moved here from yegbus.com. On your home screen? Add this page there too, then remove the old one.</span><button type="button">OK</button></div>
 
 <section id="add" hidden>
   <form id="search-form">

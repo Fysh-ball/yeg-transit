@@ -14,13 +14,19 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-/** The app is yegbus.com in a WebView; the page hands its saved stops to the widget through YegApp.sync. */
+/** The app is canadabus.org in a WebView; the page hands its saved stops to the widget through YegApp.sync. */
 public class MainActivity extends Activity {
-    static final String SITE = "https://yegbus.com/";
+    static final String SITE = "https://canadabus.org/";
+    // Our old address, kept for good (a forward, never sold): a page restored from before the move still counts as ours.
+    static final String OLD = "https://yegbus.com/";
     private WebView web;
     private String geoOrigin;
     private GeolocationPermissions.Callback geoCallback;
-    private volatile boolean ours = true; // the page on screen is yegbus.com: only it may write the widget's stops
+    private volatile boolean ours = true; // the page on screen is ours: only it may write the widget's stops
+
+    static boolean ours(String url) {
+        return url != null && (url.startsWith(SITE) || url.startsWith(OLD));
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -37,13 +43,13 @@ public class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) {
-                ours = url.startsWith(SITE); // a load shouldOverrideUrlLoading never sees (a POST) can't use the bridge
+                ours = ours(url); // a load shouldOverrideUrlLoading never sees (a POST) can't use the bridge
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
                 Uri u = r.getUrl();
-                if (SITE.startsWith(u.getScheme() + "://" + u.getHost() + "/")) return false;
+                if (ours(u.getScheme() + "://" + u.getHost() + "/")) return false;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, u)); // sms:, OpenStreetMap credits, anything off-site
                 } catch (Exception e) {
@@ -56,7 +62,7 @@ public class MainActivity extends Activity {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback cb) {
                 if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                    cb.invoke(origin, SITE.startsWith(origin), false); // only our own page gets the location
+                    cb.invoke(origin, ours(origin.endsWith("/") ? origin : origin + "/"), false); // only our own page gets the location
                     return;
                 }
                 geoOrigin = origin;
