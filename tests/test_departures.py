@@ -112,3 +112,13 @@ class LoopTrip(unittest.TestCase):
                 mock.patch("sys.stderr", io.StringIO()):
             live.poll()
         self.assertEqual(live.trips["t"][0]["5212"], now + 600)
+
+    def test_a_bus_running_40_min_late_on_a_trip_due_35_min_ago_shows(self):  # audit 2026-11-08: the window was now-30 min
+        now, seen = int(time.time()), []
+        def sched(db, stop, start, end):
+            seen.append(start)
+            return [{"trip": "t", "seq": 11, "sched": now - 2100, "route": "201"}] if start <= now - 2100 else []
+        with mock.patch.object(app, "scheduled", sched), mock.patch.object(app.LIVE, "trips", {"t": ({}, 2400, {})}), \
+                mock.patch.object(app.LIVE, "vehicles", {}), mock.patch.object(app.LIVE, "ts", now):
+            out = app.departures(fixture(), "1797", 8)
+        self.assertEqual([d["time"] - now for d in out], [300])

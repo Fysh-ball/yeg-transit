@@ -280,6 +280,7 @@ def scheduled(db, stop_id, start, end):
     return out
 
 
+LATE_MAX = 2 * 3600  # the latest a bus runs that we still show
 BUS_SPEED = 8  # m/s, straight line: buses at WEM TC made 6.5 to 13 on 2026-10-22, stops and lights included
 TRAINS = {"Capital", "Metro", "Valley"}
 
@@ -288,7 +289,8 @@ def departures(db, stop_id, n):
     now = int(time.time())
     here = db.execute("SELECT lat, lon FROM stops WHERE stop_id=?", (stop_id,)).fetchone()
     out = []
-    for d in scheduled(db, stop_id, now - 1800, now + 3 * 3600):
+    # From 2 h back on the timetable: a bus 40 min late on a trip due 35 min ago is still coming (t >= now - 30 trims).
+    for d in scheduled(db, stop_id, now - LATE_MAX, now + 3 * 3600):
         live = LIVE.trip(d["trip"])
         t, seq = d["sched"], d.pop("seq")
         if live:
