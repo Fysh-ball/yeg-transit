@@ -51,13 +51,16 @@ def main():
         os.fsync(fd)
     finally:
         os.close(fd)
-    # The QR is drawn before the swap: if qrencode fails, the old secret (and his Aegis entry) still work.
+    # The QR is drawn before the swap: if qrencode fails or this is cut short, the old secret (and his Aegis entry)
+    # still work, and the unused new one is removed.
     try:
         subprocess.run(["qrencode", "-t", "PNG" if png else "ansiutf8", "-o", "-"], input=uri.encode(), check=True, timeout=30)
+        os.replace(tmp, path)
     except (OSError, subprocess.SubprocessError) as e:
-        os.unlink(tmp)
         sys.exit(f"qrencode failed ({e}); secret unchanged")
-    os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
     print(f"{action}: new secret in place; scan it into Aegis as kill-switch {label}. The old code stops working now.",
           file=sys.stderr)
 

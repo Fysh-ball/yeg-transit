@@ -383,7 +383,9 @@ class Receiver:
         """Only a passkey holder gets here (the code is inside the verified signature), so only they can use up the cap."""
         now = self.clock()
         fails = [t for t in self.state["totp_fails"].get(action, []) if 0 <= now - t < 3600]
-        if len(fails) >= TOTP_FAILS:
+        # LOCK is never shut by the cap: a stolen passkey could otherwise burn it and keep the owner from locking.
+        # Guessing a LOCK code is still one passkey touch per try (~10^6 / 3 tries), and each wrong one is loud.
+        if len(fails) >= TOTP_FAILS and action != "kill-on":
             raise Refused(f"{TOTP_FAILS} wrong codes for {action} this hour: refused until {time.strftime('%H:%M', time.localtime(min(fails) + 3600))}", loud=True)
         # After a power cut the clock may be days off until NTP answers: say so, and don't count it as a wrong code.
         if not self.clock_synced():
@@ -463,6 +465,8 @@ class Receiver:
                 self.state["kill_state"] = before
                 self.save()
                 raise
+            except Refused as e:
+                return f"{self.box}: the lock command started and failed ({e}); it may be partly locked, treated as LOCKED"
             return f"{self.box}: locking now; recovery is console-only"
         raise Refused("unknown action")
 

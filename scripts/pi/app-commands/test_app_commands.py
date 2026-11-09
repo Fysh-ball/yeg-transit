@@ -476,7 +476,7 @@ class LiveConfigWithHarmlessActuators(unittest.TestCase):
         self.r = Rig(dry_run=False, ks_dry=False)
         with open(self.r.rx.cfg["killswitch_config"], "w") as f:
             json.dump({"dry_run": False, "lock_command": ["false"]}, f)
-        self.assertIn("actuator failed", self.r.two_step("kill-on")[1]["result"])
+        self.assertIn("may be partly locked, treated as LOCKED", self.r.two_step("kill-on")[1]["result"])
         self.assertEqual(self.r.rx.state["kill_state"], "LOCKED")
 
     def test_timed_out_actuators_are_treated_as_acted(self):
@@ -624,13 +624,18 @@ class SecondFactor(unittest.TestCase):
 
     def test_five_wrong_codes_shut_that_command_for_an_hour(self):
         for i in range(acr.TOTP_FAILS):
-            self.assertIn(f"({i + 1} of 5", self.result("kill-on", code="000000" if i % 2 else "999999"))
-        self.assertIn("5 wrong codes", self.result("kill-on"))  # even the right code
+            self.assertIn(f"({i + 1} of 5", self.result("kill-off", code="000000" if i % 2 else "999999"))
+        self.assertIn("5 wrong codes", self.result("kill-off"))  # even the right code
         self.assertEqual(self.result("kill-arm"), "pi: ARMED")  # other commands still work
         self.r.rx.__init__(self.r.rx.cfg)  # the count survives a restart
         self.r.rx.clock = lambda: self.r.t
-        self.assertIn("5 wrong codes", self.result("kill-on"))
+        self.assertIn("5 wrong codes", self.result("kill-off"))
         self.r.t += 3600
+        self.assertEqual(self.result("kill-off"), "pi: DISARMED")
+
+    def test_wrong_codes_never_shut_lock(self):  # a stolen passkey must not be able to keep the owner from locking
+        for _ in range(acr.TOTP_FAILS + 2):
+            self.assertIn("wrong code", self.result("kill-on", code="000000"))
         self.assertEqual(self.result("kill-on"), "dry run: would lock pi")
 
     def test_unsynced_clock_refuses_without_counting(self):
