@@ -1,6 +1,6 @@
 {
-  "name": "YEG Bus",
-  "short_name": "YEG Bus",
+  "name": "Canada Bus",
+  "short_name": "Canada Bus",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0d1117",

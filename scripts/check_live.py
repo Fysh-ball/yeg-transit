@@ -1,9 +1,9 @@
 """Do the live times people see match ETS's own feed? Exits 1 and says which bus when they don't.
 
 Run after every release and every 15 min (docs/SETUP.md). Asks the public site, so it checks what a phone gets.
-    .venv/bin/python scripts/check_live.py [--page] [https://yegbus.com]
+    .venv/bin/python scripts/check_live.py [--page] [https://canadabus.org]
 
-Exit 1: a wrong time. Exit 3: yegbus.com or ETS didn't answer, twice 20 s apart (a laptop switching networks isn't a
+Exit 1: a wrong time. Exit 3: the site or ETS didn't answer, twice 20 s apart (a laptop switching networks isn't a
 wrong time; 2026-10-26 11:16). With --page (the 15-min timer), exit 1 only for a stop and route not already paged in
 the last 6 h, and exit 3 at most once an hour; every WRONG line is still printed, and a fault already paged exits 4,
 so a timer that keeps failing never reads as green. Without it, every wrong time fails.
@@ -70,7 +70,7 @@ def due(keys, page):
 
 def main(argv=sys.argv[1:]):
     page = "--page" in argv
-    site = next((a for a in argv if not a.startswith("--")), "https://yegbus.com").rstrip("/")
+    site = next((a for a in argv if not a.startswith("--")), "https://canadabus.org").rstrip("/")
     try:
         wrong, keys, checked = check(site)
     except Unreachable as e:  # ETS's own feed: nothing to compare with

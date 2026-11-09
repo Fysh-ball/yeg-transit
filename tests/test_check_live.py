@@ -64,7 +64,7 @@ class CheckLive(unittest.TestCase):
 
     def answers(self, *site_answers, ets=None, vp=None):
         return {check_live.RT_URL: [ets or ets_feed()], check_live.VP_URL: [vp or empty().SerializeToString()],
-                "https://yegbus.com/api/stops/1407/departures": list(site_answers)}
+                "https://canadabus.org/api/stops/1407/departures": list(site_answers)}
 
     def test_a_right_time_passes(self):
         self.assertEqual(self.run_check(self.answers(site(45)))[0], 0)

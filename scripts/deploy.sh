@@ -8,7 +8,7 @@ C=${DEPLOY_CONF:-scripts/deploy.conf}
 [ -f "$C" ] && . "./$C"
 H=${DEPLOY_HOST:?set DEPLOY_HOST=user@host in scripts/deploy.conf}
 D=${DEPLOY_DIR:?set DEPLOY_DIR=/path/to/stack in scripts/deploy.conf}
-# The TrueNAS copy itself: yegbus.com is Cloudflare Pages now (built from GitHub on push), so it would not show this deploy.
+# The TrueNAS copy itself: canadabus.org (and yegbus.com) is Cloudflare Pages (built from GitHub on push), so it would not show this deploy.
 SITE=${SITE:-https://bus.fysh.site}
 DK=${DEPLOY_DOCKER:-docker} # "sudo -n docker" where the user is not in the docker group
 # A shared box can run the build under a RAM lock (DEPLOY_WRAP="ramlock run yeg-transit-deploy 2 --"); empty runs it directly.

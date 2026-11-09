@@ -989,7 +989,7 @@ $("#ob-near").onclick = () => { setAdd(true, false); $("#near").click(); };
 for (const [b, hint, mode] of [["#ob-addr", "Type an address or place", "search"], ["#ob-code", "Stop number, on the sign", "numeric"]])
   $(b).onclick = () => { $("#q").placeholder = hint; $("#q").inputMode = mode; setAdd(true); };
 // In the Android app the page is already installed: point at the widget instead of the browser's install menu.
-if (window.YegApp) $("#tip-handy").innerHTML = "<b>Widget:</b> hold your home screen &rarr; <b>Widgets</b> &rarr; <b>YEG Bus</b>.";
+if (window.YegApp) $("#tip-handy").innerHTML = "<b>Widget:</b> hold your home screen &rarr; <b>Widgets</b> &rarr; <b>Canada Bus</b>.";
 if (!storageOk()) $("#nosave").hidden = false;
 // iPhone: a home-screen app starts with empty storage, so stops saved in Safari aren't there.
 if (navigator.standalone && !stops.length) $("#ios-own").hidden = false;
@@ -1160,4 +1160,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=111").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=112").catch((e) => console.warn("sw:", e.message));

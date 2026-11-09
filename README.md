@@ -1,6 +1,6 @@
-# YEG Bus
+# Canada Bus
 
-Live Edmonton Transit Service (ETS) bus and LRT arrivals to your stops. Live at [yegbus.com](https://yegbus.com).
+Live Edmonton Transit Service (ETS) bus and LRT arrivals to your stops. Live at [canadabus.org](https://canadabus.org) (yegbus.com forwards there).
 
 - Save your stops, grouped by Home, School, Work or make your own. No account.
 - Live countdowns from ETS's GPS feed, and the bus on a map with how many stops away it is.
@@ -13,7 +13,7 @@ Not an official ETS app.
 
 <p>
   <img src="docs/screenshots/app.jpg" width="250" alt="Android app: next buses at West Edmonton Mall Transit Centre">
-  <img src="docs/screenshots/web.jpg" width="250" alt="yegbus.com in a phone browser">
+  <img src="docs/screenshots/web.jpg" width="250" alt="canadabus.org in a phone browser">
 </p>
 <img src="docs/screenshots/widget.jpg" width="510" alt="Android home-screen widget showing the next 54, 917 and 907">
 
@@ -23,7 +23,7 @@ Not an official ETS app.
 |---|---|
 | `server/app.py` | One Python file, standard library plus the GTFS-realtime bindings. Imports the ETS GTFS schedule into SQLite nightly, polls trip updates, and vehicle positions every 10 s and alerts every 5 min, and serves a small JSON API under `/api/` plus the static web app. |
 | `web/` | The web app: plain HTML, CSS and JavaScript, no build step. `sw.js` caches the app shell for offline starts; each saved stop keeps its own 30-hour timetable in `localStorage`. |
-| `android/` | A WebView around yegbus.com plus a home-screen widget. Built with the bare SDK tools by `android/build.sh` (no Gradle). |
+| `android/` | A WebView around canadabus.org plus a home-screen widget. Built with the bare SDK tools by `android/build.sh` (no Gradle). |
 | `server/places.json` | Named places from OpenStreetMap so place search answers instantly. Rebuild with `scripts/places.sh`. |
 
 Outside services, all free: ETS GTFS and GTFS-realtime (gtfs.edmonton.ca), City of Edmonton address data, [Photon](https://photon.komoot.io) for place search, [Open-Meteo](https://open-meteo.com) for weather, OpenStreetMap tiles and Leaflet (from cdnjs) for maps.

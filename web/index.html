@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>YEG Bus: live Edmonton bus &amp; LRT</title>
+<title>Canada Bus: live Edmonton bus &amp; LRT</title>
 <meta name="description" content="Your next bus and train, live. No signal? You still get the timetable.">
 <meta name="theme-color" content="#eef1f5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://canadabus.org/">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -51,11 +52,11 @@ if (window.YegApp || navigator.standalone || matchMedia("(display-mode: standalo
 if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add button can float
 // The app's bridge (YegApp) is open to every frame in the page, so in the app no frame may load at all.
 if (window.YegApp) document.head.append(Object.assign(document.createElement("meta"), { httpEquiv: "Content-Security-Policy", content: "frame-src 'none'" }));</script>
-<link rel="stylesheet" href="style.css?v=111">
+<link rel="stylesheet" href="style.css?v=112">
 </head>
 <body>
 <header>
-  <div class="brand"><img src="icon.svg" alt=""><h1>YEG Bus</h1></div>
+  <div class="brand"><img src="icon.svg" alt=""><h1>Canada Bus</h1></div>
   <span id="clock"></span>
   <button id="live-map" class="icon-btn" type="button" aria-label="Every bus, live map" title="Every bus, live">
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>
@@ -94,13 +95,13 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
     <option value="off">Off</option>
   </select></label>
   <p class="hint">Wall board shows big times and a clock and keeps the screen on, for a tablet by the door. At night it turns dark and faint; a web page can't lower the screen's own light, so turn the tablet's brightness down too.</p>
-  <p class="links"><a href="guide.html">How to use YEG Bus</a><a href="about.html">About</a><a href="privacy.html">Privacy</a><a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
+  <p class="links"><a href="guide.html">How to use Canada Bus</a><a href="about.html">About</a><a href="privacy.html">Privacy</a><a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
   <p class="hint">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.</p>
   <p class="hint" id="version"></p>
 </section>
 
 <div id="offline" role="status" hidden></div>
-<div id="nosave" role="alert" hidden><b>Your stops can't be saved.</b> This browser is blocking site data for yegbus.com, so they're gone when you close it. iPhone: Settings &rarr; Apps &rarr; Safari &rarr; turn off <b>Block All Cookies</b>. Android Chrome: tap the icon left of the address &rarr; <b>Cookies and site data</b> &rarr; allow.</div>
+<div id="nosave" role="alert" hidden><b>Your stops can't be saved.</b> This browser is blocking site data for this site, so they're gone when you close it. iPhone: Settings &rarr; Apps &rarr; Safari &rarr; turn off <b>Block All Cookies</b>. Android Chrome: tap the icon left of the address &rarr; <b>Cookies and site data</b> &rarr; allow.</div>
 <div id="stale" role="status" hidden><span></span><button type="button" id="stale-reload">Refresh</button></div>
 <div id="undo" role="status" hidden><span></span><button type="button">Undo</button></div>
 <div id="moved" role="status" hidden><span>Your stops moved here from yegbus.com. On your home screen? Add this page there too, then remove the old one.</span><button type="button">OK</button></div>
@@ -152,13 +153,13 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
 <footer>
   <section id="intro">
     <h2>Edmonton bus times for the stops you use</h2>
-    <p>YEG Bus shows when the next Edmonton Transit Service bus or LRT train reaches your stop, counting down in minutes from live GPS data. Save the stops by home, work or school once and they open first every time, with no account and no searching. Pick only the routes you ride, set your walk to the stop and it tells you when to leave, and watch a transfer to see if your connection is on track.</p>
+    <p>Canada Bus shows when the next Edmonton Transit Service bus or LRT train reaches your stop, counting down in minutes from live GPS data. Save the stops by home, work or school once and they open first every time, with no account and no searching. Pick only the routes you ride, set your walk to the stop and it tells you when to leave, and watch a transfer to see if your connection is on track.</p>
     <p>When your phone has no data, saved stops still show the timetable, and a button texts the stop number to ETS's 31100 service for live times. When ETS closes a stop for construction, the card tells you and offers the replacement stop. Turn a tablet sideways for a wall board by the front door, or add the Android widget to your home screen.</p>
-    <p><a href="guide.html">How to use YEG Bus</a> &middot; <a href="about.html">About</a> &middot; <a href="about.html#contact">Contact</a></p>
+    <p><a href="guide.html">How to use Canada Bus</a> &middot; <a href="about.html">About</a> &middot; <a href="about.html#contact">Contact</a></p>
   </section>
   <p class="legal">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
   <a href="guide.html">Help</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
 </footer>
-<script src="app.js?v=111"></script>
+<script src="app.js?v=112"></script>
 </body>
 </html>
