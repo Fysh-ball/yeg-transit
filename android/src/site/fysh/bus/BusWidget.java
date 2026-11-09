@@ -85,11 +85,15 @@ public class BusWidget extends AppWidgetProvider {
                     m.updateAppWidget(id, build(c, o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250),
                         o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 110)));
                 }
-                if (ids.length > 0) c.getSystemService(AlarmManager.class)
-                    .set(AlarmManager.RTC, (System.currentTimeMillis() / 60000 + 1) * 60000, tick(c));
             } catch (Exception e) {
                 android.util.Log.w("yeg", "widget update failed: " + e);
             } finally {
+                try { // re-armed whatever failed above: a missed tick freezes the widget looking current
+                    if (AppWidgetManager.getInstance(c).getAppWidgetIds(new ComponentName(c, BusWidget.class)).length > 0)
+                        c.getSystemService(AlarmManager.class).set(AlarmManager.RTC, (System.currentTimeMillis() / 60000 + 1) * 60000, tick(c));
+                } catch (Exception e) {
+                    android.util.Log.w("yeg", "widget alarm: " + e);
+                }
                 done.finish();
             }
         }).start();
@@ -169,7 +173,8 @@ public class BusWidget extends AppWidgetProvider {
                 android.util.Log.w("yeg", s.optString("name") + ": " + e);
                 if (!blocked.isEmpty()) { offline = true; continue; } // said once below, not per stop
                 failed = true;
-                v.addView(R.id.rows, note(c, s.optString("name") + ": can't load, and no saved timetable yet.", fg));
+                v.addView(R.id.rows, note(c, s.optString("name") + (dropped(e) ? ": ETS no longer lists this stop."
+                    : ": can't load, and no saved timetable yet."), fg));
                 room -= 34;
             }
         }
@@ -409,7 +414,12 @@ public class BusWidget extends AppWidgetProvider {
         if (c.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             LocationManager lm = c.getSystemService(LocationManager.class);
             for (String provider : lm.getProviders(true)) {
-                Location l = lm.getLastKnownLocation(provider);
+                Location l;
+                try {
+                    l = lm.getLastKnownLocation(provider); // "gps" with coarse-only permission throws on some versions
+                } catch (SecurityException e) {
+                    continue;
+                }
                 if (l != null && (me == null || l.getTime() > me.getTime())) me = l;
             }
         }
@@ -434,7 +444,13 @@ public class BusWidget extends AppWidgetProvider {
     private static boolean departures(Context c, SharedPreferences p, JSONObject s, int extra, List<JSONObject> deps, List<long[]> order,
                                       java.util.Set<String> alerts, int maxAge) throws Exception {
         String id = Uri.encode(s.optString("id")), key = "tt:" + s.optString("id");
-        JSONObject tt = new JSONObject(p.getString(key, "{}"));
+        JSONObject tt;
+        try {
+            tt = new JSONObject(p.getString(key, "{}"));
+        } catch (Exception e) { // a bad saved copy must not break the stop for good: drop it, the top-up below refills it
+            p.edit().remove(key).apply();
+            tt = new JSONObject();
+        }
         JSONArray all;
         long now;
         boolean offline = false;
@@ -449,9 +465,10 @@ public class BusWidget extends AppWidgetProvider {
             // a reused answer: the server's "now" moved on by as long as the phone's has since it came
             now = r.getLong("now") + System.currentTimeMillis() / 1000 - r.getLong("phone");
             all = r.getJSONArray("departures");
-            if (r.optLong("live_age") > 120) { // ETS's feed stalled: its last predictions aren't live any more, as the page says
+            long la = r.optLong("live_age") + System.currentTimeMillis() / 1000 - r.getLong("phone"); // a reused answer ages too
+            if (la > 120) { // ETS's feed stalled: its last predictions aren't live any more, as the page says
                 alerts.add("Times may be out of date (last live " + DateFormat.getTimeFormat(c)
-                    .format(new java.util.Date((now - r.optLong("live_age")) * 1000)) + ").");
+                    .format(new java.util.Date((now - la) * 1000)) + ").");
                 for (int i = 0; i < all.length(); i++) all.getJSONObject(i).put("live", false);
             }
             JSONArray al = r.optJSONArray("alerts");
@@ -462,14 +479,16 @@ public class BusWidget extends AppWidgetProvider {
                 alerts.add((use != null && use.length() > 0 ? "Use #" + use.getJSONObject(0).optString("code") + ": " : "") + a.optString("head"));
             }
             if (tt.optLong("to") - now < 12 * 3600) try { // same 12 h top-up rule as the page
-                p.edit().putString(key, get(MainActivity.SITE + "api/stops/" + id + "/timetable?hours=30")).apply();
+                String body = get(MainActivity.SITE + "api/stops/" + id + "/timetable?hours=30");
+                new JSONObject(body).getJSONArray("rows"); // only a real timetable replaces the saved one
+                p.edit().putString(key, body).apply();
             } catch (Exception e) {
                 android.util.Log.w("yeg", "timetable: " + e);
             }
         } catch (Exception e) {
             android.util.Log.w("yeg", "stop " + id + ", using the saved timetable: " + e);
             JSONArray rows = tt.optJSONArray("rows");
-            if (rows == null) throw e;
+            if (rows == null || dropped(e)) throw e; // a stop ETS dropped: its saved times would send you to a dead stop
             offline = true;
             now = System.currentTimeMillis() / 1000;
             all = new JSONArray();
@@ -527,13 +546,27 @@ public class BusWidget extends AppWidgetProvider {
         return t;
     }
 
+    /** The server's own answer that ETS no longer lists this stop (not any 404: an edge or proxy 404 is just "down"). */
+    private static boolean dropped(Exception e) {
+        String m = String.valueOf(e.getMessage());
+        return m.startsWith("HTTP 404") && m.contains("no such stop");
+    }
+
     private static String get(String url) throws Exception {
         HttpURLConnection h = (HttpURLConnection) new URL(url).openConnection();
         h.setConnectTimeout(4000);
         h.setReadTimeout(4000);
         h.setRequestProperty("User-Agent", "YEGBus-Android/1"); // Cloudflare turns away blank and library agents
         try {
-            if (h.getResponseCode() != 200) throw new Exception("HTTP " + h.getResponseCode());
+            if (h.getResponseCode() != 200) { // the body says why: {"error": "no such stop"} is the stop gone, not us offline
+                String why = "";
+                try (InputStream er = h.getErrorStream()) {
+                    if (er != null) why = new String(er.readNBytes(200), "UTF-8");
+                } catch (Exception e) {
+                    why = e.toString();
+                }
+                throw new Exception("HTTP " + h.getResponseCode() + " " + why);
+            }
             try (InputStream in = h.getInputStream()) {
                 return new String(in.readAllBytes(), "UTF-8");
             }
