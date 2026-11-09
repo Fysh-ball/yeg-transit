@@ -1,0 +1,21 @@
+#!/bin/sh
+# defib-tn-alert: send defib-tn's queued alerts to Lumi's app (pi-defib-tn row). Replaces its Telegram messages
+# (owner, 2026-11-09: "nothing at all connected to telegram"). Runs as root (the spool relay key is root's), started
+# by defib-tn-alert.path while the queue exists. The queue dir is oneadmin's, so the file is moved and read AS
+# oneadmin: a symlink planted there can't make root read a file oneadmin couldn't.
+# A fire happens while TrueNAS (which holds the app) is down, so a failed send puts the lines back and exits 1; the
+# path unit starts it again, about once a minute, until TrueNAS answers. Nothing is dropped.
+Q=${DEFIB_ALERT_DIR:-/var/spool/defib-tn}
+NOTIFY=${SPOOL_NOTIFY:-/usr/local/bin/spool-notify}  # both overridable for the stub test only
+sleep "${DEFIB_ALERT_BATCH:-60}"   # one row per burst: a fire queues several lines over minutes
+cd "$Q" || exit 1
+lines=$(runuser -u oneadmin -- sh -c '{ [ -e alerts.sending ] || mv alerts alerts.sending; } 2>/dev/null && cat alerts.sending && rm -f alerts.sending')
+[ -n "$lines" ] || exit 0
+result=ok
+printf '%s\n' "$lines" | grep -qE 'ABORT|FAILED|CRITICAL|STILL unreachable|WARNING|ALERT' && result=failed
+printf '%s\n' "$lines" | tail -c 1900 | "$NOTIFY" pi-defib-tn "$result" && exit 0
+rc=$?
+# Not delivered: put the lines back in front of anything queued meanwhile.
+printf '%s\n' "$lines" | runuser -u oneadmin -- sh -c '{ cat - && { cat alerts 2>/dev/null || true; }; } > alerts.new && mv alerts.new alerts'
+logger -t defib-tn-alert "NOTIFY FAILED (rc $rc): kept in $Q/alerts, retrying"
+exit 1

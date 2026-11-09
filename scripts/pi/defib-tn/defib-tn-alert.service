@@ -1,0 +1,10 @@
+# /etc/systemd/system/defib-tn-alert.service
+[Unit]
+Description=Send defib-tn alerts to Lumi's app
+# The path unit restarts it while the queue stays; no start limit, so a long TrueNAS outage can't stop the retries.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/defib-tn-alert
+TimeoutStartSec=180

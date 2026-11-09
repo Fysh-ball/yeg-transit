@@ -1,0 +1,9 @@
+# /etc/systemd/system/defib-tn-alert.path
+[Unit]
+Description=Watch the defib-tn alert queue
+
+[Path]
+PathExists=/var/spool/defib-tn/alerts
+
+[Install]
+WantedBy=multi-user.target

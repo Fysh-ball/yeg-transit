@@ -1,0 +1,2 @@
+# /etc/tmpfiles.d/defib-tn.conf: the alert queue dir; defib-tn runs as oneadmin and cannot create it under /var/spool.
+d /var/spool/defib-tn 0750 oneadmin oneadmin -

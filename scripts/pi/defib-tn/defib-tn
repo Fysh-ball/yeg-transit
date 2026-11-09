@@ -1,0 +1,308 @@
+#!/usr/bin/env python3
+"""defib-tn: manual, human-triggered TrueNAS defibrillator.
+
+Autonomy was removed after an incident: the old autonomous watchdog cut TrueNAS
+power because the Pi's *route* to TrueNAS was hijacked (a tailscale subnet-route
+blackhole) while the Pi's gateway stayed reachable. Its single gateway self-check
+could not tell "TrueNAS is dead" apart from "my path to TrueNAS is broken", so it
+fired on missing information.
+
+This tool NEVER fires on missing/ambiguous information. `fire` proceeds only when
+ALL of these hold, otherwise it reports why and aborts:
+  * TrueNAS is unreachable on the LAN (.86, ICMP+TCP 22/443/80) AND via the
+    tailnet (100.64.0.5) - a second, independent vantage point. If it answers on
+    either, it is ALIVE and we refuse.
+  * The Pi's own network is healthy (gateway AND internet reachable).
+  * The route to TrueNAS leaves via the real LAN interface, not a tailscale/tun
+    device. A hijacked or undeterminable route == missing information == abort.
+
+Usage:
+  defib-tn status            # assess only, print report, no action
+  defib-tn status --tg       # also send the report to Lumi's app (flag name kept)
+  defib-tn fire              # gated power-cycle (aborts unless positively safe)
+  defib-tn fire --force      # explicit human override of the liveness gate
+"""
+import os
+import re
+import socket
+import subprocess
+import sys
+import time
+
+TRUENAS_IP = os.environ.get("TRUENAS_IP", "192.168.1.86")
+TRUENAS_TS_IP = os.environ.get("TRUENAS_TS_IP", "100.64.0.5")
+GATEWAY_IP = os.environ.get("GATEWAY_IP", "192.168.1.254")
+INTERNET_IP = os.environ.get("INTERNET_IP", "1.1.1.1")
+TCP_PORTS = [22, 443, 80]
+# Alerts queue here; defib-tn-alert (root, from defib-tn-alert.path) sends them to Lumi's app with spool-notify and
+# keeps retrying while TrueNAS, which holds the app, is down. Telegram is gone (owner, 2026-11-09).
+ALERT_QUEUE = os.environ.get("DEFIB_ALERT_QUEUE", "/var/spool/defib-tn/alerts")
+DEFIB_ENV = "/etc/truenas-defib/defib.env"
+CORE_PATH = "/usr/local/bin/truenas-defib-core.py"
+WOL_WAIT, AC_CUT, POST_AC = 90, 10, 180
+
+
+def run(args, timeout=20):
+    return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+
+
+def ping(ip, timeout=3):
+    try:
+        return run(["ping", "-c", "1", "-W", str(timeout), ip], timeout=timeout + 5).returncode == 0
+    except Exception:
+        return False
+
+
+def tcp_alive(ip, ports=TCP_PORTS, timeout=4):
+    for p in ports:
+        try:
+            with socket.create_connection((ip, p), timeout=timeout):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def route_dev(ip):
+    """Interface the kernel would use to reach ip, or None if undeterminable."""
+    for ipbin in ("ip", "/usr/sbin/ip", "/sbin/ip", "/usr/bin/ip"):
+        try:
+            r = run([ipbin, "route", "get", ip], timeout=5)
+        except FileNotFoundError:
+            continue
+        except Exception:
+            return None
+        if r.returncode == 0:
+            m = re.search(r"\bdev\s+(\S+)", r.stdout)
+            return m.group(1) if m else None
+        return None
+    return None
+
+
+def dry_run():
+    v = os.environ.get("DRY_RUN")
+    if v is None:
+        try:
+            for line in open(DEFIB_ENV):
+                line = line.strip()
+                if line.startswith("DRY_RUN="):
+                    v = line.split("=", 1)[1].strip().strip("'\"")
+        except Exception as e:
+            # Do NOT swallow this. An unreadable config falls through to the
+            # "safe default" below and SILENTLY disarms the defibrillator: it
+            # reports "WOULD send WoL ... No action taken" while the operator
+            # believes it fired. /etc/truenas-defib is root:oneadmin 0750, so any
+            # other identity (e.g. claude-admin over ssh) lands here and gets a
+            # no-op in the one moment it has to work.
+            print("[defib-tn] WARNING: cannot read %s (%s) -> defaulting to "
+                  "DRY_RUN=1 (SIMULATE ONLY). Run as oneadmin or root to arm."
+                  % (DEFIB_ENV, e), file=sys.stderr)
+    if v is None:
+        v = "1"  # safe default: simulate unless explicitly armed
+    return v.strip().lower() not in ("0", "false", "no", "")
+
+
+def send_alert(msg):
+    """Queue one alert. Never raises: an alert must not stop or change a fire."""
+    try:
+        with open(ALERT_QUEUE, "a") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + msg.replace("\n", "\n    ") + "\n")
+            if os.geteuid() == 0:  # run by hand as root: hand the file to the queue dir's owner, or the sender can't read it
+                st = os.stat(os.path.dirname(ALERT_QUEUE))
+                os.fchown(f.fileno(), st.st_uid, st.st_gid)
+                os.fchmod(f.fileno(), 0o640)
+    except Exception as e:
+        try:
+            print(f"[defib-tn] ALERT NOT QUEUED ({e}): {msg}", file=sys.stderr)
+        except Exception:
+            pass
+
+
+KASA_PLUG = "/usr/local/bin/kasa-plug"
+
+
+def plug_status():
+    """(label, warning) for the server's Kasa plug. Never raises.
+
+    Exit codes come from kasa-plug: 0 ON, 8 OFF, 78 not configured, 3 the device
+    answered to a different name. Anything else is treated as unreachable rather
+    than guessed at, because "I could not tell" and "it is off" are different
+    answers and only one of them means power has already been cut.
+    """
+    if not os.path.exists(KASA_PLUG):
+        return "UNKNOWN", f"{KASA_PLUG} is missing; this host cannot switch power at all"
+    try:
+        r = subprocess.run(([] if os.geteuid() == 0 else ["sudo", "-n"]) +
+                           [KASA_PLUG, "state"],
+                           capture_output=True, text=True, timeout=45)
+    except subprocess.TimeoutExpired:
+        return "UNKNOWN", "kasa-plug did not answer within 45s; the plug may be off the network"
+    except OSError as e:
+        return "UNKNOWN", f"cannot run kasa-plug: {e}"
+    msg = (r.stderr or r.stdout).strip().splitlines()
+    msg = msg[-1][:180] if msg else f"exit {r.returncode}"
+    if r.returncode == 0:
+        return "ON", None
+    if r.returncode == 8:
+        return "OFF", "the server's plug reports OFF; a power-cycle would only turn it on"
+    if r.returncode == 77:
+        return "CREDENTIALS REFUSED", ("the plug answered and refused the login; the "
+                                       "stored TP-Link account or password is wrong for "
+                                       "this device, so a fire could not cut power")
+    if r.returncode == 78:
+        return "NOT CONFIGURED", ("plug credentials are not installed, so a fire would "
+                                  "send Wake-on-LAN and then STOP without cutting power")
+    if r.returncode == 3:
+        return "WRONG DEVICE", f"refusing to trust this address: {msg}"
+    return "UNREACHABLE", f"kasa-plug exit {r.returncode}: {msg}"
+
+
+def assess():
+    lan = ping(TRUENAS_IP) or tcp_alive(TRUENAS_IP)
+    ts = ping(TRUENAS_TS_IP) or tcp_alive(TRUENAS_TS_IP)
+    gw = ping(GATEWAY_IP)
+    inet = ping(INTERNET_IP)
+    dev = route_dev(TRUENAS_IP)
+    if dev is None:
+        hij = None
+    elif dev.startswith("tun") or dev.startswith("tailscale") or dev.startswith("ts"):
+        hij = True
+    else:
+        hij = False
+    alive = lan or ts
+    pi_net = gw and inet
+    reasons = []
+    if alive:
+        where = "+".join([w for w, ok in (("LAN", lan), ("tailnet", ts)) if ok])
+        reasons.append(f"TrueNAS still answers ({where}) -> ALIVE, refusing")
+    if not pi_net:
+        reasons.append(f"Pi network unhealthy (gateway={gw}, internet={inet}) -> can't trust probes")
+    if hij is True:
+        reasons.append(f"route to TrueNAS via '{dev}' (tailscale/tun) -> path hijacked, LAN probe untrustworthy")
+    if hij is None:
+        reasons.append("could not determine route to TrueNAS -> missing information")
+    safe = (not alive) and bool(pi_net) and (hij is False)
+    return dict(lan=lan, ts=ts, alive=alive, gw=gw, inet=inet, dev=dev, hij=hij,
+                pi_net=pi_net, safe=safe, reasons=reasons, dry=dry_run(),
+                plug=plug_status())
+
+
+def fmt(a):
+    lines = [
+        "defib-tn assessment:",
+        f"  TrueNAS LAN (.86)      : {'ALIVE' if a['lan'] else 'down'}",
+        f"  TrueNAS tailnet (.0.5) : {'ALIVE' if a['ts'] else 'down'}",
+        f"  Pi gateway/internet    : {'OK' if a['pi_net'] else 'DEGRADED'} (gw={a['gw']}, net={a['inet']})",
+        f"  route to .86 dev       : {a['dev']} (hijacked={a['hij']})",
+        f"  server plug            : {a['plug'][0]}",
+        f"  DRY_RUN                : {a['dry']}",
+        f"  SAFE TO FIRE           : {a['safe']}",
+    ]
+    if a["plug"][1]:
+        lines.append("  plug warning:")
+        lines.append(f"    - {a['plug'][1]}")
+    if a["reasons"]:
+        lines.append("  abort reasons:")
+        lines += [f"    - {r}" for r in a["reasons"]]
+    return "\n".join(lines)
+
+
+def load_core():
+    """Lazy-load the power-control core: Wake-on-LAN and the Kasa plug."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("truenas_defib_core", CORE_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def wait_recovery(seconds):
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if ping(TRUENAS_IP) or tcp_alive(TRUENAS_IP):
+            return True
+        time.sleep(10)
+    return ping(TRUENAS_IP) or tcp_alive(TRUENAS_IP)
+
+
+def do_fire(force, source):
+    a = assess()
+    report = fmt(a)
+    print(report)
+    send_alert(f"[defib-tn] FIRE requested ({source})\n{report}")
+    if not a["safe"] and not force:
+        m = "[defib-tn] ABORT: not safe to fire (see reasons). No action taken."
+        print(m)
+        send_alert(m)
+        return 2
+    if force and (a["alive"] or a["hij"] in (True, None)):
+        m = ("[defib-tn] WARNING: --force overriding safety gate (TrueNAS may be alive / "
+             "route uncertain). Proceeding by explicit human order.")
+        print(m)
+        send_alert(m)
+    if a["dry"]:
+        m = "[defib-tn][DRY_RUN=1] WOULD send WoL then cut and restore the server's Kasa plug. No action taken."
+        print(m)
+        send_alert(m)
+        return 0
+    try:
+        core = load_core()
+    except Exception as e:
+        m = f"[defib-tn] ABORT: cannot load power-control core ({e}). No action taken."
+        print(m)
+        send_alert(m)
+        return 1
+    st = core.read_state()
+    st["defib_active"] = True
+    st["last_defib_start"] = time.time()
+    core.write_state(st)
+    send_alert("[defib-tn] sending Wake-on-LAN...")
+    core.send_wol()
+    if wait_recovery(WOL_WAIT):
+        core.write_state({"defib_active": False, "last_recovery": time.time(), "method": "wol"})
+        m = "[defib-tn] TrueNAS recovered after Wake-on-LAN."
+        print(m)
+        send_alert(m)
+        return 0
+    send_alert("[defib-tn] WoL did not recover TrueNAS; cutting the server's Kasa plug...")
+    if not core.set_ac(False):
+        m = "[defib-tn] FAILED to switch the plug OFF; aborting. Power was NOT cut."
+        print(m)
+        send_alert(m)
+        return 1
+    time.sleep(AC_CUT)
+    if not core.set_ac(True):
+        m = "[defib-tn] CRITICAL: the plug is OFF and could not be switched back ON. The server has no power until a human intervenes."
+        print(m)
+        send_alert(m)
+        return 1
+    if wait_recovery(POST_AC):
+        core.write_state({"defib_active": False, "last_recovery": time.time(), "method": "kasa-plug"})
+        m = "[defib-tn] TrueNAS recovered after the plug power-cycle."
+        print(m)
+        send_alert(m)
+        return 0
+    m = "[defib-tn] STILL unreachable after WoL + plug power-cycle. Needs a human."
+    print(m)
+    send_alert(m)
+    return 1
+
+
+def main(argv):
+    args = argv[1:]
+    cmd = (args[0].lower() if args else "status")
+    force = ("--force" in args) or ("force" in args)
+    if cmd in ("status", "--check", "check", "assess", "-c"):
+        out = fmt(assess())
+        print(out)
+        if "--tg" in args or "tg" in args:
+            send_alert(out)
+        return 0
+    if cmd == "fire":
+        return do_fire(force, source="cli")
+    print(f"usage: {argv[0]} [status|fire [--force]]")
+    return 64
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
