@@ -26,6 +26,7 @@ import os
 import re
 import socket
 import subprocess
+import stat
 import sys
 import time
 
@@ -105,12 +106,19 @@ def dry_run():
 def send_alert(msg):
     """Queue one alert. Never raises: an alert must not stop or change a fire."""
     try:
-        with open(ALERT_QUEUE, "a") as f:
-            f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + msg.replace("\n", "\n    ") + "\n")
+        # The queue dir is oneadmin's, so a run as root must not follow a planted symlink or hard link.
+        fd = os.open(ALERT_QUEUE, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o640)
+        with os.fdopen(fd, "a") as f:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
+                raise OSError(f"{ALERT_QUEUE} is not a plain file; refusing to write")
             if os.geteuid() == 0:  # run by hand as root: hand the file to the queue dir's owner, or the sender can't read it
-                st = os.stat(os.path.dirname(ALERT_QUEUE))
-                os.fchown(f.fileno(), st.st_uid, st.st_gid)
-                os.fchmod(f.fileno(), 0o640)
+                d = os.stat(os.path.dirname(ALERT_QUEUE))
+                if st.st_uid not in (0, d.st_uid):
+                    raise OSError(f"{ALERT_QUEUE} has an unexpected owner; refusing to write")
+                os.fchown(fd, d.st_uid, d.st_gid)
+                os.fchmod(fd, 0o640)
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + msg.replace("\n", "\n    ") + "\n")
     except Exception as e:
         try:
             print(f"[defib-tn] ALERT NOT QUEUED ({e}): {msg}", file=sys.stderr)

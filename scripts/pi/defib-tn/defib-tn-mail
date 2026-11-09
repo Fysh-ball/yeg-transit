@@ -31,11 +31,12 @@ FROM = "TrueNAS defib <fysh@fysh.site>"
 # TrueNAS. admin@fysh.site is routed by Cloudflare straight to the owner's Proton (credential_map mail map).
 TO = "admin@fysh.site"
 MATCH = ("STILL unreachable", "Needs a human", "CRITICAL")
-DAILY_CAP = 10        # paid/quota API: stop and log loudly past this
+DAILY_CAP = 10        # delivered mails per day (paid/quota API): stop and log loudly past this
 # Resend's documented default limit is 2 requests/s per team; this sends at most one mail per
-# run plus up to 3 spaced retries, far below it.
-TRIES = 4
+# run plus up to 2 spaced retries, far below it.
+TRIES = 3
 MAX_WAIT = 30         # longest single wait; a longer Retry-After becomes a cooldown instead
+MAX_COOL = 3600       # longest cooldown, whatever Retry-After says
 
 
 def log(msg, crit=False):
@@ -87,7 +88,7 @@ def resolve_args():
     return ["--resolve", f"api.resend.com:443:{ips[0]}"] if ips else []
 
 
-def post(body_json):
+def post(body_json, pin):
     """One POST. Returns (http_code, retry_after_seconds_or_None)."""
     with tempfile.TemporaryDirectory(dir=STATE) as d:
         data, hdr = os.path.join(d, "body"), os.path.join(d, "hdr")
@@ -97,59 +98,70 @@ def post(body_json):
             auth = "Authorization: Bearer " + f.read().strip() + "\nContent-Type: application/json\n"
         # The key goes in on stdin (-H @-), never on argv where ps would show it.
         r = subprocess.run([CURL, "-s", "-o", "/dev/null", "-D", hdr, "-w", "%{http_code}",
-                            "--connect-timeout", "8", "-m", "20", "-H", "@-", "--data-binary", "@" + data]
-                           + resolve_args() + [URL], input=auth, capture_output=True, text=True, timeout=30)
-        code = int(r.stdout.strip() or 0) if r.stdout.strip().isdigit() else 0
+                            "--connect-timeout", "8", "-m", "15", "-H", "@-", "--data-binary", "@" + data]
+                           + pin + [URL], input=auth, capture_output=True, text=True, timeout=20)
+        code = int(r.stdout.strip()) if r.stdout.strip().isdigit() else 0
         ra = None
         try:
             with open(hdr) as f:
                 for line in f:
                     k, _, v = line.partition(":")
                     if k.strip().lower() == "retry-after" and v.strip().isdigit():
-                        ra = int(v.strip())
+                        ra = min(int(v.strip()), MAX_COOL)
         except FileNotFoundError:
             pass
         return code, ra
 
 
+def cool_down(seconds, why):
+    write("cooldown", str(int(time.time() + seconds)))
+    log(f"{why}: no mail before {time.ctime(time.time() + seconds)}", crit=True)
+
+
 def send(subject, text):
-    """Send with exponential backoff and jitter. True on 2xx."""
+    """Send with exponential backoff and jitter, within one run and across runs. True on 2xx.
+
+    Worst case per run: DNS 25s + 3 posts of 20s + waits of about 9s, under defib-tn-alert's 120s.
+    A run that fails sets a cooldown that doubles per failed run (2 min up to 1 h), so a Resend
+    outage is never retried at the path unit's once-a-minute pace."""
     import json
     cool = read("cooldown").strip()
     if cool.isdigit() and int(cool) > time.time():
-        log(f"Resend cooldown until {time.ctime(int(cool))}; not sending now", crit=True)
+        log(f"Resend cooldown until {time.ctime(int(cool))}; not sending now")
         return False
-    write("count", f"{time.strftime('%Y-%m-%d')} {day_count() + 1}")
+    try:
+        pin = resolve_args()
+    except Exception as e:
+        pin = []
+        log(f"DNS fallback error: {e}")
     body = json.dumps({"from": FROM, "to": [TO], "subject": subject, "text": text})
     for i in range(TRIES):
         try:
-            code, ra = post(body)
+            code, ra = post(body, pin)
         except Exception as e:
             code, ra = 0, None
             log(f"send attempt {i + 1} error: {e}")
         if 200 <= code < 300:
+            write("fails", "0")
             return True
-        if code in (400, 401, 403, 422):
-            log(f"Resend refused the mail (HTTP {code}); not retrying", crit=True)
+        if code in (429, 503) and ra is not None and ra > MAX_WAIT:
+            cool_down(ra, f"Resend HTTP {code}, Retry-After {ra}s")
             return False
-        wait = min(MAX_WAIT, 2 ** (i + 1)) * random.uniform(0.5, 1.5)
-        if code in (429, 503) and ra is not None:
-            if ra > MAX_WAIT:
-                write("cooldown", str(int(time.time()) + ra))
-                log(f"Resend HTTP {code}, Retry-After {ra}s: cooling down", crit=True)
-                return False
-            wait = ra + random.uniform(0, 2)
+        if code in (400, 401, 403, 422) or i + 1 == TRIES:
+            break
+        wait = min(MAX_WAIT, ra + random.uniform(0, 2)) if code in (429, 503) and ra is not None \
+            else 2 ** (i + 1) * random.uniform(0.5, 1.5)
         log(f"send attempt {i + 1} failed (HTTP {code}); next try in {wait:.0f}s")
-        if i + 1 < TRIES:
-            SLEEP(wait)
+        SLEEP(wait)
+    fails = int(read("fails", "0").strip() or 0) + 1
+    write("fails", str(fails))
+    cool_down(min(MAX_COOL, 120 * 2 ** (fails - 1)) * random.uniform(0.8, 1.2),
+              f"send failed (HTTP {code}, failed run {fails})")
     return False
 
 
 def main(argv):
     os.makedirs(STATE, mode=0o700, exist_ok=True)
-    if day_count() >= DAILY_CAP:
-        log(f"DAILY CAP of {DAILY_CAP} defib mails reached; NOT mailing. Read the defib log.", crit=True)
-        return 2
     if argv[1:] == ["--test"]:
         picked, subject = [], "defib email path test, ignore"
         text = "Test from pi-ts defib-tn-mail. No action needed."
@@ -164,10 +176,17 @@ def main(argv):
                 picked.append(e)
         if not picked:
             return 0
+        # Kept before any send, so a kill (timeout 120 in defib-tn-alert) or a failure loses nothing.
+        write("pending", "\n".join(picked) + "\n")
         subject = "TrueNAS defib: needs a human" if any("CRITICAL" not in e for e in picked) \
             else "TrueNAS defib: CRITICAL"
         text = "\n".join(picked) + "\n\nFrom pi-ts defib-tn. The app gets these lines too once TrueNAS is back."
+    if day_count() >= DAILY_CAP:
+        log(f"DAILY CAP of {DAILY_CAP} defib mails reached; NOT mailing (kept for tomorrow). "
+            "Read the defib log.", crit=True)
+        return 2
     if send(subject, text):
+        write("count", f"{time.strftime('%Y-%m-%d')} {day_count() + 1}")
         if picked:
             hashes = [hashlib.sha256(e.encode()).hexdigest() for e in picked]
             write("sent", "\n".join((read("sent").split() + hashes)[-500:]) + "\n")
@@ -175,10 +194,9 @@ def main(argv):
         log(f"mailed {TO}: {subject}")
         return 0
     if picked:
-        # ponytail: a mail that fails every retry waits here until the next alert run; a timer
-        # would retry it sooner if that ever matters.
-        write("pending", "\n".join(picked) + "\n")
-    log(f"MAIL NOT SENT: {subject}; kept for the next run", crit=True)
+        # ponytail: a pending mail is retried by the next alert run (once a minute while TrueNAS is
+        # down, after its cooldown); once the spool works again no run comes, and the app has the line.
+        log(f"MAIL NOT SENT: {subject}; kept for the next run", crit=True)
     return 1
 
 
