@@ -1,8 +1,10 @@
 # /etc/systemd/system/app-commands-receiver.service
 [Unit]
 Description=app-commands receiver (owner's signed defib and kill-switch commands from Lumi's app)
-After=network-online.target tailscaled.service
+After=network-online.target tailscaled.service app-commands-acl.service
 Wants=network-online.target
+# No ACL, no receiver: without it any tailnet node reaches the parser and the page (the signature still decides).
+Requires=app-commands-acl.service
 
 [Service]
 Type=simple

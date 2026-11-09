@@ -1,8 +1,12 @@
 // /etc/polkit-1/rules.d/49-app-commands.rules
 // app-commands-receiver runs as 'killswitch'. 49-killswitch-reboot.rules already lets it reboot and start
 // killswitch-lock.service; this adds exactly two more: starting the defib unit, and the probe that checks it.
+// Bound to the receiver's own unit, not only its uid: the Telegram killswitch-receiver runs as killswitch too
+// (audit 2026-11-08). system_unit and no_new_privileges need polkit 124+; the Pi has 126. An older polkit leaves
+// them unset, so this refuses (fail closed) and the `probe` action reports it.
 polkit.addRule(function(action, subject) {
-    if (subject.user != "killswitch") return;
+    if (subject.user != "killswitch" || subject.system_unit != "app-commands-receiver.service" ||
+        !subject.no_new_privileges) return;
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         (action.lookup("unit") == "app-commands-defib.service" ||
          action.lookup("unit") == "app-commands-probe.service") &&

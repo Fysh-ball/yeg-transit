@@ -444,6 +444,92 @@ class LiveConfigWithHarmlessActuators(unittest.TestCase):
         self.assertIn("no remote unlock", self.r.two_step("kill-off")[1]["result"])
         self.assertEqual(self.r.rx.state["kill_state"], "DISARMED")
 
+    def test_failed_lock_command_puts_the_old_state_back(self):
+        self.r = Rig(dry_run=False, ks_dry=False)
+        self.r.two_step("kill-arm")
+        with open(self.r.rx.cfg["killswitch_config"], "w") as f:
+            json.dump({"dry_run": False, "lock_command": ["false"]}, f)
+        self.assertIn("actuator failed", self.r.two_step("kill-on")[1]["result"])
+        self.assertEqual(self.r.rx.state["kill_state"], "ARMED")  # it never locked: still remote-disarmable
+        self.assertEqual(self.r.two_step("kill-off")[1]["result"], "pi: DISARMED")
+
+    def test_timed_out_actuators_are_treated_as_acted(self):
+        self.r = Rig(dry_run=False, ks_dry=False)
+        old, acr.ACTUATOR_TIMEOUT = acr.ACTUATOR_TIMEOUT, 0.3
+        self.addCleanup(setattr, acr, "ACTUATOR_TIMEOUT", old)
+        self.r.rx.cfg["defib_command"] = ["sleep", "5"]
+        self.assertIn("may have fired", self.r.two_step("defib-fire")[1]["result"])
+        self.assertTrue(self.r.rx.cooling())  # a retry can't fire it twice
+        with open(self.r.rx.cfg["killswitch_config"], "w") as f:
+            json.dump({"dry_run": False, "lock_command": ["sleep", "5"]}, f)
+        self.assertIn("may be locking", self.r.two_step("kill-on")[1]["result"])
+        self.assertEqual(self.r.rx.state["kill_state"], "LOCKED")
+
+
+class Limits(unittest.TestCase):
+    def tearDown(self):
+        self.r.close()
+
+    def test_signed_bytes_golden_vector(self):  # built by hand, not by the code under test
+        self.r = Rig()
+        n = "ab" * 32
+        self.assertEqual(acr.signed_bytes("pi", "kill-on", "confirm", n),
+                         b"app-commands/v1\npi\nkill-on\nconfirm\n" + n.encode())
+        n1 = secrets.token_hex(32)
+        lit = b"app-commands/v1\npi\nprobe\nrequest\n" + n1.encode()
+        sig = base64.b64encode(self.r.phone.sign(lit, ec.ECDSA(hashes.SHA256()))).decode()
+        code, out = self.r.post("/request", {"action": "probe", "n1": n1, "key": "phone", "sig": sig})
+        self.assertEqual(out["result"], "pending", out)
+
+    def test_a_trickling_client_is_cut_off(self):
+        old, acr.READ_DEADLINE = acr.READ_DEADLINE, 0.5
+        self.addCleanup(setattr, acr, "READ_DEADLINE", old)
+        self.r = Rig()
+        s = socket.create_connection(("127.0.0.1", self.r.servers[0].server_address[1]))
+        s.settimeout(5)
+        t0 = time.monotonic()
+        for _ in range(3):  # a byte at a time, each well inside the 5 s per-read timeout
+            s.sendall(b"P")
+            time.sleep(0.3)
+        try:
+            self.assertEqual(s.recv(100), b"")
+        except ConnectionResetError:
+            pass
+        self.assertLess(time.monotonic() - t0, 3)
+        s.close()
+
+    def test_connections_over_the_cap_are_closed(self):
+        old, acr.MAX_CONNECTIONS = acr.MAX_CONNECTIONS, 2
+        self.addCleanup(setattr, acr, "MAX_CONNECTIONS", old)
+        self.r = Rig()
+        port = self.r.servers[0].server_address[1]
+        held = [socket.create_connection(("127.0.0.1", port)) for _ in range(2)]
+        time.sleep(0.2)
+        extra = socket.create_connection(("127.0.0.1", port))
+        extra.settimeout(3)
+        try:
+            self.assertEqual(extra.recv(100), b"")
+        except ConnectionResetError:
+            pass
+        for h in held + [extra]:
+            h.close()
+        time.sleep(0.3)  # their slots come back
+        (code, out), _ = self.r.request("probe")
+        self.assertEqual(out["result"], "pending")
+
+    def test_a_probe_does_not_hold_the_lock(self):
+        self.r = Rig()
+        self.r.rx.cfg["probe_command"] = ["sh", "-c", 'sleep 1.5; echo ok > "$0"', self.r.rx.cfg["probe_result"]]
+        (code, out), _ = self.r.request("probe")
+        t = threading.Thread(target=self.r.confirm, args=("probe", out["n2"]))
+        t.start()
+        time.sleep(0.3)
+        t0 = time.monotonic()
+        (code, out2), _ = self.r.request("kill-arm")
+        self.assertEqual(out2["result"], "pending")
+        self.assertLess(time.monotonic() - t0, 1)
+        t.join()
+
 
 if __name__ == "__main__":
     unittest.main()

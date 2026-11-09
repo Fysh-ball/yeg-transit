@@ -16,10 +16,12 @@ Never test by firing: dry_run=true answers "dry run: would ..."; the `probe` act
 checks and stops before any actuator.
 """
 import base64
+import ctypes
 import hashlib
 import hmac
 import json
 import logging
+import logging.handlers
 import os
 import re
 import secrets
@@ -45,6 +47,10 @@ DEFIB_COOLDOWN = 600
 MAX_BODY = 4096
 SEEN_N1_CAP = 4096
 ALERTS_CAP = 64 * 1024
+READ_DEADLINE = 10  # seconds for a whole request to arrive: a byte every 4 s can't hold a thread for ever
+MAX_CONNECTIONS = 64  # at once, per listener; more are closed unanswered (the tunnel is public)
+ACTUATOR_TIMEOUT = 30
+PROBE = object()  # act()'s answer for a probe: the handler runs it outside the lock (it may take 60 s)
 NONCE_RE = re.compile(r"[0-9a-f]{64}")
 CRED_RE = re.compile(r"[A-Za-z0-9_-]{16,1400}")
 NAME_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
@@ -80,6 +86,10 @@ class Refused(Exception):
 
 class Unparseable(Refused):
     """A body the receiver couldn't parse: the only refusal answered 400 (design section 6.5)."""
+
+
+class ActuatorTimeout(Refused):
+    """The actuator didn't return in time: it may still have acted, so the receipt must not say it didn't."""
 
 
 def load_config(path):
@@ -305,14 +315,21 @@ class Receiver:
     # ---- actions -----------------------------------------------------------
     def act(self, action):
         if action == "probe":
-            return self.probe()
+            return PROBE
         if action == "defib-fire":
             if self.cooling():
                 raise Refused("defib cooling down (10 min after a fire)")
             if self.cfg["dry_run"]:
                 LOG.warning("DRY-RUN: would run %s", self.cfg["defib_command"])
                 return "dry run: would fire"
-            run_actuator(self.cfg["defib_command"])
+            try:
+                run_actuator(self.cfg["defib_command"])
+            except ActuatorTimeout:
+                # The start may have been queued: cool down as if it fired, so a retry can't fire it twice.
+                self.state["last_fire"] = time.time()
+                self.last_fire_mono = time.monotonic()
+                self.save()
+                return f"unknown: the defib start timed out after {ACTUATOR_TIMEOUT} s and may have fired; cooling down 10 min as if it did"
             # Only after the start was accepted: a failed start must leave the owner free to retry.
             self.state["last_fire"] = time.time()
             self.last_fire_mono = time.monotonic()
@@ -340,9 +357,19 @@ class Receiver:
                 return f"dry run: would lock {self.box}"
             if not cmd:
                 raise Refused("no lock actuator configured")
+            # LOCKED is saved first: a reboot can kill this process before a later save. A lock command that
+            # failed puts the old state back, so the owner can retry or disarm a box that never locked.
+            before = self.state["kill_state"]
             self.state["kill_state"] = "LOCKED"
             self.save()
-            run_actuator(cmd)
+            try:
+                run_actuator(cmd)
+            except ActuatorTimeout:
+                return f"{self.box}: the lock command timed out after {ACTUATOR_TIMEOUT} s and may be locking; treated as LOCKED"
+            except Refused:
+                self.state["kill_state"] = before
+                self.save()
+                raise
             return f"{self.box}: locking now; recovery is console-only"
         raise Refused("unknown action")
 
@@ -382,7 +409,10 @@ class Receiver:
 
 def run_actuator(cmd):
     try:
-        subprocess.run(cmd, check=True, timeout=30)
+        subprocess.run(cmd, check=True, timeout=ACTUATOR_TIMEOUT)
+    except subprocess.TimeoutExpired as e:
+        LOG.error("actuator %s timed out: %s", cmd, e)
+        raise ActuatorTimeout(f"actuator timed out ({e})", loud=True)
     except (subprocess.SubprocessError, OSError) as e:
         LOG.error("actuator %s failed: %s", cmd, e)
         raise Refused(f"actuator failed ({e})", loud=True)
@@ -393,6 +423,24 @@ def make_handler(rx):
         timeout = 5  # a slow client can't hold the listener
         server_version = "app-commands"
         sys_version = ""
+
+        def setup(self):
+            super().setup()
+            # A whole request within READ_DEADLINE: past it the socket is shut, and the read in progress ends.
+            self.cut = threading.Timer(READ_DEADLINE, self.cut_off)
+            self.cut.daemon = True
+            self.cut.start()
+
+        def cut_off(self):
+            LOG.warning("%s took over %d s to send its request: cut off", self.client_address[0], READ_DEADLINE)
+            try:
+                self.connection.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+        def finish(self):
+            self.cut.cancel()
+            super().finish()
 
         def log_message(self, fmt, *args):
             LOG.info("%s %s", self.client_address[0], fmt % args)
@@ -410,6 +458,7 @@ def make_handler(rx):
                 LOG.info("reply to %s not delivered: %s", self.client_address[0], e)
 
         def do_GET(self):
+            self.cut.cancel()  # the request is in: the deadline covers reading it, not answering
             # The WebAuthn page (design B): it only signs; every decision is still the POST steps'.
             page = {"/": ("index.html", "text/html; charset=utf-8"),
                     "/app.js": ("app.js", "text/javascript; charset=utf-8")}.get(self.path)
@@ -454,12 +503,17 @@ def make_handler(rx):
                 if not 0 < n <= MAX_BODY:
                     raise Unparseable("body too large or empty")
                 raw = self.rfile.read(n)
+                self.cut.cancel()  # the request is in: the deadline covers reading it, not acting on it
+                if len(raw) < n:
+                    raise Unparseable("body cut short")
                 try:
                     body = json.loads(raw)
                 except ValueError:
                     raise Unparseable("body is not JSON")
                 with rx.lock:
                     out = rx.request(body) if step == "request" else rx.confirm(body)
+                if out["result"] is PROBE:  # verified and consumed under the lock; the 60 s check runs outside it
+                    out = {"result": rx.probe()}
                 self.reply(200, out)
             except Refused as r:
                 with rx.lock:
@@ -483,6 +537,27 @@ class FreebindServer(ThreadingHTTPServer):
 
     daemon_threads = True
 
+    def __init__(self, *a, **kw):
+        self.slots = threading.BoundedSemaphore(MAX_CONNECTIONS)
+        super().__init__(*a, **kw)
+
+    def process_request(self, request, client_address):
+        if not self.slots.acquire(blocking=False):
+            LOG.warning("over %d connections at once: closing one from %s unanswered", MAX_CONNECTIONS, client_address[0])
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except Exception:
+            self.slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.slots.release()
+
     def server_bind(self):
         # Python names the constant only from 3.14; the Pi runs 3.13. 15 is Linux's IP_FREEBIND.
         self.socket.setsockopt(socket.SOL_IP, getattr(socket, "IP_FREEBIND", 15), 1)
@@ -497,10 +572,15 @@ def main():
         except (Refused, IndexError) as e:
             sys.exit(f"bad: {e}")
         return
+    # Not dumpable: another process of the killswitch uid (the Telegram receiver) can't ptrace this one or read
+    # its memory to borrow its polkit grant. The Pi has no Yama, so same-uid ptrace is otherwise open.
+    if ctypes.CDLL(None, use_errno=True).prctl(4, 0, 0, 0, 0) != 0:  # PR_SET_DUMPABLE, 0
+        LOG.error("prctl(PR_SET_DUMPABLE, 0) failed (errno %d): a same-uid process could ptrace this one",
+                  ctypes.get_errno())
     cfg = load_config(CONFIG_PATH)
     if cfg.get("log_file"):
         try:
-            fh = logging.FileHandler(cfg["log_file"])
+            fh = logging.handlers.RotatingFileHandler(cfg["log_file"], maxBytes=5 << 20, backupCount=3)
             fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
             LOG.addHandler(fh)
         except OSError as e:
