@@ -26,8 +26,12 @@ function clean(list) {
     .map((s) => ({ ...s, walk: Math.min(Math.max(Number(s.walk) || 0, 0), 60) || undefined, n: Number(s.n) || undefined,
       only: Array.isArray(s.only) && s.only.every((r) => typeof r === "string") ? s.only : undefined }));
 }
+// Blocked cookies or site data make localStorage throw: say so on screen, or stops vanish without a word.
+function storageOk() {
+  try { localStorage.setItem("yeg.probe", "1"); localStorage.removeItem("yeg.probe"); return true; } catch (e) { console.warn("storage:", e.message); return false; }
+}
 function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(stops)); } catch (e) { console.warn("save failed:", e.message); }
+  try { localStorage.setItem(KEY, JSON.stringify(stops)); $("#nosave").hidden = true; } catch (e) { console.warn("save failed:", e.message); $("#nosave").hidden = false; }
   // Ask the browser not to clear saved stops when space runs low (Chrome grants it quietly; Firefox asks once).
   // ponytail: iPhone Safari still clears a site after 7 days unvisited unless it's on the home screen; the tips say how.
   navigator.storage?.persisted?.().then((p) => p || navigator.storage.persist()).catch((e) => console.warn("persist:", e.message));
@@ -938,6 +942,9 @@ for (const [b, hint, mode] of [["#ob-addr", "Type an address or place", "search"
   $(b).onclick = () => { $("#q").placeholder = hint; $("#q").inputMode = mode; setAdd(true); };
 // In the Android app the page is already installed: point at the widget instead of the browser's install menu.
 if (window.YegApp) $("#tip-handy").innerHTML = "<b>Widget:</b> hold your home screen &rarr; <b>Widgets</b> &rarr; <b>YEG Bus</b>.";
+if (!storageOk()) $("#nosave").hidden = false;
+// iPhone: a home-screen app starts with empty storage, so stops saved in Safari aren't there.
+if (navigator.standalone && !stops.length) $("#ios-own").hidden = false;
 let installEvt = null;
 window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("#install").hidden = false; });
 // The Android app's floating add button slides away while you scroll down and comes back on the way up.
@@ -1102,4 +1109,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=108").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=109").catch((e) => console.warn("sw:", e.message));

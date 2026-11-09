@@ -45,7 +45,7 @@ if (window.YegApp || navigator.standalone || matchMedia("(display-mode: standalo
 if (window.YegApp) de.classList.add("native"); // no ads in the app, so the add button can float
 // The app's bridge (YegApp) is open to every frame in the page, so in the app no frame may load at all.
 if (window.YegApp) document.head.append(Object.assign(document.createElement("meta"), { httpEquiv: "Content-Security-Policy", content: "frame-src 'none'" }));</script>
-<link rel="stylesheet" href="style.css?v=108">
+<link rel="stylesheet" href="style.css?v=109">
 </head>
 <body>
 <header>
@@ -94,6 +94,7 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
 </section>
 
 <div id="offline" role="status" hidden></div>
+<div id="nosave" role="alert" hidden><b>Your stops can't be saved.</b> This browser is blocking site data for yegbus.com, so they're gone when you close it. iPhone: Settings &rarr; Apps &rarr; Safari &rarr; turn off <b>Block All Cookies</b>. Android Chrome: tap the icon left of the address &rarr; <b>Cookies and site data</b> &rarr; allow.</div>
 <div id="stale" role="status" hidden><span></span><button type="button" id="stale-reload">Refresh</button></div>
 <div id="undo" role="status" hidden><span></span><button type="button">Undo</button></div>
 
@@ -114,6 +115,7 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
   <button class="big" id="ob-addr" type="button">Near an address</button>
   <button class="big" id="ob-code" type="button">I know the stop number</button>
   <p>You can change everything later.</p>
+  <p id="ios-own" hidden>On iPhone the home-screen app keeps its own stops, apart from Safari's. Add your stops again here once and they stay.</p>
 </div>
 
 <nav id="groups" class="chips" aria-label="Groups" hidden></nav>
@@ -149,6 +151,6 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
   <p class="legal">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
   <a href="guide.html">Help</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
 </footer>
-<script src="app.js?v=108"></script>
+<script src="app.js?v=109"></script>
 </body>
 </html>
