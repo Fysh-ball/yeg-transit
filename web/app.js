@@ -901,10 +901,18 @@ async function placeBus() {
   }
 }
 // The map sheet's height: drag its handle, or tap it for full height and back (owner, 2026-11-05: "a small pop up
-// that cannot be adjusted"). Kept for next time.
+// that cannot be adjusted"). On wide screens its corner drags width and height together (owner, 2026-11-08: "it
+// should be to horizontal / whatever free transform the user wants"). Kept for next time, per device.
 let fitMapBox;
 (() => {
-  const grab = $("#map-grab"), box = $("#map-box"), sheet = $("#map-sheet");
+  const grab = $("#map-grab"), box = $("#map-box"), sheet = $("#map-sheet"), corner = $("#map-corner");
+  const wide = () => matchMedia("(min-width: 1000px)").matches; // the centred sheet; phones keep the full-width one
+  const setW = (w, keep = true) => {
+    w = Math.max(360, Math.min(innerWidth - 32, Math.round(w)));
+    sheet.style.width = w + "px";
+    mapState?.map?.invalidateSize();
+    if (keep) try { localStorage.setItem("yeg.mapW", String(w)); } catch (e) { console.warn("map width:", e.message); }
+  };
   const most = () => Math.round(innerHeight * 0.9) - (sheet.offsetHeight - box.offsetHeight); // the sheet tops out at 90dvh
   const set = (h, keep = true) => {
     h = Math.max(160, Math.min(most(), Math.round(h)));
@@ -928,9 +936,38 @@ let fitMapBox;
     const d = { ArrowUp: 40, ArrowDown: -40 }[e.key];
     if (d) { e.preventDefault(); set(box.offsetHeight + d); }
   });
-  fitMapBox = () => { // on open: the height you left it at, fitted to this screen
-    let h = 0;
-    try { h = Number(localStorage.getItem("yeg.mapH")); } catch (e) { console.warn("map height:", e.message); }
+  // The corner: the sheet is centred, so it grows both ways and the corner stays under the pointer (2x the move).
+  let at = null;
+  corner.addEventListener("pointerdown", (e) => {
+    at = { x: e.clientX, y: e.clientY, w: sheet.offsetWidth, h: box.offsetHeight };
+    corner.setPointerCapture(e.pointerId);
+  });
+  corner.addEventListener("pointermove", (e) => {
+    if (!at) return;
+    setW(at.w + 2 * (e.clientX - at.x), false);
+    set(at.h + 2 * (e.clientY - at.y), false);
+  });
+  corner.addEventListener("pointerup", () => {
+    if (!at) return;
+    at = null;
+    setW(sheet.offsetWidth);
+    set(box.offsetHeight);
+  });
+  corner.addEventListener("keydown", (e) => {
+    const d = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -40], ArrowDown: [0, 40] }[e.key];
+    if (!d) return;
+    e.preventDefault();
+    if (d[0]) setW(sheet.offsetWidth + d[0]);
+    if (d[1]) set(box.offsetHeight + d[1]);
+  });
+  fitMapBox = () => { // on open: the size you left it at, fitted to this screen
+    let h = 0, w = 0;
+    try {
+      h = Number(localStorage.getItem("yeg.mapH"));
+      w = Number(localStorage.getItem("yeg.mapW"));
+    } catch (e) { console.warn("map size:", e.message); }
+    if (w && wide()) setW(w, false);
+    else sheet.style.width = ""; // a phone, or a window made narrow since: the sheet's own width
     if (h) set(h, false);
   };
 })();

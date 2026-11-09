@@ -215,6 +215,7 @@ html:has(.board.night) { background: #000; }
   background: var(--card); color: var(--text); }
 #map-sheet::backdrop { background: rgb(0 0 0 / .45); }
 #map-grab { height: 24px; margin-bottom: -12px; display: grid; place-items: center; touch-action: none; cursor: ns-resize; }
+#map-corner { display: none; } /* shown on the wide, centred sheet only (below) */
 #map-grab::before { content: ""; width: 44px; height: 5px; border-radius: 3px; background: var(--muted); opacity: .6; }
 #map-sheet .bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
 #map-sheet .bar h2 { flex: 1; min-width: 0; margin: 0; font-size: 1rem; }
@@ -307,6 +308,11 @@ body:has(#empty:not([hidden])) #add-btn[aria-expanded="false"] { display: none; 
   body:not(.board) footer { text-align: center; max-width: 720px; margin-inline: auto; }
   #map-sheet { width: min(720px, 90vw); margin: auto; border-radius: 16px; }
   #map-box { height: min(65dvh, 560px); }
+  /* the centred sheet: drag its corner to any width and height */
+  #map-corner { display: block; position: absolute; right: 0; bottom: 0; width: 28px; height: 28px; z-index: 1000;
+    cursor: nwse-resize; touch-action: none; }
+  #map-corner::before { content: ""; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; opacity: .6;
+    background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55% 70%, var(--muted) 70% 80%, transparent 80%); }
 }
 
 /* ===== Looks (v52). Material 3 Expressive on Android, Liquid Glass on iPhone; Settings > Look overrides.
