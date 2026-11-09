@@ -41,9 +41,9 @@ def b64u(b):
 
 
 def assertion(key, box, action, step, nonce, origin="https://" + RP, rp=RP, flags=0x05, typ="webauthn.get",
-              challenge_of=None):
+              challenge_of=None, extra=b""):
     """What a browser + authenticator would send for these signed bytes."""
-    signed = acr.signed_bytes(*(challenge_of or (box, action, step, nonce)))
+    signed = acr.signed_bytes(*(challenge_of or (box, action, step, nonce))) + extra
     cd = json.dumps({"type": typ, "challenge": b64u(hashlib.sha256(signed).digest()), "origin": origin,
                      "crossOrigin": False}).encode()
     ad = hashlib.sha256(rp.encode()).digest() + bytes([flags]) + b"\0\0\0\0"
@@ -78,8 +78,16 @@ class Rig:
                    state_dir=self.dir, log_file=None, killswitch_config=ksc, killswitch_state=self.ks_state,
                    defib_command=["true"],
                    probe_command=["sh", "-c", 'echo "$0" > "$1"', "ok", os.path.join(self.dir, "probe.txt")],
-                   probe_result=os.path.join(self.dir, "probe.txt"), page_dir=os.path.join(HERE, "page"))
+                   probe_result=os.path.join(self.dir, "probe.txt"), page_dir=os.path.join(HERE, "page"),
+                   totp_dir=self.dir, clock_check=["echo", "yes"])
+        self.totp = {}
+        for action in acr.TOTP_ACTIONS:
+            self.totp[action] = secrets.token_bytes(20)
+            with open(os.path.join(self.dir, action), "w") as f:
+                f.write(base64.b32encode(self.totp[action]).decode().rstrip("=") + "\n")
         self.rx = acr.Receiver(cfg)
+        self.t = time.time()
+        self.rx.clock = lambda: self.t
         self.servers = [acr.FreebindServer(("127.0.0.1", 0), acr.make_handler(self.rx)) for _ in range(2)]
         for s in self.servers:
             threading.Thread(target=s.serve_forever, daemon=True).start()
@@ -106,10 +114,21 @@ class Rig:
         return self.post("/request", {"action": action, "n1": n1, "key": name,
                                       "sig": sign(key, box, action, "request", n1)}), n1
 
-    def confirm(self, action, n2, key=None, name="phone", box="pi", server=0):
+    def code(self, action):
+        """The code Aegis would show now, half a minute on from the last one asked for (each code is good once)."""
+        self.t += 30
+        return acr.totp(self.totp[action], int(self.t // 30))
+
+    def confirm(self, action, n2, key=None, name="phone", box="pi", server=0, code="now"):
         key = key or self.phone
-        return self.post("/confirm", {"action": action, "n2": n2, "key": name,
-                                      "sig": sign(key, box, action, "confirm", n2)}, server)
+        if code == "now":
+            code = self.code(action) if action in acr.TOTP_ACTIONS else None
+        body = {"action": action, "n2": n2, "key": name}
+        signed = acr.signed_bytes(box, action, "confirm", n2) + (f"\n{code}".encode() if code is not None else b"")
+        body["sig"] = base64.b64encode(key.sign(signed, ec.ECDSA(hashes.SHA256()))).decode()
+        if code is not None:
+            body["totp"] = code
+        return self.post("/confirm", body, server)
 
     def two_step(self, action, **kw):
         (code, out), _ = self.request(action, **kw)
@@ -536,6 +555,107 @@ class Limits(unittest.TestCase):
         self.assertEqual(out2["result"], "pending")
         self.assertLess(time.monotonic() - t0, 1)
         t.join()
+
+
+class SecondFactor(unittest.TestCase):
+    """Arm, disarm and lock need the Aegis code too (owner, 2026-11-08)."""
+
+    def setUp(self):
+        self.r = Rig()
+
+    def tearDown(self):
+        self.r.close()
+
+    def pending(self, action):
+        (code, out), _ = self.r.request(action)
+        self.assertEqual(out["result"], "pending", out)
+        return out["n2"]
+
+    def result(self, action, **kw):
+        return self.r.confirm(action, self.pending(action), **kw)[1]["result"]
+
+    def test_rfc6238_vectors(self):  # Appendix B, SHA1, last 6 of the 8 digits
+        k = b"12345678901234567890"
+        for t, want in ((59, "287082"), (1111111109, "081804"), (1234567890, "005924"), (2000000000, "279037")):
+            self.assertEqual(acr.totp(k, t // 30), want)
+
+    def test_every_kill_command_needs_a_code(self):
+        for action in acr.TOTP_ACTIONS:
+            self.assertIn("6-digit code", self.result(action, code=None))
+        self.assertEqual(self.r.rx.state["kill_state"], "DISARMED")
+
+    def test_right_code_acts(self):
+        self.assertEqual(self.result("kill-arm"), "pi: ARMED")
+        self.assertEqual(self.result("kill-off"), "pi: DISARMED")
+        self.assertEqual(self.result("kill-on"), "dry run: would lock pi")
+
+    def test_probe_and_defib_take_no_code(self):
+        self.assertIn("malformed", self.result("defib-fire", code="123456"))
+        self.assertEqual(self.result("defib-fire"), "dry run: would fire")
+
+    def test_code_is_inside_the_signature(self):
+        n2 = self.pending("kill-arm")
+        good = self.r.code("kill-arm")
+        sig = base64.b64encode(self.r.phone.sign(acr.signed_bytes("pi", "kill-arm", "confirm", n2) + b"\n000000",
+                                                 ec.ECDSA(hashes.SHA256()))).decode()
+        out = self.r.post("/confirm", {"action": "kill-arm", "n2": n2, "key": "phone", "sig": sig, "totp": good})[1]
+        self.assertIn("bad signature", out["result"])
+        self.assertEqual(self.r.rx.state["kill_state"], "DISARMED")
+
+    def test_window_is_one_step_each_way(self):
+        k, t = self.r.totp["kill-arm"], int(self.r.t // 30)
+        self.assertEqual(self.result("kill-arm", code=acr.totp(k, t - 1)), "pi: ARMED")
+        self.assertIn("wrong code", self.result("kill-arm", code=acr.totp(k, t + 2)))
+        self.assertIn("wrong code", self.result("kill-arm", code=acr.totp(k, t - 2)))
+        self.assertEqual(self.result("kill-arm", code=acr.totp(k, t + 1)), "pi: ARMED")
+
+    def test_a_code_is_good_once(self):
+        c = self.r.code("kill-arm")
+        self.assertEqual(self.result("kill-arm", code=c), "pi: ARMED")
+        self.assertIn("already used", self.result("kill-arm", code=c))
+        # an older code inside the window is used up too
+        self.assertIn("already used", self.result("kill-arm", code=acr.totp(self.r.totp["kill-arm"], int(self.r.t // 30) - 1)))
+
+    def test_another_commands_code_is_wrong(self):
+        self.r.t += 30
+        c = acr.totp(self.r.totp["kill-off"], int(self.r.t // 30))
+        self.assertIn("wrong code", self.result("kill-arm", code=c))
+        self.assertEqual(self.r.rx.state["kill_state"], "DISARMED")
+
+    def test_five_wrong_codes_shut_that_command_for_an_hour(self):
+        for i in range(acr.TOTP_FAILS):
+            self.assertIn(f"({i + 1} of 5", self.result("kill-on", code="000000" if i % 2 else "999999"))
+        self.assertIn("5 wrong codes", self.result("kill-on"))  # even the right code
+        self.assertEqual(self.result("kill-arm"), "pi: ARMED")  # other commands still work
+        self.r.rx.__init__(self.r.rx.cfg)  # the count survives a restart
+        self.r.rx.clock = lambda: self.r.t
+        self.assertIn("5 wrong codes", self.result("kill-on"))
+        self.r.t += 3600
+        self.assertEqual(self.result("kill-on"), "dry run: would lock pi")
+
+    def test_unsynced_clock_refuses_without_counting(self):
+        self.r.rx.cfg["clock_check"] = ["echo", "no"]
+        for _ in range(acr.TOTP_FAILS + 1):
+            self.assertIn("clock isn't synced", self.result("kill-on"))
+        self.r.rx.cfg["clock_check"] = ["false"]
+        self.assertIn("clock isn't synced", self.result("kill-on"))
+        self.r.rx.cfg["clock_check"] = ["echo", "yes"]
+        self.assertEqual(self.result("kill-on"), "dry run: would lock pi")
+        self.assertEqual(self.r.rx.state["totp_fails"].get("kill-on", []), [])
+
+    def test_no_secret_enrolled(self):
+        os.unlink(os.path.join(self.r.dir, "kill-off"))
+        self.assertIn("no second-factor secret", self.result("kill-off"))
+
+    def test_webauthn_key_signs_the_code(self):
+        n1 = secrets.token_hex(32)
+        out = self.r.post("/request", {"action": "kill-arm", "n1": n1,
+                                       **assertion(self.r.yubikey, "pi", "kill-arm", "request", n1)})[1]
+        c = self.r.code("kill-arm")
+        out = self.r.post("/confirm", {"action": "kill-arm", "n2": out["n2"], "totp": c,
+                                       **assertion(self.r.yubikey, "pi", "kill-arm", "confirm", out["n2"],
+                                                   extra=b"\n" + c.encode())})[1]
+        self.assertEqual(out["result"], "pi: ARMED")
 
 
 if __name__ == "__main__":

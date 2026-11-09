@@ -9,6 +9,7 @@ const WORDS = {
   "kill-off": "disarm the kill switch",
   "kill-on": "LOCK the Pi (Tang goes down; recovery is at the console)",
 };
+const TOTP = { "kill-arm": "ARM", "kill-off": "DISARM", "kill-on": "LOCK" }; // the Aegis entry for each
 const $ = (id) => document.getElementById(id);
 const enc = new TextEncoder();
 
@@ -34,8 +35,8 @@ function busy(on) {
   for (const b of document.querySelectorAll("button")) b.disabled = on;
 }
 
-async function sign(action, step, nonce) {
-  const bytes = enc.encode(`app-commands/v1\n${BOX}\n${action}\n${step}\n${nonce}`);
+async function sign(action, step, nonce, code) {
+  const bytes = enc.encode(`app-commands/v1\n${BOX}\n${action}\n${step}\n${nonce}` + (code ? `\n${code}` : ""));
   const challenge = await crypto.subtle.digest("SHA-256", bytes);
   const cred = await navigator.credentials.get({
     publicKey: { challenge, rpId: RP_ID, userVerification: "required", timeout: 60000 },
@@ -72,6 +73,9 @@ async function ask(action) {
     }
     pending = { action, n2: out.n2 };
     $("confirm-q").textContent = `pi: ${WORDS[action]}. Confirm?`;
+    $("code-box").style.display = TOTP[action] ? "block" : "none";
+    $("code-label").textContent = TOTP[action] ? `6-digit code from Aegis entry "kill-switch ${TOTP[action]}"` : "";
+    $("code").value = "";
     $("actions").style.display = "none";
     $("confirm").style.display = "block";
     say("The Pi is waiting 90 seconds for your answer.");
@@ -91,10 +95,15 @@ function reset() {
 async function confirmIt() {
   if (!pending) return;
   const { action, n2 } = pending;
+  const code = TOTP[action] ? $("code").value.trim() : undefined;
+  if (code !== undefined && !/^[0-9]{6}$/.test(code)) {
+    say(`Type the 6-digit code from Aegis entry "kill-switch ${TOTP[action]}".`, "bad");
+    return;
+  }
   busy(true);
   try {
     say("Unlock your key again to confirm.");
-    const out = await post("/confirm", { action, n2, ...(await sign(action, "confirm", n2)) });
+    const out = await post("/confirm", { action, n2, ...(code ? { totp: code } : {}), ...(await sign(action, "confirm", n2, code)) });
     say(out.result, out.result.startsWith("refused") || out.result.startsWith("probe failed") ? "bad" : "good");
     reset();
   } catch (e) {

@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Make (or replace) the second-factor secret for one kill-switch command and show it as a QR for Aegis.
+
+THE QR IS THE SECRET. No Claude session, agent or tool that shows images or output to a model may read, view,
+screenshot or print it. Two ways only:
+  1. The owner runs this in his own terminal:   sudo app-commands-totp-enroll lock
+     (QR drawn with qrencode -t ansiutf8; refused unless stdout is a terminal)
+  2. Drop file:  ssh pi-ts 'sudo app-commands-totp-enroll lock --png' > ~/lock-qr.png ; chmod 600 it, open it for him
+     with xdg-open only, shred -u it once he says Aegis has it. (--png refuses to write to a terminal.)
+If a tool would show the image to a model, use way 1.
+
+Aegis entry: issuer "kill-switch", name ARM / DISARM / LOCK. Back the Aegis vault up (encrypted export) to a second
+device: a lost phone otherwise means re-enrolling here at the console. Re-running replaces the secret at once.
+Needs: apt install qrencode.
+"""
+import base64
+import grp
+import os
+import secrets
+import subprocess
+import sys
+
+TOTP_DIR = "/etc/app-commands/totp"
+NAMES = {"arm": ("kill-arm", "ARM"), "disarm": ("kill-off", "DISARM"), "lock": ("kill-on", "LOCK")}
+
+
+def main():
+    args = sys.argv[1:]
+    png = "--png" in args
+    args = [a for a in args if a != "--png"]
+    if len(args) != 1 or args[0] not in NAMES:
+        sys.exit("usage: app-commands-totp-enroll arm|disarm|lock [--png]")
+    if os.geteuid() != 0:
+        sys.exit("run as root")
+    if png == os.isatty(1):
+        sys.exit("--png writes to a file, never a terminal" if png else "the QR goes to your own terminal only (or use --png > file)")
+    action, label = NAMES[args[0]]
+    secret = base64.b32encode(secrets.token_bytes(20)).decode()
+    uri = f"otpauth://totp/kill-switch:{label}?secret={secret}&issuer=kill-switch&algorithm=SHA1&digits=6&period=30"
+    os.makedirs(TOTP_DIR, mode=0o750, exist_ok=True)
+    gid = grp.getgrnam("killswitch").gr_gid
+    os.chown(TOTP_DIR, 0, gid)
+    os.chmod(TOTP_DIR, 0o750)
+    path = os.path.join(TOTP_DIR, action)
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o440)
+    try:
+        os.fchown(fd, 0, gid)
+        os.fchmod(fd, 0o440)
+        os.write(fd, (secret + "\n").encode())
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    # The QR is drawn before the swap: if qrencode fails, the old secret (and his Aegis entry) still work.
+    try:
+        subprocess.run(["qrencode", "-t", "PNG" if png else "ansiutf8", "-o", "-"], input=uri.encode(), check=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as e:
+        os.unlink(tmp)
+        sys.exit(f"qrencode failed ({e}); secret unchanged")
+    os.replace(tmp, path)
+    print(f"{action}: new secret in place; scan it into Aegis as kill-switch {label}. The old code stops working now.",
+          file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

@@ -7,6 +7,12 @@ Design: ~/.cache/app-commands/design.md (v4, 2026-10-30), section 3. Two signed 
 The signed bytes are b"app-commands/v1\\n<box>\\n<action>\\n<step>\\n<nonce hex>". The signature is the only
 authority: the source address is logged, never trusted.
 
+Arm, disarm and lock also need a second factor (owner, 2026-11-08: "we could also use aegis for a secondary key"):
+the confirm carries {"totp": "<6 digits>"} from that action's own Aegis entry, and the confirm's signed bytes end
+in "\\n<code>". One secret per action in <totp_dir>/<action> (base32, root:killswitch 0440), made by
+app-commands-totp-enroll. RFC 6238, SHA1, 30 s, +-1 step; a code is good once; 5 wrong codes per action per hour
+shut that action for the hour. Probe and defib stay passkey-only.
+
 Keys: /etc/app-commands/keys, root-owned, one credential per line:
   <name> p256 - <base64 SubjectPublicKeyInfo DER>          (the phone's Keystore key, SHA256withECDSA, DER sig)
   <name> webauthn <credential id> <base64 SPKI DER>        (spares; parsed, refused until WebAuthn verify lands)
@@ -50,6 +56,9 @@ ALERTS_CAP = 64 * 1024
 READ_DEADLINE = 10  # seconds for a whole request to arrive: a byte every 4 s can't hold a thread for ever
 MAX_CONNECTIONS = 64  # at once, per listener; more are closed unanswered (the tunnel is public)
 ACTUATOR_TIMEOUT = 30
+TOTP_ACTIONS = {"kill-arm": "ARM", "kill-off": "DISARM", "kill-on": "LOCK"}  # action -> its Aegis entry name
+TOTP_FAILS = 5  # wrong codes per action per hour, then that action is refused until the hour is up
+TOTP_RE = re.compile(r"[0-9]{6}")
 PROBE = object()  # act()'s answer for a probe: the handler runs it outside the lock (it may take 60 s)
 NONCE_RE = re.compile(r"[0-9a-f]{64}")
 CRED_RE = re.compile(r"[A-Za-z0-9_-]{16,1400}")
@@ -73,6 +82,8 @@ DEFAULTS = {
     "probe_result": "/run/app-commands-probe.txt",
     "webauthn_rp_id": "pi-commands.fysh.site",
     "page_dir": "/usr/local/share/app-commands",
+    "totp_dir": "/etc/app-commands/totp",
+    "clock_check": ["timedatectl", "show", "-p", "NTPSynchronized", "--value"],
 }
 
 
@@ -114,6 +125,33 @@ def b64url(s):
 
 def signed_bytes(box, action, step, nonce):
     return f"{PROTO}\n{box}\n{action}\n{step}\n{nonce}".encode()
+
+
+def totp(secret, step):
+    """RFC 6238 (SHA1, 6 digits) for one 30 s step."""
+    h = hmac.new(secret, step.to_bytes(8, "big"), hashlib.sha1).digest()
+    o = h[-1] & 15
+    return "%06d" % ((int.from_bytes(h[o:o + 4], "big") & 0x7FFFFFFF) % 1000000)
+
+
+def load_totp_secret(path, must_be_root):
+    try:
+        with open(path) as f:
+            st = os.fstat(f.fileno())
+            text = f.read().strip().upper()
+    except FileNotFoundError:
+        raise Refused(f"no second-factor secret for this command yet ({os.path.basename(path)}): enroll it at the console", loud=True)
+    except (OSError, UnicodeDecodeError) as e:
+        raise Refused(f"second-factor secret unreadable ({e})", loud=True)
+    if must_be_root and (st.st_uid != 0 or st.st_mode & (stat.S_IWGRP | stat.S_IWOTH)):
+        raise Refused("second-factor secret not root-owned or writable by others", loud=True)
+    try:
+        secret = base64.b32decode(text + "=" * (-len(text) % 8))
+    except ValueError:
+        raise Refused("second-factor secret is not base32", loud=True)
+    if len(secret) < 16:
+        raise Refused("second-factor secret too short", loud=True)
+    return secret
 
 
 def load_keys(path, must_be_root):
@@ -161,16 +199,22 @@ class Receiver:
         self.probe_lock = threading.Lock()  # one probe at a time: two would share one result file
         self.pending = None  # {"n2", "action", "key", "deadline" (monotonic)}
         self.last_fire_mono = None
+        self.clock = time.time  # the TOTP clock (tests step it)
         self.state_path = os.path.join(cfg["state_dir"], "state.json")
         self.alerts_path = os.path.join(cfg["state_dir"], "alerts")
-        self.state = {"kill_state": "DISARMED", "last_fire": 0, "seen_n1": []}
+        self.state = {"kill_state": "DISARMED", "last_fire": 0, "seen_n1": [], "totp_step": {}, "totp_fails": {}}
         try:
             with open(self.state_path) as f:
                 d = json.load(f)
             if not (isinstance(d, dict) and d.get("kill_state", "DISARMED") in ("DISARMED", "ARMED", "LOCKED")
                     and isinstance(d.get("last_fire", 0), (int, float))
                     and isinstance(d.get("seen_n1", []), list)
-                    and all(isinstance(x, str) for x in d.get("seen_n1", []))):
+                    and all(isinstance(x, str) for x in d.get("seen_n1", []))
+                    and isinstance(d.get("totp_step", {}), dict)
+                    and all(isinstance(v, int) for v in d.get("totp_step", {}).values())
+                    and isinstance(d.get("totp_fails", {}), dict)
+                    and all(isinstance(v, list) and all(isinstance(t, (int, float)) for t in v)
+                            for v in d.get("totp_fails", {}).values())):
                 raise ValueError("wrong shape")
             self.state.update(d)
         except FileNotFoundError:
@@ -222,7 +266,7 @@ class Receiver:
         return abs(now - float(self.state.get("last_fire") or 0)) < DEFIB_COOLDOWN
 
     # ---- the two steps -----------------------------------------------------
-    def verify(self, body, step, nonce_field):
+    def verify(self, body, step, nonce_field, code=None):
         """Check one signed step. Two shapes (design section 6, and B for the WebAuthn spares):
         p256:     {action, <nonce>, key, sig}
         webauthn: {action, <nonce>, credentialId, authenticatorData, clientDataJSON, sig}
@@ -237,8 +281,15 @@ class Receiver:
             raise Refused("unknown action")
         if not NONCE_RE.fullmatch(nonce):
             raise Refused("nonce must be 64 lowercase hex")
+        if step == "confirm" and action in TOTP_ACTIONS:
+            if not isinstance(code, str) or not TOTP_RE.fullmatch(code):
+                raise Refused(f"this command needs the 6-digit code from Aegis entry kill-switch {TOTP_ACTIONS[action]}")
+        elif code is not None:
+            raise Refused("malformed body")
         keys = load_keys(self.cfg["keys_file"], self.cfg["keys_must_be_root"])
         signed = signed_bytes(self.box, action, step, nonce)
+        if code is not None:
+            signed += f"\n{code}".encode()  # the passkey signs the code too: it can't be moved to another request
         if set(body) == p256:
             name = body["key"]
             if name not in keys:
@@ -300,7 +351,8 @@ class Receiver:
         return {"result": "pending", "n2": n2}
 
     def confirm(self, body):
-        action, n2, name = self.verify(body, "confirm", "n2")
+        code = body.pop("totp", None) if isinstance(body, dict) else None
+        action, n2, name = self.verify(body, "confirm", "n2", code)
         p = self.pending
         if p is None:
             raise Refused("no pending request")
@@ -313,9 +365,44 @@ class Receiver:
         if time.monotonic() >= p["deadline"]:
             self.pending = None
             raise Refused("confirm too late (over 90 s)")
-        self.pending = None  # consumed: the same n2 can't pass twice
+        self.pending = None  # consumed: the same n2 can't pass twice; a wrong code means asking again
+        if action in TOTP_ACTIONS:
+            self.check_totp(action, code)
         LOG.warning("confirm ok: action=%s key=%s", action, name)
         return {"result": self.act(action)}
+
+    def clock_synced(self):
+        try:
+            out = subprocess.run(self.cfg["clock_check"], capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.SubprocessError) as e:
+            LOG.error("clock check failed: %s", e)
+            return False
+        return out.returncode == 0 and out.stdout.strip() == "yes"
+
+    def check_totp(self, action, code):
+        """Only a passkey holder gets here (the code is inside the verified signature), so only they can use up the cap."""
+        now = self.clock()
+        fails = [t for t in self.state["totp_fails"].get(action, []) if 0 <= now - t < 3600]
+        if len(fails) >= TOTP_FAILS:
+            raise Refused(f"{TOTP_FAILS} wrong codes for {action} this hour: refused until {time.strftime('%H:%M', time.localtime(min(fails) + 3600))}", loud=True)
+        # After a power cut the clock may be days off until NTP answers: say so, and don't count it as a wrong code.
+        if not self.clock_synced():
+            raise Refused("the Pi's clock isn't synced yet, so codes can't be checked; try again in a minute", loud=True)
+        secret = load_totp_secret(os.path.join(self.cfg["totp_dir"], action), self.cfg["keys_must_be_root"])
+        t = int(now // 30)
+        good = [s for s in (t - 1, t, t + 1) if hmac.compare_digest(totp(secret, s), code)]
+        last = self.state["totp_step"].get(action, -1)
+        if good and max(good) > last:
+            self.state["totp_step"][action] = max(good)
+            self.state["totp_fails"][action] = fails
+            self.save()
+            return
+        if good:
+            raise Refused("that code was already used: wait for the next one", loud=True)
+        fails.append(now)
+        self.state["totp_fails"][action] = fails
+        self.save()
+        raise Refused(f"wrong code for {action} ({len(fails)} of {TOTP_FAILS} this hour); check it's the kill-switch {TOTP_ACTIONS[action]} entry", loud=True)
 
     # ---- actions -----------------------------------------------------------
     def act(self, action):
