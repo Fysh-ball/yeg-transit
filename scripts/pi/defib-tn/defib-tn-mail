@@ -80,8 +80,11 @@ def day_count():
 
 def resolve_args():
     """Pin api.resend.com through 1.1.1.1 only if the system resolver can't find it."""
-    if subprocess.run(["getent", "hosts", "api.resend.com"], capture_output=True, timeout=10).returncode == 0:
-        return []
+    try:
+        if subprocess.run(["getent", "hosts", "api.resend.com"], capture_output=True, timeout=10).returncode == 0:
+            return []
+    except subprocess.TimeoutExpired:
+        pass  # measured 2026-11-09: pi-ts lists a dead 127.0.0.1 resolver first, so this can time out
     r = subprocess.run(["dig", "@1.1.1.1", "+short", "+time=3", "+tries=2", "A", "api.resend.com"],
                        capture_output=True, text=True, timeout=15)
     ips = [l for l in r.stdout.split() if l[:1].isdigit()]
