@@ -9,9 +9,11 @@ self.addEventListener("activate", (e) => e.waitUntil(
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
-  // Network first so updates land; cache when offline.
+  // Network first so updates land; the saved copy when offline or when the site answers an error (a 5xx while online
+  // must still open the saved timetables and the 31100 button). A page with a ?query falls back to the saved app.
+  const saved = () => caches.match(e.request).then((c) => c || (e.request.mode === "navigate" ? caches.match("./") : undefined));
   e.respondWith(fetch(e.request).then((r) => {
-    if (r.ok) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); } // an error page must not replace the offline copy
-    return r;
-  }).catch(() => caches.match(e.request)));
+    if (r.ok) { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); return r; } // an error page must not replace the offline copy
+    return r.status >= 500 ? saved().then((c) => c || r) : r;
+  }).catch(() => saved().then((c) => c || Response.error())));
 });
