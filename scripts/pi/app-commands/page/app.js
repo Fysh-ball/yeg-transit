@@ -23,9 +23,6 @@ function b64(buf) {
   for (const b of new Uint8Array(buf)) s += String.fromCharCode(b);
   return btoa(s);
 }
-function hex(buf) {
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 function say(text, cls) {
   const st = $("status");
   st.textContent = text;
@@ -59,31 +56,18 @@ async function post(path, body) {
   return out;
 }
 
-let pending = null; // {action, n2}
+let pending = null; // {action}
 
-async function ask(action) {
-  busy(true);
-  try {
-    say(`Asking the Pi to ${WORDS[action]}. Unlock your key.`);
-    const n1 = hex(crypto.getRandomValues(new Uint8Array(32)));
-    const out = await post("/request", { action, n1, ...(await sign(action, "request", n1)) });
-    if (out.result !== "pending" || !out.n2) {
-      say(out.result, "bad");
-      return;
-    }
-    pending = { action, n2: out.n2 };
-    $("confirm-q").textContent = `pi: ${WORDS[action]}. Confirm?`;
-    $("code-box").style.display = TOTP[action] ? "block" : "none";
-    $("code-label").textContent = TOTP[action] ? `6-digit code from Aegis entry "kill-switch ${TOTP[action]}"` : "";
-    $("code").value = "";
-    $("actions").style.display = "none";
-    $("confirm").style.display = "block";
-    say("The Pi is waiting 90 seconds for your answer.");
-  } catch (e) {
-    say(`Not sent: ${e.name}: ${e.message}`, "bad");
-  } finally {
-    busy(false);
-  }
+// The first tap only opens the question: nothing is signed or sent until "Yes", which unlocks the key once.
+function ask(action) {
+  pending = { action };
+  $("confirm-q").textContent = `pi: ${WORDS[action]}. Confirm?`;
+  $("code-box").style.display = TOTP[action] ? "block" : "none";
+  $("code-label").textContent = TOTP[action] ? `6-digit code from Aegis entry "kill-switch ${TOTP[action]}"` : "";
+  $("code").value = "";
+  $("actions").style.display = "none";
+  $("confirm").style.display = "block";
+  say("Tap Yes, then unlock your key once.");
 }
 
 function reset() {
@@ -94,7 +78,7 @@ function reset() {
 
 async function confirmIt() {
   if (!pending) return;
-  const { action, n2 } = pending;
+  const { action } = pending;
   const code = TOTP[action] ? $("code").value.trim() : undefined;
   // LOCK may go empty: the Pi takes it on the passkey alone only while its clock isn't synced (after a power cut).
   if (code !== undefined && !/^[0-9]{6}$/.test(code) && !(action === "kill-on" && code === "")) {
@@ -103,8 +87,14 @@ async function confirmIt() {
   }
   busy(true);
   try {
-    say("Unlock your key again to confirm.");
-    const out = await post("/confirm", { action, n2, ...(code ? { totp: code } : {}), ...(await sign(action, "confirm", n2, code || undefined)) });
+    say("Unlock your key.");
+    const ch = await post("/challenge", {});
+    if (ch.result !== "challenge" || !/^[0-9a-f]{64}$/.test(ch.n || "")) {
+      say(ch.result, "bad");
+      return;
+    }
+    const n = ch.n;
+    const out = await post("/command", { action, n, ...(code ? { totp: code } : {}), ...(await sign(action, "command", n, code || undefined)) });
     say(out.result, out.result.startsWith("refused") || out.result.startsWith("probe failed") ? "bad" : "good");
     reset();
   } catch (e) {
@@ -146,6 +136,6 @@ async function enroll() {
 
 for (const b of document.querySelectorAll("#actions button")) b.addEventListener("click", () => ask(b.dataset.action));
 $("yes").addEventListener("click", confirmIt);
-$("no").addEventListener("click", () => { reset(); say("Cancelled. The Pi forgets it after 90 seconds."); });
+$("no").addEventListener("click", () => { reset(); say("Cancelled. Nothing was sent."); });
 $("enroll").addEventListener("click", enroll);
 if (!window.PublicKeyCredential) say("This browser has no passkey support.", "bad");

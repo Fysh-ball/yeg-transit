@@ -672,5 +672,72 @@ class SecondFactor(unittest.TestCase):
         self.assertEqual(out["result"], "pi: ARMED")
 
 
+
+class OneTap(unittest.TestCase):
+    """The page's one-assertion flow: /challenge, then one signed /command (owner, 2026-11-09)."""
+
+    def setUp(self):
+        self.r = Rig()
+
+    def tearDown(self):
+        self.r.close()
+
+    def challenge(self):
+        code, out = self.r.post("/challenge", {})
+        self.assertEqual((code, out["result"]), (200, "challenge"), out)
+        return out["n"]
+
+    def command(self, action, n, code=None, step="command"):
+        extra = f"\n{code}".encode() if code is not None else b""
+        body = {"action": action, "n": n, **assertion(self.r.yubikey, "pi", action, step, n, extra=extra)}
+        if code is not None:
+            body["totp"] = code
+        return self.r.post("/command", body)
+
+    def test_lock_is_one_assertion_and_a_dry_run(self):
+        out = self.command("kill-on", self.challenge(), self.r.code("kill-on"))
+        self.assertEqual(out, (200, {"result": "dry run: would lock pi"}))
+
+    def test_challenge_is_good_once(self):
+        n = self.challenge()
+        self.assertEqual(self.command("defib-fire", n)[1]["result"], "dry run: would fire")
+        self.assertIn("already used", self.command("defib-fire", n)[1]["result"])
+        self.assertIn("unknown challenge", self.command("defib-fire", "0" * 16 + n[16:])[1]["result"])
+
+    def test_made_up_nonce(self):
+        self.assertIn("unknown challenge", self.command("probe", secrets.token_hex(32))[1]["result"])
+
+    def test_confirm_signature_is_not_a_command(self):
+        self.assertEqual(self.command("defib-fire", self.challenge(), step="confirm")[1]["result"],
+                         "refused: WebAuthn challenge is not these signed bytes")
+
+    def test_bad_signature_leaves_the_challenge(self):
+        n = self.challenge()
+        body = {"action": "defib-fire", "n": n, **assertion(self.r.stranger, "pi", "defib-fire", "command", n)}
+        self.assertEqual(self.r.post("/command", body)[1]["result"], "refused: bad signature")
+        self.assertEqual(self.command("defib-fire", n)[1]["result"], "dry run: would fire")
+
+    def test_too_late(self):
+        ms = "%016x" % int((time.monotonic() - acr.CONFIRM_WINDOW - 1) * 1000)
+        self.assertIn("too late", self.command("defib-fire", ms + self.r.rx.challenge_mac(ms))[1]["result"])
+
+    def test_arm_needs_its_code(self):
+        self.assertIn("6-digit code", self.command("kill-arm", self.challenge())[1]["result"])
+        self.assertEqual(self.command("kill-arm", self.challenge(), self.r.code("kill-arm"))[1]["result"], "pi: ARMED")
+
+    def test_code_is_inside_the_signature(self):
+        n = self.challenge()
+        body = {"action": "kill-arm", "n": n, "totp": self.r.code("kill-arm"),
+                **assertion(self.r.yubikey, "pi", "kill-arm", "command", n, extra=b"\n000000")}
+        self.assertEqual(self.r.post("/command", body)[1]["result"], "refused: WebAuthn challenge is not these signed bytes")
+
+    def test_a_flood_of_challenges_cannot_push_out_the_owners(self):
+        n = self.challenge()
+        for _ in range(200):
+            self.challenge()
+        self.assertEqual(self.r.rx.used_n, {})
+        self.assertEqual(self.command("kill-on", n, self.r.code("kill-on"))[1]["result"], "dry run: would lock pi")
+
+
 if __name__ == "__main__":
     unittest.main()

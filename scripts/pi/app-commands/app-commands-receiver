@@ -4,6 +4,9 @@
 Design: ~/.cache/app-commands/design.md (v4, 2026-10-30), section 3. Two signed steps:
   POST /request {action, n1, key, sig}  ->  {"result": "pending", "n2": <hex>}
   POST /confirm {action, n2, key, sig}  ->  {"result": "fired" | "dry run: would fire" | "refused: <why>" ...}
+The WebAuthn page signs once per command instead (owner, 2026-11-09: two key prompts per tap was too many):
+  POST /challenge {}                       ->  {"result": "challenge", "n": <hex>}   (unsigned, good once, 90 s)
+  POST /command {action, n, <signature>}   ->  same results as /confirm; its step in the signed bytes is "command"
 The signed bytes are b"app-commands/v1\\n<box>\\n<action>\\n<step>\\n<nonce hex>". The signature is the only
 authority: the source address is logged, never trusted.
 
@@ -198,6 +201,10 @@ class Receiver:
         self.lock = threading.Lock()  # every request's check-and-act runs under it
         self.probe_lock = threading.Lock()  # one probe at a time: two would share one result file
         self.pending = None  # {"n2", "action", "key", "deadline" (monotonic)}
+        # /challenge keeps no state: its nonce is a time plus this process's MAC of it, so unsigned callers can't
+        # fill or evict anything. Only a signed /command records a nonce as used (checker, 2026-11-09).
+        self.challenge_key = secrets.token_bytes(32)
+        self.used_n = {}  # nonce -> its deadline (monotonic); pruned as they pass
         self.last_fire_mono = None
         self.clock = time.time  # the TOTP clock (tests step it)
         self.state_path = os.path.join(cfg["state_dir"], "state.json")
@@ -281,7 +288,7 @@ class Receiver:
             raise Refused("unknown action")
         if not NONCE_RE.fullmatch(nonce):
             raise Refused("nonce must be 64 lowercase hex")
-        if step == "confirm" and action in TOTP_ACTIONS:
+        if step in ("confirm", "command") and action in TOTP_ACTIONS:
             # LOCK may come without a code: check_totp lets that through only while the clock can't check one.
             if not (code is None and action == "kill-on") and (not isinstance(code, str) or not TOTP_RE.fullmatch(code)):
                 raise Refused(f"this command needs the 6-digit code from Aegis entry kill-switch {TOTP_ACTIONS[action]}")
@@ -370,6 +377,34 @@ class Receiver:
         if action in TOTP_ACTIONS:
             self.check_totp(action, code)
         LOG.warning("confirm ok: action=%s key=%s", action, name)
+        return {"result": self.act(action)}
+
+    def challenge_mac(self, ms_hex):
+        return hmac.new(self.challenge_key, ms_hex.encode(), hashlib.sha256).hexdigest()[:48]
+
+    def challenge(self):
+        """Unsigned on purpose: a nonce is worth nothing until a passkey signs over it in /command."""
+        ms = "%016x" % int(time.monotonic() * 1000)
+        return {"result": "challenge", "n": ms + self.challenge_mac(ms)}
+
+    def command(self, body):
+        """One signed step: the page's own second tap is the confirm, the Pi's nonce is the freshness."""
+        code = body.pop("totp", None) if isinstance(body, dict) else None
+        action, n, name = self.verify(body, "command", "n", code)
+        # Checked only after the signature: an unsigned caller can't spend or probe the owner's nonce.
+        if not hmac.compare_digest(n[16:], self.challenge_mac(n[:16])):
+            raise Refused("unknown challenge (made up, or from before a restart)", loud=True)
+        now = time.monotonic()
+        self.used_n = {k: d for k, d in self.used_n.items() if d > now}
+        if n in self.used_n:
+            raise Refused("challenge already used", loud=True)
+        deadline = int(n[:16], 16) / 1000 + CONFIRM_WINDOW
+        if now >= deadline:
+            raise Refused("too late (over 90 s): tap again")
+        self.used_n[n] = deadline
+        if action in TOTP_ACTIONS:
+            self.check_totp(action, code)
+        LOG.warning("command ok: action=%s key=%s", action, name)
         return {"result": self.act(action)}
 
     def clock_synced(self):
@@ -609,7 +644,8 @@ def make_handler(rx):
                 # The cloudflared tunnel (design C). Logged only, never trusted: the signature is the authority.
                 src = "tunnel:" + (re.sub(r"[^0-9a-fA-F:.]", "", self.headers.get("CF-Connecting-IP", ""))[:45]
                                    or "unknown")
-            step = {"/request": "request", "/confirm": "confirm"}.get(self.path)
+            step = {"/request": "request", "/confirm": "confirm", "/challenge": "challenge",
+                    "/command": "command"}.get(self.path)
             try:
                 if step is None:
                     raise Refused("not found")
@@ -628,7 +664,8 @@ def make_handler(rx):
                 except ValueError:
                     raise Unparseable("body is not JSON")
                 with rx.lock:
-                    out = rx.request(body) if step == "request" else rx.confirm(body)
+                    out = {"request": rx.request, "confirm": rx.confirm, "command": rx.command,
+                           "challenge": lambda _b: rx.challenge()}[step](body)
                 if out["result"] is PROBE:  # verified and consumed under the lock; the 60 s check runs outside it
                     out = {"result": rx.probe()}
                 self.reply(200, out)
