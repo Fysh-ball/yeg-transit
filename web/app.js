@@ -460,8 +460,8 @@ function drawCityPick() {
   el.hidden = cities.length < 2;
   el.innerHTML = cities.map((c) => `<button type="button" class="chip" data-city="${c}" aria-pressed="${c === city}">${CITY[c].name}</button>`).join("");
   $("#q").placeholder = city === "yeg" ? "Address, place or stop #" : "Stop name or number";
-  // ponytail: wording to be checked against Open Calgary's terms before go-live; shown only where Calgary is served.
-  const credit = cities.includes("cgy") ? "Contains information licensed under the Open Government Licence \u2013 City of Edmonton, and from the City of Calgary under its Open Data Terms of Use. Not an official ETS or Calgary Transit app." : "";
+  // Calgary's exact line (licence v2.1, read 2026-11-10): "Contains information licensed under the Open Government Licence \u2013 City of Calgary." Shown only where Calgary is served; the licence link goes on About at go-live.
+  const credit = cities.includes("cgy") ? "Contains information licensed under the Open Government Licence \u2013 City of Edmonton and the Open Government Licence \u2013 City of Calgary. Not an official ETS or Calgary Transit app." : "";
   for (const id of ["#credit", "#legal"]) if (credit) $(id).firstChild.textContent = credit;
 }
 function setCity(c, quiet = false) {
