@@ -811,7 +811,8 @@ def walk_weather(city="yeg"):
         c, hr = r["current"], r.get("hourly") or {}
     except Exception as e:
         print("weather lookup failed:", repr(e), file=sys.stderr)
-        w["at"] = time.time() - 600  # retry in 5 min, keep the last answer meanwhile
+        # retry in 5 min, keep the last answer meanwhile; our own 10 s gap (Busy) is no host trouble: 15 s
+        w["at"] = time.time() - (885 if isinstance(e, Busy) else 600)
         if time.time() - w["good"] > 7200:  # but not for hours: "+2 for snow" and 1° must be today's weather
             w["value"] = dict(NO_WEATHER)
         return w["value"]

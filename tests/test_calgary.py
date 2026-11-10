@@ -243,6 +243,13 @@ class WeatherPerCity(unittest.TestCase):
         again, seen = self.ask("yeg", 99)  # inside 15 min: no second call, and Calgary's answer didn't overwrite it
         self.assertEqual((again["temp"], seen), (-3, []))
 
+    def test_a_busy_gap_retries_in_15_s_not_5_min(self):  # Edmonton's call just before Calgary's first
+        def busy(url, timeout):
+            raise app.Busy("api.open-meteo.com: one call per 10 s")
+        with mock.patch.object(app.OPEN_METEO, "get_json", busy):
+            app.walk_weather("cgy")
+        self.assertAlmostEqual(900 - (time.time() - app.WEATHER["cgy"]["at"]), 15, delta=2)
+
     def test_the_calgary_route_serves_calgarys_weather(self):
         with mock.patch.object(app, "walk_weather", lambda city="yeg": {"temp": city}):
             self.assertEqual(app.cgy_route(None, ["weather"], {}), ({"temp": "cgy"}, 600))
