@@ -808,7 +808,7 @@ async function openMap(dep) {
   m.map.invalidateSize();
   if (s && s.lat) m.map.setView([s.lat, s.lon], 15);
   // The route line first, under everything; a missing shape only costs the line.
-  m.pts = null; m.color = getComputedStyle(label).backgroundColor; m.line = L.layerGroup().addTo(m.layer);
+  m.pts = null; m.color = getComputedStyle(label).backgroundColor; if (m.color === "rgba(0, 0, 0, 0)") m.color = "#17694a"; /* Calgary publishes no route colours: the brand green */ m.line = L.layerGroup().addTo(m.layer);
   api(`trips/${encodeURIComponent(m.trip)}/shape?${cq(m.city).slice(1)}`).then((pts) => {
     if (m.trip !== dep.dataset.trip || !pts.length) return;
     m.pts = pts;
