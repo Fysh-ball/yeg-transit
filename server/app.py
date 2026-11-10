@@ -232,13 +232,16 @@ class CgyLive:
             if time.time() - self.fetched < self.FRESH:
                 return
             self.fetched = time.time()  # on every attempt: a failing host is not asked again for 30 s
+            body = b""
             try:
                 f = gtfs_realtime_pb2.FeedMessage()
-                f.ParseFromString(self.get())
+                body = self.get()
+                f.ParseFromString(body)
                 self.trips, self.ts, self.error = self.load(f), f.header.timestamp, None
             except Exception as e:  # Busy included: the old copy ages out by itself
                 self.error = f"{type(e).__name__}: {e}"
-                print(f"{type(self).__name__} poll failed:", self.error, file=sys.stderr)
+                # the length shows a cut-short file (Calgary's came back 253,952 / 491,520 / 1,007,616 bytes, 2026-11-10)
+                print(f"{type(self).__name__} poll failed:", self.error, f"({len(body)} bytes read)", file=sys.stderr)
 
     def trip(self, trip_id):
         return self.trips.get(trip_id) if self.ts and time.time() - self.ts <= self.STALE else None

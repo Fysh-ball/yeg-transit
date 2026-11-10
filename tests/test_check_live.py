@@ -43,9 +43,11 @@ def site(shows, live_age=10):  # the site's answer for stop 1407: route 002 at `
 
 def calgary(cities=("yeg", "cgy"), buses=1, age=20, live_age=30):  # the site's three Calgary answers, healthy by default
     b = "https://canadabus.org/api/"
-    return {b + "cities": [json.dumps({"cities": list(cities)}).encode()],
-            b + "vehicles": [json.dumps({"now": NOW, "age": age, "buses": [[51.0, -114.0, 0, "10", "x", "t"]] * buses}).encode()],
-            b + f"stops/{check_live.CGY_STOP}/departures": [json.dumps({"now": NOW, "live_age": live_age, "departures": []}).encode()]}
+    v = json.dumps({"now": NOW, "age": age, "buses": [[51.0, -114.0, 0, "10", "x", "t"]] * buses}).encode()
+    d = json.dumps({"now": NOW, "live_age": live_age, "departures": []}).encode()
+    # twice each: a fault gets a second look
+    return {b + "cities": [json.dumps({"cities": list(cities)}).encode()], b + "vehicles": [v, v],
+            b + f"stops/{check_live.CGY_STOP}/departures": [d, d]}
 
 
 class CheckLive(unittest.TestCase):
@@ -204,6 +206,19 @@ class CheckLive(unittest.TestCase):
         w, k = self.calgary_run(calgary(cities=("yeg",)))
         self.assertIn("isn't listed", w[0])
         self.assertEqual(k, ["wrong calgary cities"])
+
+    def test_a_fault_that_mends_by_the_second_look_passes_after_waiting_past_the_servers_30s(self):
+        good, bad = calgary(), calgary(live_age=None)
+        mixed = {**good, **{k: [bad[k][0], good[k][0]] for k in good if "cities" not in k}}
+        with mock.patch.object(check_live.time, "sleep") as sleep:
+            self.assertEqual(self.calgary_run(mixed), ([], []))
+        sleep.assert_called_once_with(check_live.CGY_RETRY)
+        self.assertGreater(check_live.CGY_RETRY, 30)
+
+    def test_a_healthy_calgary_is_looked_at_once_with_no_wait(self):
+        with mock.patch.object(check_live.time, "sleep") as sleep:
+            self.calgary_run(calgary())
+        sleep.assert_not_called()
 
     def test_a_dead_calgary_pages_through_main_and_exits_1(self):
         code, out = self.run_check(self.answers(site(45), cgy=calgary(live_age=900)), "--page")
