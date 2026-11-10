@@ -81,8 +81,9 @@ class Host:
 
 # Limits: data.edmonton.ca (Socrata) publishes no number for calls without an app token (unknown), so 2 a second and
 # 5,000 a day; Photon's public API is fair-use with no number (unknown), so 1 a second and 5,000 a day; Open-Meteo's
-# free tier is 600 a minute and 10,000 a day (open-meteo.com/en/terms), we need 1 per 15 min, capped at 1 a minute.
-SOCRATA, PHOTON_HOST, OPEN_METEO = Host("data.edmonton.ca", 0.5, 5000), Host("photon.komoot.io", 1, 5000), Host("api.open-meteo.com", 60, 500)
+# free tier is 600 a minute and 10,000 a day (open-meteo.com/en/terms), we need 1 per 15 min per city (2 cities: about
+# 200 a day), capped at 1 per 10 s so two cities' first looks don't block each other.
+SOCRATA, PHOTON_HOST, OPEN_METEO = Host("data.edmonton.ca", 0.5, 5000), Host("photon.komoot.io", 1, 5000), Host("api.open-meteo.com", 10, 500)
 
 
 class Unchanged(Exception):
@@ -770,7 +771,9 @@ def stop_where(db, stop):
     return out
 
 
-WEATHER = {"at": 0, "good": 0, "value": {"extra": 0, "why": "", "soon": "", "temp": None}}
+NO_WEATHER = {"extra": 0, "why": "", "soon": "", "temp": None}
+WEATHER = {}  # city -> {"at", "good", "value"}: one answer per city, each cached 15 min
+CITY_XY = {"yeg": (53.54, -113.49), "cgy": (51.05, -114.07)}  # both Mountain time
 PHOTON, PHOTON_LOCK = {"cache": {}}, threading.Lock()  # cache: Photon URL -> answer, newest 500
 
 
@@ -794,12 +797,13 @@ def weather_icon(code, wind, gusts, is_day):
     return "sun" if is_day else "moon"  # 0 and 1, and a code we don't know: a plain sky
 
 
-def walk_weather():
-    """Extra walking minutes for Edmonton's weather right now (0 to 3), from Open-Meteo; cached 15 min.
+def walk_weather(city="yeg"):
+    """Extra walking minutes for a city's weather right now (0 to 3), from Open-Meteo; cached 15 min.
     The page adds it on top of the walk time you set."""
-    if time.time() - WEATHER["at"] < 900:
-        return WEATHER["value"]
-    url = "https://api.open-meteo.com/v1/forecast?" + urlencode({"latitude": 53.54, "longitude": -113.49, "current":
+    w = WEATHER.setdefault(city, {"at": 0, "good": 0, "value": dict(NO_WEATHER)})
+    if time.time() - w["at"] < 900:
+        return w["value"]
+    url = "https://api.open-meteo.com/v1/forecast?" + urlencode({"latitude": CITY_XY[city][0], "longitude": CITY_XY[city][1], "current":
           "temperature_2m,apparent_temperature,rain,showers,snowfall,snow_depth,weather_code,wind_speed_10m,wind_gusts_10m,is_day", "hourly": "precipitation_probability,snowfall",
           "forecast_hours": 12, "timezone": "America/Edmonton"})
     try:
@@ -807,10 +811,10 @@ def walk_weather():
         c, hr = r["current"], r.get("hourly") or {}
     except Exception as e:
         print("weather lookup failed:", repr(e), file=sys.stderr)
-        WEATHER["at"] = time.time() - 600  # retry in 5 min, keep the last answer meanwhile
-        if time.time() - WEATHER["good"] > 7200:  # but not for hours: "+2 for snow" and 1° must be today's weather
-            WEATHER["value"] = {"extra": 0, "why": "", "soon": "", "temp": None}
-        return WEATHER["value"]
+        w["at"] = time.time() - 600  # retry in 5 min, keep the last answer meanwhile
+        if time.time() - w["good"] > 7200:  # but not for hours: "+2 for snow" and 1° must be today's weather
+            w["value"] = dict(NO_WEATHER)
+        return w["value"]
     extra, why = 0, []
     if (c.get("snowfall") or 0) > 0:
         extra, why = extra + 2, why + ["snow"]
@@ -826,10 +830,10 @@ def walk_weather():
     if wet:
         soon = ("Snow" if any((x or 0) > 0 for x in hr.get("snowfall") or []) else "Rain") + (" soon" if wet[0] < 3 else " later")
     temp = c.get("temperature_2m")
-    WEATHER.update(at=time.time(), good=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why), "soon": soon,
+    w.update(at=time.time(), good=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why), "soon": soon,
                                           "temp": None if temp is None else round(temp),
                                           "icon": weather_icon(c.get("weather_code"), c.get("wind_speed_10m"), c.get("wind_gusts_10m"), c.get("is_day", 1))})
-    return WEATHER["value"]
+    return w["value"]
 
 
 # Street plowing from the City's "Snow and Ice Clearing Route Status" (data.edmonton.ca 8pdx-hfxi, updated hourly,
@@ -1067,6 +1071,8 @@ def cgy_stop(r):
 
 def cgy_route(db, parts, q):
     """(json, cache seconds) for Calgary's few routes: search, near, a stop's departures and timetable."""
+    if parts == ["weather"]:
+        return walk_weather("cgy"), 600
     if parts == ["stops", "search"]:
         text = q["q"].strip()
         words = [w for w in re.split(r"\W+", text.lower()) if w and w not in FILLER]

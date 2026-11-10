@@ -219,5 +219,34 @@ class CitiesRoute(unittest.TestCase):
                 self.assertEqual(self.get("/api/stops/cgy:6451/departures")[0], 404)
 
 
+class WeatherPerCity(unittest.TestCase):
+    """The sky chip follows the city (2026-11-10: Calgary showed Edmonton's temperature): own coordinates, own 15 min cache."""
+    def setUp(self):
+        for p in (mock.patch.dict(app.WEATHER, clear=True),):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def ask(self, city, temp):
+        seen = []
+        def get_json(url, timeout):
+            seen.append(url)
+            return {"current": {"temperature_2m": temp, "weather_code": 0}, "hourly": {}}
+        with mock.patch.object(app.OPEN_METEO, "get_json", get_json):
+            return app.walk_weather(city), seen
+
+    def test_each_city_asks_for_its_own_coordinates_and_caches_its_own_answer(self):
+        e, seen = self.ask("yeg", -3.4)
+        self.assertIn("latitude=53.54", seen[0])
+        c, seen = self.ask("cgy", 6.2)
+        self.assertIn("latitude=51.05", seen[0])
+        self.assertEqual((e["temp"], c["temp"]), (-3, 6))
+        again, seen = self.ask("yeg", 99)  # inside 15 min: no second call, and Calgary's answer didn't overwrite it
+        self.assertEqual((again["temp"], seen), (-3, []))
+
+    def test_the_calgary_route_serves_calgarys_weather(self):
+        with mock.patch.object(app, "walk_weather", lambda city="yeg": {"temp": city}):
+            self.assertEqual(app.cgy_route(None, ["weather"], {}), ({"temp": "cgy"}, 600))
+
+
 if __name__ == "__main__":
     unittest.main()

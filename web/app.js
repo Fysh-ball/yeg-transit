@@ -140,7 +140,7 @@ function showWeather() {
   el.hidden = false;
 }
 async function loadWeather() {
-  try { wx = await api("weather"); } catch (e) { console.warn("weather:", e.message); }
+  try { wx = await api(city === "yeg" ? "weather" : `weather?${cq(city).slice(1)}`); } catch (e) { console.warn("weather:", e.message); }
   showWeather();
 }
 function grouped(s, list, now) {
@@ -468,6 +468,7 @@ function drawCityPick() {
 function setCity(c, quiet = false) {
   if (c === city || !cities.includes(c)) return;
   city = c;
+  loadWeather().then(() => renderAll()); // the sky chip and walk padding follow the city
   try { localStorage.setItem("yeg.city", c); } catch { /* storage blocked: kept for this visit only */ }
   drawCityPick();
   if (quiet) return;
@@ -476,7 +477,7 @@ function setCity(c, quiet = false) {
 }
 async function loadCities() {
   try { cities = (await api("cities")).cities.filter((c) => CITY[c]); } catch (e) { console.warn("cities:", e.message); }
-  if (!cities.includes(city)) city = "yeg";
+  if (!cities.includes(city)) { city = "yeg"; loadWeather().then(() => renderAll()); } // a saved city we no longer serve: its weather was asked for
   drawCityPick();
   autoCity();
 }
@@ -1306,4 +1307,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=120").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=121").catch((e) => console.warn("sw:", e.message));
