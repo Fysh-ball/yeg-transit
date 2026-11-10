@@ -784,6 +784,67 @@ def snow_loop():
         time.sleep((wait or 900) * random.uniform(0.8, 1.2))
 
 
+def snow_class(status):
+    """The City's status words as one of done / doing / todo / other, or None for NA (not in this event).
+    ponytail: the words are guessed from the data set's description; the first declared event shows the real ones."""
+    u = (status or "").strip().lower()
+    if u in ("", "na", "n/a"):
+        return None
+    if any(w in u for w in ("not", "pending", "schedul", "wait", "queue")):
+        return "todo"
+    if any(w in u for w in ("complet", "done", "finish", "clear")):
+        return "done"
+    if any(w in u for w in ("progress", "active", "plow", "under")):
+        return "doing"
+    return "other"
+
+
+def simplify(pts, tol):
+    """Douglas-Peucker on (lat, lon) in degrees; tol in degrees. Keeps the ends."""
+    if len(pts) < 3:
+        return pts
+    keep, todo = {0, len(pts) - 1}, [(0, len(pts) - 1)]
+    while todo:
+        a, b = todo.pop()
+        (ay, ax), (by, bx) = pts[a], pts[b]
+        dx, dy = bx - ax, by - ay
+        far, at = 0.0, None
+        for i in range(a + 1, b):
+            y, x = pts[i]
+            d = abs(dy * (x - ax) - dx * (y - ay)) / (math.hypot(dx, dy) or 1) if dx or dy else math.hypot(x - ax, y - ay)
+            if d > far:
+                far, at = d, i
+        if at is not None and far > tol:
+            keep.add(at)
+            todo += [(a, at), (at, b)]
+    return [pts[i] for i in sorted(keep)]
+
+
+def snow_map(south, west, north, east, zoom):
+    """The plow-route segments in a map window, coloured by the City's status, lines thinned to what a pixel can show.
+    Nothing outside a declared event. A phone gets only what is in view, never the 9 MB of shapes.
+    ponytail: scans all ~2,240 segments per ask (about 70k points); a visitor cache at the edge, or the grid, if that shows."""
+    if not SNOW["event"]:
+        return {"event": False}
+    if not (north - south <= 0.3 and east - west <= 0.5):
+        raise ValueError("window too large")
+    tol = 156543 * 0.595 / 2 ** max(8, min(zoom, 19)) * 1.2 / 111320  # 1.2 px, in degrees of latitude
+    out = []
+    for rid, road, lines in SNOW["segs"]:
+        cls = snow_class(SNOW["stat"].get(rid))
+        if not cls:
+            continue
+        keep = []
+        for line in lines:
+            if any(south <= la <= north and west <= lo <= east for la, lo in line):
+                keep.append([[round(la, 5), round(lo, 5)] for la, lo in simplify(line, tol)])
+        if keep:
+            out.append([cls, road, SNOW["stat"][rid], keep])
+        if len(out) >= 1500:
+            break
+    return {"event": True, "as_of": SNOW["as_of"], "segs": out}
+
+
 def stop_snow(stop):
     """{"event": False} outside a snow event; in one, the stop's road and the City's words for it, or road None
     when the City's map doesn't cover this stop's street."""
@@ -987,6 +1048,8 @@ class Handler(SimpleHTTPRequestHandler):
                                       (parts[1], nxt, mine[0])).fetchone()[0]
                     out["stops_away"] = left if mine[0] >= nxt else None
             return self.json(out)
+        if parts == ["snow", "map"]:
+            return self.json(snow_map(float(q["s"]), float(q["w"]), float(q["n"]), float(q["e"]), int(q.get("z", 14))), cache=60)
         if parts == ["stops", "search"]:
             text = q["q"].strip()
             text = (ALIASES.get(text.lower(), (None,))[0]) or text

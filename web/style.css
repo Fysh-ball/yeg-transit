@@ -223,6 +223,10 @@ html:has(.board.night) { background: #000; }
 #map-sheet .bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
 #map-sheet .bar h2 { flex: 1; min-width: 0; margin: 0; font-size: 1rem; }
 #map-sheet .bar .sub { display: block; font-weight: 400; color: var(--muted); font-size: .82rem; }
+#map-snow { margin: 0; padding: 0 14px 10px; font-size: .82rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+#map-snow[hidden] { display: none; }
+#map-snow span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+#map-snow i { width: 18px; height: 5px; border-radius: 3px; }
 #map-box { height: min(60dvh, 460px); background: var(--card-2); }
 #map-box :is(.leaflet-tile, .leaflet-gl-layer) { filter: var(--tile-filter); }
 #map-note { margin: 0; padding: 8px 14px calc(10px + env(safe-area-inset-bottom)); color: var(--muted); font-size: .82rem; }

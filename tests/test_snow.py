@@ -51,3 +51,29 @@ class Snow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SnowMap(unittest.TestCase):
+    def setUp(self):
+        p = mock.patch.dict(app.SNOW, {"near": {}, "stat": {}, "event": False, "as_of": 1})
+        p.start(); self.addCleanup(p.stop)
+        app.SNOW["segs"], app.SNOW["grid"] = app.snow_shapes(ROWS)
+        self.win = (53.40, -113.54, 53.41, -113.52)
+
+    def test_nothing_outside_an_event(self):
+        self.assertEqual(app.snow_map(*self.win, 15), {"event": False})
+
+    def test_in_an_event_only_the_window_and_only_roads_with_a_status(self):
+        app.SNOW.update(event=True, stat={"2sw 021 - 16": "In progress", "2sw 024 - 16": "NA"})
+        r = app.snow_map(*self.win, 15)
+        self.assertEqual([(s[0], s[1], s[2]) for s in r["segs"]], [("doing", "Allard Gt SW", "In progress")])
+        app.SNOW["stat"]["2sw 024 - 16"] = "Complete"
+        self.assertEqual(len(app.snow_map(*self.win, 15)["segs"]), 1)  # Andrews Gt is 3 km away: out of this window
+        self.assertEqual(len(app.snow_map(53.40, -113.60, 53.43, -113.52, 15)["segs"]), 2)
+
+    def test_status_words_and_thinning(self):
+        self.assertEqual([app.snow_class(x) for x in ("NA", "Not Started", "In Progress", "Complete", "Odd")],
+                         [None, "todo", "doing", "done", "other"])
+        line = [(53.0, -113.0), (53.00001, -113.005), (53.0, -113.01)]  # a 1 m kink on a 700 m line
+        self.assertEqual(len(app.simplify(line, 0.0001)), 2)
+        self.assertEqual(len(app.simplify(line, 0.000001)), 3)

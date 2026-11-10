@@ -759,7 +759,7 @@ async function openMap(dep) {
   if (!await sheetMap()) return;
   const m = mapState;
   m.trip = dep.dataset.trip; m.stop = s; m.style = label.getAttribute("style"); m.fitted = false;
-  m.label = label.textContent; m.bus = null; m.at = null; m.others = L.layerGroup();
+  $("#map-snow").hidden = true; m.label = label.textContent; m.bus = null; m.at = null; m.others = L.layerGroup();
   m.layer.clearLayers(); m.others.addTo(m.layer);
   m.map.invalidateSize();
   if (s && s.lat) m.map.setView([s.lat, s.lon], 15);
@@ -786,7 +786,7 @@ async function sheetMap() {
     const map = L.map("map-box", { zoomControl: false, maxZoom: 19 });
     baseMap(map);
     mapState = { map, layer: L.layerGroup().addTo(map), timer: 0 };
-    map.on("moveend", () => { if (mapState.trip === "all") { drawFleet(); drawStops(); } });
+    map.on("moveend", () => { if (mapState.trip === "all") { drawFleet(); drawStops(); drawSnow(); } });
   }
   clearInterval(mapState.timer);
   return true;
@@ -799,9 +799,12 @@ async function openLiveMap() {
   if (!await sheetMap()) return;
   const m = mapState, home = stops.find((s) => s.lat);
   m.trip = "all"; m.buses = []; m.busOpen = false; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
+  m.snow = L.layerGroup().addTo(m.layer); m.snowNo = 0; m.snowSeq = 0; m.snowCanvas = L.canvas({ padding: 0.3 }); // under the buses
   m.stopPins = L.layerGroup().addTo(m.layer); m.stopsAt = null;
+  $("#map-snow").hidden = true;
   m.map.invalidateSize();
   m.map.setView(home ? [home.lat, home.lon] : [53.5461, -113.4938], 14); // your first stop, or downtown
+  drawSnow();
   await placeFleet();
   if (!$("#map-sheet").open || m.trip !== "all") return; // closed, or a bus opened, while it loaded: no orphan timer
   clearInterval(m.timer);
@@ -819,6 +822,30 @@ async function placeFleet() {
     $("#map-title").firstChild.textContent = "Every bus, not live";
     $("#map-note").textContent = `Can't get bus positions (${e.message}).`;
   }
+}
+// Street plowing on the live map, only in a declared snow event (the City updates its table then; outside one the server
+// says {event:false} and we stop asking for 5 min). The window is rounded out to 0.01 deg so nearby views are one URL, and
+// only roads in view come back, thinned for this zoom. The colour is ours; the words in the popup are the City's own.
+const SNOW_COLOR = { done: "#2e9e5b", doing: "#e0a100", todo: "#d6453d", other: "#8a8f96" };
+const SNOW_WORD = { done: "Plowed", doing: "Being plowed", todo: "Not started", other: "Other" };
+async function drawSnow() {
+  const m = mapState, z = m.map.getZoom(), seq = ++m.snowSeq, off = () => { m.snow.clearLayers(); $("#map-snow").hidden = true; };
+  if (z < 12 || Date.now() < m.snowNo) return off();
+  const b = m.map.getBounds().pad(0.1), lo = (v) => Math.floor(v * 100) / 100, hi = (v) => Math.ceil(v * 100) / 100;
+  let d;
+  try { d = await api(`snow/map?s=${lo(b.getSouth())}&w=${lo(b.getWest())}&n=${hi(b.getNorth())}&e=${hi(b.getEast())}&z=${z}`); }
+  catch (e) { console.warn("snow map:", e.message); return; } // the buses matter more: say nothing
+  if (seq !== m.snowSeq || m.trip !== "all") return;
+  if (!d.event) { m.snowNo = Date.now() + 300000; return off(); }
+  m.snow.clearLayers();
+  for (const [cls, road, status, lines] of d.segs) {
+    L.polyline(lines, { color: SNOW_COLOR[cls] || SNOW_COLOR.other, weight: z >= 15 ? 6 : z >= 13 ? 4 : 3, opacity: 0.85, lineCap: "round", renderer: m.snowCanvas })
+      .bindPopup(`<b>${esc(road)}</b><br>${esc(status)} <small>(City of Edmonton)</small>`, { closeButton: false }).addTo(m.snow);
+  }
+  const at = d.as_of ? `, as of ${clock(d.as_of)}` : "";
+  $("#map-snow").innerHTML = `Street plowing (City of Edmonton${at}): ` + Object.keys(SNOW_WORD).filter((k) => k !== "other" || d.segs.some((s) => s[0] === "other"))
+    .map((k) => `<span><i style="background:${SNOW_COLOR[k]}"></i>${SNOW_WORD[k]}</span>`).join("");
+  $("#map-snow").hidden = false;
 }
 // A bus seen from above, nose to its heading, the route number upright on it (owner, 2026-10-29). ETS sends bearing 0
 // for "unknown" (about 1 bus in 9): no windshield then, so it claims no direction.
@@ -1194,4 +1221,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=116").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=117").catch((e) => console.warn("sw:", e.message));
