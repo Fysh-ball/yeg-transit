@@ -314,8 +314,8 @@ function alertBox(s, alerts) {
 }
 
 function stopHead(s) {
-  const walk = s.walk ? ` &middot; ${s.walk} min walk${wx.extra ? ` + ${wx.extra} for ${esc(wx.why)}` : ""}` : "";
-  return `<div class="stop-head"><h2>${esc(s.name)}<span class="sub">Stop #${esc(s.code)}${s.where ? ` &middot; ${esc(s.where)}` : ""}${walk}</span></h2>
+  const walk = s.walk ? `${s.walk} min walk${wx.extra ? ` + ${wx.extra} for ${esc(wx.why)}` : ""}` : "";
+  return `<div class="stop-head"><h2>${esc(s.name)}<span class="sub">${[s.code ? `Stop #${esc(s.code)}` : "", s.where ? esc(s.where) : "", walk].filter(Boolean).join(" &middot; ")}</span></h2>
     <button class="icon-btn" data-settings="${esc(s.id)}" aria-label="Settings for ${esc(s.name)}" title="Settings" aria-expanded="${editing.has(s.id)}">
       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
     </button>
@@ -347,7 +347,7 @@ async function renderStop(s, el) {
       .catch((e) => ({ error: e.message })); // said on the card: a missing line would read as no transfer to make
     const d = await api(`stops/${encodeURIComponent(s.id)}/departures?n=30`);
     if (d.stop.routes) s.allRoutes = d.stop.routes.split(",");
-    Object.assign(s, { lat: d.stop.lat, lon: d.stop.lon, where: d.stop.where }); // nearest group; which kerb
+    Object.assign(s, { lat: d.stop.lat, lon: d.stop.lon, where: d.stop.where, code: d.stop.code }); // code: stops saved before it was kept // nearest group; which kerb
     save();
     const xf = await x;
     body = alertBox(s, d.alerts || []) + snowLine(d.stop.snow) + (xf?.error ? `<p class="note">Can't check your change to ${esc(routeLabel(s.xfer.to))} right now.</p>` : xf ? xferLine(s, xf, d.now) : "") +
@@ -1170,4 +1170,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=114").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=115").catch((e) => console.warn("sw:", e.message));
