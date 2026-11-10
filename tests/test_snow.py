@@ -77,3 +77,11 @@ class SnowMap(unittest.TestCase):
         line = [(53.0, -113.0), (53.00001, -113.005), (53.0, -113.01)]  # a 1 m kink on a 700 m line
         self.assertEqual(len(app.simplify(line, 0.0001)), 2)
         self.assertEqual(len(app.simplify(line, 0.000001)), 3)
+
+    def test_far_out_only_the_main_roads(self):
+        rows = [dict(ROWS[0], priority="1"), dict(ROWS[1], priority="3")]
+        app.SNOW["segs"], app.SNOW["grid"] = app.snow_shapes(rows)
+        app.SNOW.update(event=True, stat={"2sw 021 - 16": "Complete", "2sw 024 - 16": "Complete"})
+        wide = (53.38, -113.62, 53.45, -113.50)
+        self.assertEqual([s[1] for s in app.snow_map(*wide, 12)["segs"]], ["Allard Gt SW"])
+        self.assertEqual(len(app.snow_map(*wide, 15)["segs"]), 2)

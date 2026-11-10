@@ -748,6 +748,7 @@ function baseMap(map) {
     for (const [id, [k, v]] of Object.entries(TINT)) if (e.target.getLayer(id)) e.target.setPaintProperty(id, k, v);
   }));
   gl.addTo(map);
+  return gl;
 }
 async function openMap(dep) {
   const s = stops.find((x) => x.id === dep.dataset.stop);
@@ -784,8 +785,9 @@ async function sheetMap() {
   try { await loadLeaflet(); } catch (e) { $("#map-note").textContent = `Map unavailable: ${e.message}`; return false; }
   if (!mapState) {
     const map = L.map("map-box", { zoomControl: false, maxZoom: 19 });
-    baseMap(map);
-    mapState = { map, layer: L.layerGroup().addTo(map), timer: 0 };
+    const gl = baseMap(map);
+    mapState = { map, gl, layer: L.layerGroup().addTo(map), timer: 0 };
+    map.on("click", snowTap);
     map.on("moveend", () => { if (mapState.trip === "all") { drawFleet(); drawStops(); drawSnow(); } });
   }
   clearInterval(mapState.timer);
@@ -799,7 +801,7 @@ async function openLiveMap() {
   if (!await sheetMap()) return;
   const m = mapState, home = stops.find((s) => s.lat);
   m.trip = "all"; m.buses = []; m.busOpen = false; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
-  m.snow = L.layerGroup().addTo(m.layer); m.snowNo = 0; m.snowSeq = 0; m.snowCanvas = L.canvas({ padding: 0.3 }); // under the buses
+  m.snowNo = 0; m.snowSeq = 0;
   m.stopPins = L.layerGroup().addTo(m.layer); m.stopsAt = null;
   $("#map-snow").hidden = true;
   m.map.invalidateSize();
@@ -824,28 +826,49 @@ async function placeFleet() {
   }
 }
 // Street plowing on the live map, only in a declared snow event (the City updates its table then; outside one the server
-// says {event:false} and we stop asking for 5 min). The window is rounded out to 0.01 deg so nearby views are one URL, and
-// only roads in view come back, thinned for this zoom. The colour is ours; the words in the popup are the City's own.
+// says {event:false} and we stop asking for 5 min). The roads are a MapLibre line layer inserted UNDER the base map's labels,
+// so street names stay readable and the buses (Leaflet markers) sit on top. The window is rounded out to 0.01 deg so nearby
+// views are one URL; far out the server sends only the main roads. Colour is ours; the popup shows the City's own words.
 const SNOW_COLOR = { done: "#2e9e5b", doing: "#e0a100", todo: "#d6453d", other: "#8a8f96" };
-const SNOW_WORD = { done: "Plowed", doing: "Being plowed", todo: "Not started", other: "Other" };
+const SNOW_WORD = { done: "Done", doing: "Underway", todo: "Not started", other: "Other" };
+function snowLayer(m, data) {
+  const mb = m.gl?.getMaplibreMap?.();
+  let style = null;
+  try { style = mb?.getStyle(); } catch { /* not loaded yet */ } // the style, not the tiles: tiles still loading must not hold the roads back
+  if (!style?.layers) { mb?.once("styledata", () => drawSnow()); return false; }
+  if (mb.getSource("snow")) mb.getSource("snow").setData(data);
+  else {
+    mb.addSource("snow", { type: "geojson", data });
+    const label = mb.getStyle().layers.find((l) => l.type === "symbol")?.id; // under the first label
+    mb.addLayer({ id: "snow", type: "line", source: "snow", layout: { "line-cap": "round", "line-join": "round" }, paint: {
+      "line-color": ["match", ["get", "c"], "done", SNOW_COLOR.done, "doing", SNOW_COLOR.doing, "todo", SNOW_COLOR.todo, SNOW_COLOR.other],
+      "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 13, 1.6, 15, 3, 17, 5], "line-opacity": 0.72 } }, label);
+  }
+  return true;
+}
 async function drawSnow() {
-  const m = mapState, z = m.map.getZoom(), seq = ++m.snowSeq, off = () => { m.snow.clearLayers(); $("#map-snow").hidden = true; };
-  if (z < 12 || Date.now() < m.snowNo) return off();
+  const m = mapState, z = m.map.getZoom(), seq = ++m.snowSeq, none = { type: "FeatureCollection", features: [] };
+  const off = () => { snowLayer(m, none); $("#map-snow").hidden = true; };
+  if (z < 10 || Date.now() < m.snowNo) return off();
   const b = m.map.getBounds().pad(0.1), lo = (v) => Math.floor(v * 100) / 100, hi = (v) => Math.ceil(v * 100) / 100;
   let d;
-  try { d = await api(`snow/map?s=${lo(b.getSouth())}&w=${lo(b.getWest())}&n=${hi(b.getNorth())}&e=${hi(b.getEast())}&z=${z}`); }
+  try { d = await api(`snow/map?s=${lo(b.getSouth())}&w=${lo(b.getWest())}&n=${hi(b.getNorth())}&e=${hi(b.getEast())}&z=${Math.floor(z)}`); }
   catch (e) { console.warn("snow map:", e.message); return; } // the buses matter more: say nothing
   if (seq !== m.snowSeq || m.trip !== "all") return;
   if (!d.event) { m.snowNo = Date.now() + 300000; return off(); }
-  m.snow.clearLayers();
-  for (const [cls, road, status, lines] of d.segs) {
-    L.polyline(lines, { color: SNOW_COLOR[cls] || SNOW_COLOR.other, weight: z >= 15 ? 6 : z >= 13 ? 4 : 3, opacity: 0.85, lineCap: "round", renderer: m.snowCanvas })
-      .bindPopup(`<b>${esc(road)}</b><br>${esc(status)} <small>(City of Edmonton)</small>`, { closeButton: false }).addTo(m.snow);
-  }
-  const at = d.as_of ? `, as of ${clock(d.as_of)}` : "";
-  $("#map-snow").innerHTML = `Street plowing (City of Edmonton${at}): ` + Object.keys(SNOW_WORD).filter((k) => k !== "other" || d.segs.some((s) => s[0] === "other"))
-    .map((k) => `<span><i style="background:${SNOW_COLOR[k]}"></i>${SNOW_WORD[k]}</span>`).join("");
+  const feats = d.segs.map(([c, r, s, lines]) => ({ type: "Feature", properties: { c, r, s },
+    geometry: { type: "MultiLineString", coordinates: lines.map((l) => l.map(([la, lo2]) => [lo2, la])) } }));
+  if (!snowLayer(m, { type: "FeatureCollection", features: feats })) return;
+  const at = d.as_of ? ` ${clock(d.as_of)}` : "";
+  $("#map-snow").innerHTML = `<b>Plowing${at}</b>` + ["done", "doing", "todo"].map((k) => `<span><i style="background:${SNOW_COLOR[k]}"></i>${SNOW_WORD[k]}</span>`).join("");
+  $("#map-snow").title = "Street plowing, City of Edmonton open data";
   $("#map-snow").hidden = false;
+}
+function snowTap(e) { // a tap near a drawn road: the City's own words for it
+  const m = mapState, mb = m.gl?.getMaplibreMap?.();
+  if (m.trip !== "all" || !mb?.getLayer("snow") || m.busOpen) return;
+  const { x, y } = e.containerPoint, hit = mb.queryRenderedFeatures([[x - 8, y - 8], [x + 8, y + 8]], { layers: ["snow"] })[0];
+  if (hit) L.popup({ closeButton: false }).setLatLng(e.latlng).setContent(`<b>${esc(hit.properties.r)}</b><br>${esc(hit.properties.s)} <small>(City of Edmonton)</small>`).openOn(m.map);
 }
 // A bus seen from above, nose to its heading, the route number upright on it (owner, 2026-10-29). ETS sends bearing 0
 // for "unknown" (about 1 bus in 9): no windshield then, so it claims no direction.
@@ -1221,4 +1244,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=117").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=118").catch((e) => console.warn("sw:", e.message));

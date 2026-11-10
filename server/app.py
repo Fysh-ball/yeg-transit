@@ -724,7 +724,8 @@ def snow_shapes(rows):
         if not r.get("route_id") or not lines:
             continue
         i = len(segs)
-        segs.append((r["route_id"], r.get("road_on") or "", [[(p[1], p[0]) for p in line] for line in lines]))
+        segs.append((r["route_id"], r.get("road_on") or "", [[(p[1], p[0]) for p in line] for line in lines],
+                     int(r["priority"]) if str(r.get("priority") or "").isdigit() else 2))
         for line in segs[-1][2]:
             for lat, lon in line:
                 grid.setdefault(snow_cell(lat, lon), set()).add(i)
@@ -826,13 +827,14 @@ def snow_map(south, west, north, east, zoom):
     ponytail: scans all ~2,240 segments per ask (about 70k points); a visitor cache at the edge, or the grid, if that shows."""
     if not SNOW["event"]:
         return {"event": False}
-    if not (north - south <= 0.3 and east - west <= 0.5):
+    if not (north - south <= 0.6 and east - west <= 1.0):
         raise ValueError("window too large")
     tol = 156543 * 0.595 / 2 ** max(8, min(zoom, 19)) * 1.2 / 111320  # 1.2 px, in degrees of latitude
     out = []
-    for rid, road, lines in SNOW["segs"]:
+    top = 1 if zoom < 13 else 2 if zoom < 15 else 9  # far out: the City's priority-1 roads only; closer, more
+    for rid, road, lines, prio in SNOW["segs"]:
         cls = snow_class(SNOW["stat"].get(rid))
-        if not cls:
+        if not cls or prio > top:
             continue
         keep = []
         for line in lines:
@@ -856,7 +858,7 @@ def stop_snow(stop):
     i = SNOW["near"][sid]
     if i is None or i >= len(SNOW["segs"]):
         return {"event": True, "road": None, "as_of": SNOW["as_of"]}
-    rid, road, _ = SNOW["segs"][i]
+    rid, road = SNOW["segs"][i][:2]
     return {"event": True, "road": road, "status": SNOW["stat"].get(rid) or None, "as_of": SNOW["as_of"]}
 
 
