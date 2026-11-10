@@ -434,7 +434,7 @@ async function renderAll() {
   $("#offline").hidden = !off;
   $("#offline").textContent = !off ? "" : navigator.onLine ? "Live times are down right now. Showing saved scheduled times instead." : "No connection. Showing saved scheduled times instead of live times.";
   const at = [...main.children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live); // ETS's own last update, not ours
-  $("#updated").textContent = !stops.length || off ? "" : at.length ? `Live times, updated ${clock(Math.min(...at))}` : "No live times from ETS right now: scheduled times.";
+  $("#updated").textContent = !stops.length || off ? "" : at.length ? `Live times, updated ${clock(Math.min(...at))}` : stops.length && stops.every((s) => s.id.startsWith("cgy:")) ? "Calgary live times aren't available yet: scheduled times." : "No live times from ETS right now: scheduled times.";
   checkStale();
 }
 
@@ -448,6 +448,37 @@ function metres(a, b) {
 }
 
 let here = null; // last "near me" fix; ranks typed results closest first
+// Cities: the server lists the ones it serves (/api/cities). A single city hides the picker, so a box without Calgary
+// shows riders no change. Near me picks the city from where you are; the picker is the manual switch.
+const CITY = { yeg: { name: "Edmonton", box: [52.9, -114.2, 54.0, -112.8] }, cgy: { name: "Calgary", box: [50.6, -114.5, 51.4, -113.6] } };
+let cities = ["yeg"], city = "yeg";
+try { city = localStorage.getItem("yeg.city") || "yeg"; } catch { /* storage blocked: Edmonton */ }
+const cityAt = (p) => cities.find((c) => p.lat >= CITY[c].box[0] && p.lon >= CITY[c].box[1] && p.lat <= CITY[c].box[2] && p.lon <= CITY[c].box[3]);
+const cq = (c) => (c === "yeg" ? "" : `&city=${c}`);
+function drawCityPick() {
+  const el = $("#city-pick");
+  el.hidden = cities.length < 2;
+  el.innerHTML = cities.map((c) => `<button type="button" class="chip" data-city="${c}" aria-pressed="${c === city}">${CITY[c].name}</button>`).join("");
+  $("#q").placeholder = city === "yeg" ? "Address, place or stop #" : "Stop name or number";
+  // ponytail: wording to be checked against Open Calgary's terms before go-live; shown only where Calgary is served.
+  const credit = cities.includes("cgy") ? "Contains information licensed under the Open Government Licence \u2013 City of Edmonton, and from the City of Calgary under its Open Data Terms of Use. Not an official ETS or Calgary Transit app." : "";
+  for (const id of ["#credit", "#legal"]) if (credit) $(id).firstChild.textContent = credit;
+}
+function setCity(c, quiet = false) {
+  if (c === city || !cities.includes(c)) return;
+  city = c;
+  try { localStorage.setItem("yeg.city", c); } catch { /* storage blocked: kept for this visit only */ }
+  drawCityPick();
+  if (quiet) return;
+  $("#results").innerHTML = "";
+  if ($("#q").value.trim()) suggest($("#q").value.trim());
+}
+async function loadCities() {
+  try { cities = (await api("cities")).cities.filter((c) => CITY[c]); } catch (e) { console.warn("cities:", e.message); }
+  if (!cities.includes(city)) city = "yeg";
+  drawCityPick();
+}
+$("#city-pick").onclick = (e) => { const b = e.target.closest("[data-city]"); if (b) setCity(b.dataset.city); };
 
 function stopItems(list, from, numbered = false) {
   return list.map((s, i) => {
@@ -478,9 +509,9 @@ let seq = 0, timer = 0;
 async function suggest(q) {
   const n = ++seq;
   const at = here ? `&lat=${here.lat.toFixed(2)}&lon=${here.lon.toFixed(2)}` : ""; // about 1 km: enough to rank, not where you stand
-  const stopsP = api(`stops/search?q=${encodeURIComponent(q)}${at}`);
+  const stopsP = api(`stops/search?q=${encodeURIComponent(q)}${at}${cq(city)}`);
   // Places twice: our own list of shops, schools and landmarks answers at once; Photon (streets, areas) adds more after.
-  const placesP = (path) => q.length < 3 ? Promise.resolve([])
+  const placesP = (path) => q.length < 3 || city !== "yeg" ? Promise.resolve([]) // places and addresses are Edmonton's only
     : api(`${path}?q=${encodeURIComponent(q)}${at}`).catch((e) => { console.warn(path + ":", e.message); return []; });
   const localP = placesP("places/local"), photonP = placesP("places");
   try {
@@ -497,7 +528,9 @@ const PINS = 8;
 let nearMap = null;
 async function nearby(from, title, you = false) {
   let list;
-  try { list = await api(`stops/near?lat=${from.lat}&lon=${from.lon}`); }
+  const c = cityAt(from) || city;
+  setCity(c, true);
+  try { list = await api(`stops/near?lat=${from.lat}&lon=${from.lon}${cq(c)}`); }
   catch (err) { $("#results").innerHTML = `<li>Needs a connection (${esc(err.message)}).</li>`; return; }
   if (!list.length) return showResults([], from, title);
   list = list.slice(0, PINS);
@@ -1245,6 +1278,7 @@ applyBoard();
 
 renderAll();
 loadWeather().then(() => wx.extra && renderAll());
+loadCities();
 nearestGroup();
 setInterval(() => { if (!document.hidden) renderAll(); }, 30000);
 setInterval(loadWeather, 15 * 60000);

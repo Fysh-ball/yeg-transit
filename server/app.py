@@ -1105,6 +1105,8 @@ class Handler(SimpleHTTPRequestHandler):
                               "vehicles": len(LIVE.vehicles), "vehicle_error": LIVE.vp_error}, 200 if ok else 503)
         if parts == ["version"]:
             return self.json({"sha": SHA})
+        if parts == ["cities"]:  # the cities this box serves; the page shows a picker only when there is more than one
+            return self.json({"cities": ["yeg"] + (["cgy"] if "cgy" in CITIES and os.path.exists(CGY_DB) else [])}, cache=60)
         if parts == ["vehicles"]:
             # age: how old the positions are; a failing ETS feed leaves the last ones in place, so the map must say so
             return self.json({"now": int(time.time()), "age": int(time.time()) - LIVE.vp_ts if LIVE.vp_ts else None,

@@ -97,7 +97,7 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
   </select></label>
   <p class="hint">Wall board shows big times and a clock and keeps the screen on, for a tablet by the door. At night it turns dark and faint; a web page can't lower the screen's own light, so turn the tablet's brightness down too.</p>
   <p class="links"><a href="guide.html">How to use Canada Bus</a><a href="about.html">About</a><a href="privacy.html">Privacy</a><a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
-  <p class="hint">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.</p>
+  <p class="hint" id="credit">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.</p>
   <p class="hint" id="version"></p>
 </section>
 
@@ -108,6 +108,7 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
 <div id="moved" role="status" hidden><span>Your stops moved here from yegbus.com. On your home screen? Add this page there too, then remove the old one.</span><button type="button">OK</button></div>
 
 <section id="add" hidden>
+  <div id="city-pick" class="chips" role="group" aria-label="City" hidden></div>
   <form id="search-form">
     <input id="q" type="search" inputmode="search" placeholder="Address, place or stop #" autocomplete="off" aria-label="Stop number, street or place">
     <button id="near" type="button" title="Stops near me"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="2"/></svg> Near me</button>
@@ -158,7 +159,7 @@ if (window.YegApp) document.head.append(Object.assign(document.createElement("me
     <p>When your phone has no data, saved stops still show the timetable, and a button texts the stop number to ETS's 31100 service for live times. When ETS closes a stop for construction, the card tells you and offers the replacement stop. Turn a tablet sideways for a wall board by the front door, or add the Android widget to your home screen.</p>
     <p><a href="guide.html">How to use Canada Bus</a> &middot; <a href="about.html">About</a> &middot; <a href="about.html#contact">Contact</a></p>
   </section>
-  <p class="legal">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
+  <p class="legal" id="legal">Contains information licensed under the Open Government Licence &ndash; City of Edmonton. Not an official ETS app.<br>
   <a href="guide.html">Help</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="https://ko-fi.com/fysh_yum" target="_blank" rel="noopener">Buy me a coffee</a></p>
 </footer>
 <script src="app.js?v=119"></script>
