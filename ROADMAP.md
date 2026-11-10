@@ -31,5 +31,5 @@ on our box at a public address. (Outreach to Eastside Urbanism, makers of Transi
    - [x] Feeds and licence read: static `npk7-z3bj`, realtime `gs4m-mdc2` (30 s), alerts `jhgn-ynqj`, all on data.calgary.ca (no published rate limit: 1 call per 5 min, 12 a day).
    - [x] Server: schedule import with calendar expansion, `cgy:` stop ids, search, near, departures and timetable as scheduled (f069ba5).
    - [x] City picker (from location and a manual switch; hidden when one city), Calgary scheduled times at phone width.
-   - [ ] Calgary realtime trip updates, outside-API rules (timeout, jittered backoff, Retry-After, caps) and one backoff test.
+   - [x] Calgary realtime (1d2ff21): on-demand, one shared poll, 30 s cache, own Host (25 s gap, 3,000 a day, limit unknown), backoff test.
    - [ ] Go-live: confirm the licence wording, Calgary attribution in footer and About, SEO copy, `check_live.py` canary stop per city, no SMS for Calgary, then `YEG_CITIES=cgy` on TrueNAS and the Pi and a version bump.
