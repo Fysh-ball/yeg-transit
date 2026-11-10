@@ -24,6 +24,7 @@
   <h2>Where the times come from</h2>
   <p>Every time, route and stop comes from the City of Edmonton's open data: the Edmonton Transit Service schedule (GTFS) and its real-time feeds for trip updates, vehicle positions and service alerts. Our server reads those feeds every 10 seconds and passes the times for your stops to your phone. Addresses and places come from OpenStreetMap, and maps use OpenStreetMap tiles.</p>
   <p>Contains information licensed under the Open Government Licence &ndash; City of Edmonton.</p>
+  <p id="cgy-about" hidden>Calgary schedules and live times come from the City of Calgary's open data. Contains information licensed under the <a href="https://data.calgary.ca/stories/s/Open-Calgary-Terms-of-Use/u45n-7awa/" target="_blank" rel="noopener">Open Government Licence &ndash; City of Calgary</a>.</p>
   <p>Street plowing is the City's plow-route status (same open data). The weather comes from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0), and the weather symbols were drawn for this app.</p>
 
   <h2>Not an official ETS app</h2>
@@ -38,5 +39,6 @@
 
   <p><a href="./">Open Canada Bus</a> &middot; <a href="guide.html">How to use it</a> &middot; <a href="privacy.html">Privacy</a></p>
 </main>
+<script>fetch("/api/cities").then((r) => r.json()).then((d) => { if (d.cities.includes("cgy")) document.getElementById("cgy-about").hidden = false; }).catch(() => {});</script>
 </body>
 </html>
