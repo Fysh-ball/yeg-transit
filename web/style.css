@@ -576,4 +576,5 @@ body.in-edit main > .stop.editing { background: none !important; color: var(--te
 #stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(66px + env(safe-area-inset-bottom)); } /* both up: stack, don't overlap */
 .native body:not(.board) #stale:not([hidden]) ~ #undo:not([hidden]) { bottom: calc(150px + env(safe-area-inset-bottom)); }
 #city-pick { margin: 0 0 10px; }
+#city-sel { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); font: inherit; font-weight: 600; }
 #city-pick[hidden] { display: none; }

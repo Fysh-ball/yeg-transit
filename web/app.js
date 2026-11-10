@@ -459,7 +459,7 @@ const agency = (c) => (c === "cgy" ? "Calgary Transit" : "ETS"); // who feeds th
 function drawCityPick() {
   const el = $("#city-pick");
   el.hidden = cities.length < 2;
-  el.innerHTML = cities.map((c) => `<button type="button" class="chip" data-city="${c}" aria-pressed="${c === city}">${CITY[c].name}</button>`).join("");
+  el.innerHTML = `<select id="city-sel" aria-label="City">${cities.map((c) => `<option value="${c}"${c === city ? " selected" : ""}>${CITY[c].name}</option>`).join("")}</select>`;
   $("#q").placeholder = city === "yeg" ? "Address, place or stop #" : "Stop name or number";
   // Calgary's exact line (licence v2.1, read 2026-11-10): "Contains information licensed under the Open Government Licence \u2013 City of Calgary." Shown only where Calgary is served; the licence link goes on About at go-live.
   const credit = cities.includes("cgy") ? "Contains information licensed under the Open Government Licence \u2013 City of Edmonton and the Open Government Licence \u2013 City of Calgary. Not an official ETS or Calgary Transit app." : "";
@@ -478,8 +478,25 @@ async function loadCities() {
   try { cities = (await api("cities")).cities.filter((c) => CITY[c]); } catch (e) { console.warn("cities:", e.message); }
   if (!cities.includes(city)) city = "yeg";
   drawCityPick();
+  autoCity();
 }
-$("#city-pick").onclick = (e) => { const b = e.target.closest("[data-city]"); if (b) setCity(b.dataset.city); };
+// A pick by hand sticks (yeg.cityset); without one, the city follows where the rider is, but only if location is already
+// allowed: no prompt just for this. Off, denied or blocked: the last choice stays (Edmonton on a first visit).
+$("#city-pick").onchange = (e) => {
+  if (e.target.id !== "city-sel") return;
+  try { localStorage.setItem("yeg.cityset", "1"); } catch { /* storage blocked: sticks for this visit only */ }
+  setCity(e.target.value);
+};
+async function autoCity() {
+  try {
+    if (cities.length < 2 || localStorage.getItem("yeg.cityset") || !navigator.geolocation) return;
+    if ((await navigator.permissions.query({ name: "geolocation" })).state !== "granted") return;
+    navigator.geolocation.getCurrentPosition((p) => {
+      const c = cityAt({ lat: p.coords.latitude, lon: p.coords.longitude });
+      if (c && !localStorage.getItem("yeg.cityset")) setCity(c, true);
+    }, () => {}, { timeout: 8000, maximumAge: 600000 });
+  } catch (e) { console.warn("auto city:", e.message); }
+}
 
 function stopItems(list, from, numbered = false) {
   return list.map((s, i) => {
