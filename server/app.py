@@ -426,6 +426,12 @@ def scheduled(db, stop_id, start, end):
 
 LATE_MAX = 2 * 3600  # the latest a bus runs that we still show
 BUS_SPEED = 8  # m/s, straight line: buses at WEM TC made 6.5 to 13 on 2026-10-22, stops and lights included
+
+
+def bus_eta(m):
+    """Seconds for a bus m straight-line metres away. 8 m/s is the city rate; past 4 km a bus is on an arterial or highway,
+    so the rest goes at 15 m/s (a 560 22.5 km out was held 46 min while ETS said 27 and was right: hermes-yeg-check 2026-11-10)."""
+    return int(min(m, 4000) / BUS_SPEED + max(0, m - 4000) / 15)
 TRAINS = {"Capital", "Metro", "Valley"}
 
 
@@ -469,7 +475,7 @@ def departures(db, stop_id, n):
             # Not started: the bus ETS put on it is still driving an earlier trip and must get here first. ETS can hold
             # the start at its timetable time with a 40 min delay, which hid a 560 at Kingsway as gone (2026-10-26).
             m = math.hypot(b[0] - here[0], (b[1] - here[1]) * math.cos(math.radians(here[0]))) * 111000
-            d["time"] = t = max(t, b[3] + int(m / BUS_SPEED))
+            d["time"] = t = max(t, b[3] + bus_eta(m))
         if v and v[4] and here and now - v[3] < 120 and d["route"] not in TRAINS:
             nxt = next_stop(db, d["trip"], v)
             mine = db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=? AND stop_id=? AND seq>=?",
@@ -498,7 +504,12 @@ def departures(db, stop_id, n):
                 AWAY[d["trip"], stop_id] = (m, now)
             if prev and 30 <= now - prev[1] <= 900 and m - prev[0] > 1000 and t < now - 300:
                 continue
-            held = max(t, v[3] + int(m / BUS_SPEED))
+            # ETS has it under way (its own stop count is past the first) and says it left over 15 min ago, yet the bus is
+            # over 5 km off: nobody is that late. The looks can be 15 min apart (the checker), so no growth test here
+            # (a 051 shown 17 to 33 min with ETS at -23 to -113 min, hermes-yeg-check 2026-11-10).
+            if t < now - 900 and m > 5000 and v[4] > db.execute("SELECT min(seq) FROM stop_times WHERE trip_id=?", (d["trip"],)).fetchone()[0]:
+                continue
+            held = max(t, v[3] + bus_eta(m))
             if held - t > 600 and now - HELD_LOGGED.get((d["trip"], stop_id), 0) >= 300:  # to replay a held time later (2026-11-10)
                 if len(HELD_LOGGED) > 5000:
                     HELD_LOGGED.clear()

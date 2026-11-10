@@ -54,6 +54,16 @@ class Departures(unittest.TestCase):
         with mock.patch.dict(app.AWAY, {}, clear=True):  # first look: nothing to compare, kept
             self.assertTrue(run(far, eta=-1200))
 
+    def test_a_bus_far_off_whose_ets_time_is_long_gone_is_dropped_on_one_look(self):  # 051 at 2890, 2026-11-10: looks 15 min apart
+        far = (53.429, -113.5091)  # about 8.7 km south, on the way in
+        with mock.patch.dict(app.AWAY, {}, clear=True):
+            self.assertFalse(run(far, eta=-1380))  # ETS says 23 min gone, bus 8 km off: no growth test needed
+            self.assertTrue(run(far, eta=-600))    # 10 min gone could be a late bus: kept
+
+    def test_a_far_bus_is_timed_faster_than_the_city_rate(self):  # a 560 22.5 km out was held 46 min; ETS said 27 and was right
+        self.assertEqual(app.bus_eta(2000), 250)
+        self.assertEqual(app.bus_eta(22500), 500 + 1233)
+
     def test_a_held_time_logs_where_the_bus_was_once_per_5_min(self):  # so the next held time can be replayed
         import contextlib
         err = io.StringIO()
