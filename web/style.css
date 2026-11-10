@@ -251,9 +251,13 @@ html:has(.board.night) { background: #000; }
 .bus-body::before { content: ""; position: absolute; inset: 3px 3px auto; height: 8px; border-radius: 6px 6px 2px 2px; background: rgb(0 0 0 / .5); } /* windshield: the front */
 .bus-body::after { content: ""; position: absolute; inset: auto 5px 3px; height: 3px; border-radius: 2px; background: rgb(0 0 0 / .25); } /* rear */
 .bus-body.still::before { display: none; }
+.bus-pin .bus-body.dot { height: 30px; margin-top: -15px; border-radius: 50%; } /* no heading known for any bus: a dot, no rear mark */
+.bus-pin .bus-body.dot::after { display: none; }
 .bus-pin:has(.bus-body) b { position: relative; padding: 1px 3px; border-radius: 6px; background: var(--accent); font: inherit; line-height: 1.1; }
 .bus-pin.fleet .bus-body { width: 23px; height: 40px; margin: -20px 0 0 -11.5px; } /* 10% under the old 26x44 (owner, 2026-11-04) */
 .bus-pin.fleet.far .bus-body { width: 10px; height: 18px; margin: -9px 0 0 -5px; border-width: 1.5px; border-radius: 4px 4px 2px 2px; }
+.bus-pin.fleet .bus-body.dot { height: 23px; margin-top: -11.5px; }
+.bus-pin.fleet.far .bus-body.dot { height: 10px; margin-top: -5px; border-radius: 50%; }
 .bus-pin.fleet.far .bus-body::before { inset: 1px 1px auto; height: 4px; border-radius: 2px; }
 .bus-pin.fleet.far .bus-body::after { display: none; }
 

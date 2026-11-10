@@ -389,8 +389,8 @@ async function renderStop(s, el) {
     else el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
   } catch (e) {
-    if (e.message.startsWith("404 no such stop")) { // dropped by ETS: old saved times would send people to a dead stop (not any 404: an edge or proxy one is just down)
-      body = `<div class="alert"><b>ETS no longer lists this stop.</b> It may have closed or been renumbered.
+    if (e.message.startsWith("404 no such stop")) { // dropped by the agency: old saved times would send people to a dead stop (not any 404: an edge or proxy one is just down)
+      body = `<div class="alert"><b>${agency(s.id.startsWith("cgy:") ? "cgy" : "yeg")} no longer lists this stop.</b> It may have closed or been renumbered.
         ${s.lat ? `<button data-near-stop="${esc(s.id)}">Stops near here</button>` : ""}</div>`;
       el.innerHTML = stopHead(s) + body;
       return;
@@ -915,14 +915,15 @@ function snowTap(e) { // a tap near a drawn road: the City's own words for it
 }
 // A bus seen from above, nose to its heading, the route number upright on it (owner, 2026-10-29). ETS sends bearing 0
 // for "unknown" (about 1 bus in 9): no windshield then, so it claims no direction.
-const busBody = (b, style = "") => `<i class="bus-body${b ? "" : " still"}" style="--b:${Number(b) || 0}deg;${esc(style)}"></i>`;
+// A feed that sends 0 for every bus (Calgary's) has no heading at all: a plain dot, not a bus facing up.
+const busBody = (b, style = "", dot = false) => `<i class="bus-body${b ? "" : " still"}${dot ? " dot" : ""}" style="--b:${Number(b) || 0}deg;${esc(style)}"></i>`;
 function drawFleet() { // only the buses in view: a city of pins at once makes a phone crawl
   const m = mapState, view = m.map.getBounds().pad(0.2), far = m.map.getZoom() < 13;
-  const seen = m.buses.filter(([lat, lon]) => view.contains([lat, lon]));
+  const seen = m.buses.filter(([lat, lon]) => view.contains([lat, lon])), flat = m.buses.every((b) => !b[2]);
   if (m.busOpen) return; // redrawing would close the bus card being read; the next move or poll after it closes redraws
   m.fleet.clearLayers();
   for (const [lat, lon, bearing, route, head, trip] of seen) L.marker([lat, lon], { icon: L.divIcon({ className: "", iconSize: far ? [18, 18] : [36, 36],
-    html: `<span class="bus-pin fleet${far ? " far" : ""}">${busBody(bearing)}${far ? "" : `<b>${esc(routeLabel(route))}</b>`}</span>` }) })
+    html: `<span class="bus-pin fleet${far ? " far" : ""}">${busBody(bearing, "", flat)}${far ? "" : `<b>${esc(routeLabel(route))}</b>`}</span>` }) })
     .bindPopup("", { closeButton: false, minWidth: 210 }).addTo(m.fleet) // a function body here would re-run, and re-ask, on every update()
     .on("popupopen", (e) => { m.busOpen = true; e.popup.setContent(busCard(e.target, trip, route, head)); })
     .on("popupclose", () => { m.busOpen = false; });
@@ -1014,9 +1015,9 @@ async function placeBus() {
     if (m.trip !== trip) return; // another bus was opened meanwhile
     m.at = v;
     drawLine();
-    if (m.bus) { glide(m.bus, [v.lat, v.lon]); const b = m.bus.getElement()?.querySelector(".bus-body"); if (b) b.outerHTML = busBody(v.bearing, m.style); }
+    if (m.bus) { glide(m.bus, [v.lat, v.lon]); const b = m.bus.getElement()?.querySelector(".bus-body"); if (b) b.outerHTML = busBody(v.bearing, m.style, !v.bearing && m.city === "cgy"); }
     else m.bus = L.marker([v.lat, v.lon], { zIndexOffset: 1000, icon: L.divIcon({ className: "", iconSize: [46, 46],
-      html: `<span class="bus-pin" style="${esc(m.style)}">${busBody(v.bearing, m.style)}<b style="${esc(m.style)}">${esc(m.label)}</b></span>` }) }).addTo(m.layer);
+      html: `<span class="bus-pin" style="${esc(m.style)}">${busBody(v.bearing, m.style, !v.bearing && m.city === "cgy")}<b style="${esc(m.style)}">${esc(m.label)}</b></span>` }) }).addTo(m.layer);
     m.others.clearLayers();
     for (const o of v.others) L.marker(o, { interactive: false, icon: L.divIcon({ className: "", iconSize: [30, 30],
       html: `<span class="bus-pin other" style="${esc(m.style)}">${esc(m.label)}</span>` }) }).addTo(m.others);
