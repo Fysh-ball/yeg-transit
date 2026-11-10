@@ -1,0 +1,10 @@
+# /etc/systemd/system/alertpath-watch.service
+[Unit]
+Description=Probe Prometheus's alert path on TrueNAS from outside it; mail the owner when it dies
+After=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/alertpath-watch
+# Probe 10s + worst-case Resend send about 85s.
+TimeoutStartSec=150

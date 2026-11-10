@@ -1,0 +1,114 @@
+#!/usr/bin/python3 -I
+"""alertpath-watch (hermes): mail the owner when Prometheus's alert path on TrueNAS dies.
+
+Every alert to his phone (app, spool-notify, defib) ends at the relay and mailbox on TrueNAS, so
+a dead relay, mailbox or TrueNAS reaches nobody. This probes the relay's liveness from outside
+TrueNAS once a minute; after 2 failed probes in a row it sends ONE mail through Resend, and one
+more when the path is back. Nothing repeats while it stays dead. Owner ruling 2026-11-10 (via
+Super Senior): an outside heartbeat (healthchecks.io, Lumi Web) plus this.
+
+The Resend send (timeout, backoff with jitter, 429/503 Retry-After, cooldown across runs) is
+defib-tn-mail's own send(), loaded as a module, with this watcher's key, state dir and sender.
+  alertpath-watch    one probe, and a mail if one is owed. Run by alertpath-watch.timer.
+Env, for the test only: ALERTPATH_URL, ALERTPATH_TO, ALERTPATH_MAILER, DEFIB_MAIL_STATE/KEY/CURL.
+"""
+import importlib.machinery
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.request
+
+os.environ.setdefault("DEFIB_MAIL_KEY", "/etc/alertpath-watch/resend.key")
+os.environ.setdefault("DEFIB_MAIL_STATE", "/var/lib/alertpath-watch")
+MAILER = os.environ.get("ALERTPATH_MAILER", "/usr/local/bin/defib-tn-mail")
+# The same probe custodian's sweep uses (sweep.ts:205). Tailnet, so no outside host is hit here.
+URL = os.environ.get("ALERTPATH_URL", "http://100.64.0.5:8788/liveness")
+# The mailbox door's pre-auth health (packages/mailbox/src/door.ts:1617); :8788 says nothing about the mailbox.
+MAILBOX_URL = os.environ.get("ALERTPATH_MAILBOX_URL", "http://100.64.0.5:4223/health")
+# admin@ goes from Cloudflare straight to his Proton, with no hop through TrueNAS (fysh@ would land in Dovecot ON TrueNAS).
+TO = os.environ.get("ALERTPATH_TO", "admin@fysh.site")
+FROM = "Prometheus alert-path watch <fysh@fysh.site>"
+DOWN_AFTER = 2   # failed probes in a row before the down mail
+DAILY_CAP = 5    # delivered mails per day (paid API): stop and log loudly past this
+
+
+def load_mailer():
+    loader = importlib.machinery.SourceFileLoader("defib_tn_mail", MAILER)
+    m = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(m)
+    m.FROM, m.TO = FROM, TO
+
+    def log(msg, crit=False):   # own journal tag, so these lines aren't read as defib's
+        print(f"[alertpath-watch] {msg}", file=sys.stderr)
+        subprocess.run(["logger", "-t", "alertpath-watch", "-p", "user.crit" if crit else "user.notice", msg])
+    m.log = log
+    return m
+
+
+def get(url, ok):
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            body = json.loads(r.read(4096))
+            if r.status == 200 and isinstance(body, dict) and ok(body):
+                return None
+            return f"{url}: HTTP {r.status}, unexpected body"
+    except Exception as e:
+        return f"{url}: {type(e).__name__}: {e}"
+
+
+def probe():
+    """(alive, why). Alive = relay liveness JSON AND mailbox health ok, both HTTP 200.
+    No staleness test: the relay's latest.at only moves when an alert goes out (Lumi Web, notify.ts)."""
+    bad = [w for w in (get(URL, lambda b: "epoch" in b), get(MAILBOX_URL, lambda b: b.get("ok") is True)) if w]
+    return (not bad), ("; ".join(bad) or "ok")
+
+
+def main():
+    m = load_mailer()
+    os.makedirs(m.STATE, mode=0o700, exist_ok=True)
+    try:
+        st = json.loads(m.read("watch", "{}"))
+    except ValueError as e:
+        m.log(f"state unreadable ({e}); starting fresh", crit=True)
+        st = {}
+    fails, down, mailed_down, owed = st.get("fails", 0), st.get("down", False), st.get("mailed_down", False), st.get("owed")
+    alive, why = probe()
+    now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+    if alive:
+        if down:
+            m.log("alert path is back")
+            down, owed = False, ("up" if mailed_down else None)   # no "back" mail for a down mail that never went
+        fails = 0
+    else:
+        fails += 1
+        m.log(f"probe {fails} failed: {why}")
+        if fails >= DOWN_AFTER and not down:
+            down, owed, st["since"], st["why"] = True, "down", now, why
+    if owed:
+        if m.day_count() >= DAILY_CAP:
+            m.log(f"DAILY CAP of {DAILY_CAP} alert-path mails reached; NOT mailing '{owed}'", crit=True)
+        else:
+            if owed == "down":
+                subject = "Prometheus alert path DOWN (seen from hermes)"
+                text = (f"The alert-path check (relay {URL}, mailbox {MAILBOX_URL}) failed {fails} times in a row, since {st.get('since')}.\n"
+                        f"Last error: {st.get('why')}\n\nEvery alert to your phone ends at that relay and mailbox on TrueNAS, "
+                        "so nothing else will reach you until it's back. One more mail comes when it recovers.\n\nFrom hermes alertpath-watch.")
+            else:
+                subject = "Prometheus alert path is back"
+                text = f"Relay and mailbox answer again ({now}). Down since {st.get('since')}.\n\nFrom hermes alertpath-watch."
+            if m.send(subject, text):
+                m.write("count", f"{time.strftime('%Y-%m-%d')} {m.day_count() + 1}")
+                m.log(f"mailed {TO}: {subject}")
+                mailed_down, owed = (owed == "down"), None
+            else:
+                m.log(f"MAIL NOT SENT: {subject}; retried on the next probe after the cooldown", crit=True)
+    st.update(fails=fails, down=down, mailed_down=mailed_down, owed=owed)
+    m.write("watch", json.dumps(st))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

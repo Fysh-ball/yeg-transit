@@ -1,0 +1,11 @@
+# /etc/systemd/system/alertpath-watch.timer
+[Unit]
+Description=Probe the alert path once a minute (never faster: it hits TrueNAS)
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=60s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
