@@ -434,7 +434,7 @@ async function renderAll() {
   $("#offline").hidden = !off;
   $("#offline").textContent = !off ? "" : navigator.onLine ? "Live times are down right now. Showing saved scheduled times instead." : "No connection. Showing saved scheduled times instead of live times.";
   const at = [...main.children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live); // ETS's own last update, not ours
-  $("#updated").textContent = !stops.length || off ? "" : at.length ? `Live times, updated ${clock(Math.min(...at))}` : stops.length && stops.every((s) => s.id.startsWith("cgy:")) ? "Calgary live times aren't available yet: scheduled times." : "No live times from ETS right now: scheduled times.";
+  $("#updated").textContent = !stops.length || off ? "" : at.length ? `Live times, updated ${clock(Math.min(...at))}` : stops.length && stops.every((s) => s.id.startsWith("cgy:")) ? "No live times from Calgary right now: scheduled times." : "No live times from ETS right now: scheduled times.";
   checkStale();
 }
 

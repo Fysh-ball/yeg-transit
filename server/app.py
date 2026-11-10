@@ -190,12 +190,55 @@ def refresh_gtfs():
     WHERE.clear()
 
 
-# Calgary (unreleased, scheduled times only for now). The portal's limit is unknown (none published), so a conservative
+# Calgary (unreleased). The portal's limit is unknown (none published), so a conservative
 # one call per 5 min and 12 a day; the zip is fetched once a night. Off unless YEG_CITIES contains "cgy".
 CGY_DB = os.path.join(DATA, "gtfs-cgy.db")
 CGY_URL = "https://data.calgary.ca/download/npk7-z3bj/application%2Fzip"
 CALGARY = Host("data.calgary.ca", 300, 12)
 CITIES = set(filter(None, os.environ.get("YEG_CITIES", "").split(",")))
+
+# Calgary live times: a second Host, since the zip's 12 a day cannot carry a feed that changes every 30 s. The portal
+# publishes no limit (unknown), so: asked only when a rider's request finds our copy over 30 s old (no riders, no calls),
+# one call per 25 s at most, 3,000 a day (a 30 s cadence all day is 2,880), and the Host's backoff and Retry-After.
+CGY_RT_URL = "https://data.calgary.ca/download/gs4m-mdc2/application%2Foctet-stream"
+CALGARY_RT = Host("data.calgary.ca (realtime)", 25, 3000)
+
+
+class CgyLive:
+    """Calgary's trip updates: trip_id -> {stop_id: epoch, or None if skipped}. Refreshed on demand, never on a timer."""
+    FRESH, STALE = 30, 120
+
+    def __init__(self):
+        self.trips, self.ts, self.fetched, self.error, self.lock = {}, 0, 0.0, None, threading.Lock()
+
+    def refresh(self):
+        with self.lock:  # one rider refreshes, the rest wait and read the result (single flight)
+            if time.time() - self.fetched < self.FRESH:
+                return
+            self.fetched = time.time()  # on every attempt: a failing host is not asked again for 30 s
+            try:
+                f = gtfs_realtime_pb2.FeedMessage()
+                f.ParseFromString(CALGARY_RT.get_bytes(CGY_RT_URL, 20))
+                trips = {}
+                for e in f.entity:
+                    if not e.HasField("trip_update"):
+                        continue
+                    stops = {}
+                    for u in e.trip_update.stop_time_update:
+                        ev = u.departure if u.HasField("departure") else u.arrival
+                        if u.stop_id not in stops:
+                            stops[u.stop_id] = None if u.schedule_relationship == SKIPPED else (ev.time or None)
+                    trips[e.trip_update.trip.trip_id] = stops
+                self.trips, self.ts, self.error = trips, f.header.timestamp, None
+            except Exception as e:  # Busy included: the old copy ages out by itself
+                self.error = f"{type(e).__name__}: {e}"
+                print("calgary live poll failed:", self.error, file=sys.stderr)
+
+    def trip(self, trip_id):
+        return self.trips.get(trip_id) if self.ts and time.time() - self.ts <= self.STALE else None
+
+
+CGYLIVE = CgyLive()
 
 
 def refresh_cgy():
@@ -996,10 +1039,21 @@ def cgy_route(db, parts, q):
             return {"error": "no such stop"}, 0
         now = int(time.time())
         if parts[2] == "departures":
-            deps = [dict(d, time=d["sched"], live=False) for d in scheduled(db, stop[0], now - 30, now + 3 * 3600)]
-            for d in deps:
+            CGYLIVE.refresh()
+            deps = []
+            for d in scheduled(db, stop[0], now - 600, now + 3 * 3600):
                 d.pop("seq", None)
-            return {"stop": {**cgy_stop(stop), "where": "", "snow": {"event": False}}, "now": now, "live_age": None,
+                st = CGYLIVE.trip(d["trip"])
+                t = st.get(stop[0], d["sched"]) if st else d["sched"]  # a stop the feed does not list stays scheduled
+                if st and stop[0] in st and t is None:
+                    continue  # skipped stop
+                d["time"], d["live"] = t or d["sched"], bool(st and st.get(stop[0]))
+                if d["time"] >= now - 30:
+                    deps.append(d)
+            deps.sort(key=lambda d: d["time"])
+            age = now - CGYLIVE.ts if CGYLIVE.ts and CGYLIVE.trips else None
+            return {"stop": {**cgy_stop(stop), "where": "", "snow": {"event": False}}, "now": now,
+                    "live_age": age if age is not None and age <= CgyLive.STALE else None,
                     "departures": deps[:min(int(q.get("n", 8)), 30)], "alerts": []}, 0
         if parts[2] == "timetable":
             hours = min(int(q.get("hours", 30)), 48)
@@ -1074,7 +1128,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.json({"error": "server error"}, 500)
 
     def cgy(self, parts, q):
-        """Calgary: its own database and ids ("cgy:<stop_id>"), scheduled times only (no realtime yet), none of Edmonton's
+        """Calgary: its own database and ids ("cgy:<stop_id>"), scheduled plus on-demand realtime (CGYLIVE), none of Edmonton's
         live, snow, places or alert code. Edmonton's routes never see this."""
         if "cgy" not in CITIES or not os.path.exists(CGY_DB):
             return self.json({"error": "not available"}, 404)

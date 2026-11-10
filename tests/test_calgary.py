@@ -1,6 +1,6 @@
 """Calgary's schedule (weekly ranges in calendar.txt plus calendar_dates exceptions, as in its real GTFS 2026-11-10) and its
 own stop ids and routes. A tiny feed stands in for the 10 MB one."""
-import io, os, sqlite3, tempfile, time, unittest, zipfile
+import io, json, os, sqlite3, tempfile, time, unittest, zipfile
 from datetime import datetime
 from unittest import mock
 
@@ -64,6 +64,99 @@ class Calgary(unittest.TestCase):
         with mock.patch.object(app.time, "time", lambda: now):
             deps, _ = app.cgy_route(self.db, ["stops", "cgy:6451", "departures"], {})
         self.assertEqual(deps["departures"], [])
+
+
+def feed(trip, stop, when, ts, skip=False):
+    from google.transit import gtfs_realtime_pb2 as g
+    f = g.FeedMessage(); f.header.gtfs_realtime_version = "2.0"; f.header.timestamp = ts
+    e = f.entity.add(); e.id = "1"; e.trip_update.trip.trip_id = trip
+    u = e.trip_update.stop_time_update.add(); u.stop_id = stop; u.departure.time = when
+    if skip:
+        u.schedule_relationship = u.SKIPPED
+    return f.SerializeToString()
+
+
+class CalgaryLive(unittest.TestCase):
+    """Realtime: one shared poll, asked only on demand, cached 30 s, backed off on errors, never shown stale."""
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        zp, self.db_path = os.path.join(tmp.name, "z.zip"), os.path.join(tmp.name, "c.db")
+        build(zp); app.import_gtfs(zp, self.db_path)
+        self.db = sqlite3.connect(self.db_path)
+        self.now = int(datetime(2026, 11, 10, 7, 55, tzinfo=app.TZ).timestamp())  # a Tuesday; t1 leaves 6451 at 08:00
+        self.live, self.host = app.CgyLive(), app.Host("test", 25, 3000)
+        for patch in (mock.patch.object(app, "CGYLIVE", self.live), mock.patch.object(app, "CALGARY_RT", self.host),
+                      mock.patch.object(app.time, "time", lambda: self.now)):
+            patch.start(); self.addCleanup(patch.stop)
+
+    def ask(self):
+        return app.cgy_route(self.db, ["stops", "cgy:6451", "departures"], {})[0]
+
+    def test_a_prediction_replaces_the_timetable_and_is_live(self):
+        sched = self.now + 300
+        with mock.patch.object(app, "fetch", lambda u, t: io.BytesIO(feed("t1", "6451", sched + 240, self.now - 10))):
+            d = self.ask()
+        self.assertEqual([(x["time"], x["live"]) for x in d["departures"]], [(sched + 240, True)])
+        self.assertEqual(d["live_age"], 10)
+
+    def test_a_skipped_stop_is_dropped(self):
+        with mock.patch.object(app, "fetch", lambda u, t: io.BytesIO(feed("t1", "6451", 0, self.now, skip=True))):
+            self.assertEqual(self.ask()["departures"], [])
+
+    def test_riders_share_one_poll_for_30_s(self):
+        asked = []
+        def fetch(u, t):
+            asked.append(u); return io.BytesIO(feed("t1", "6451", self.now + 400, self.now))
+        with mock.patch.object(app, "fetch", fetch):
+            for _ in range(5):
+                self.ask()
+            self.assertEqual(len(asked), 1)
+            self.now += 31; self.ask()
+        self.assertEqual(len(asked), 2)
+
+    def test_a_429_backs_off_and_the_old_copy_ages_out_to_scheduled(self):
+        from test_outside_hosts import http_error
+        asked = []
+        def fetch(u, t):
+            asked.append(self.now)
+            if len(asked) == 1:
+                return io.BytesIO(feed("t1", "6451", self.now + 400, self.now))
+            raise http_error(429, 600)
+        with mock.patch.object(app, "fetch", fetch):
+            self.ask()
+            self.now += 31; d = self.ask()  # the 429: the 31 s old copy is still shown as live
+            self.assertTrue(d["departures"][0]["live"])
+            for _ in range(8):  # riders keep asking for 4 min; Retry-After 600 keeps the host unasked
+                self.now += 31; d = self.ask()
+        self.assertEqual(len(asked), 2)
+        self.assertFalse(d["departures"][0]["live"])  # copy older than 120 s: scheduled again, never a stale "live"
+        self.assertIsNone(d["live_age"])
+
+
+class CitiesRoute(unittest.TestCase):
+    """The switch that keeps Edmonton riders unchanged, through the real HTTP Handler."""
+    def get(self, path):
+        import http.client, threading
+        srv = app.ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.server_close); self.addCleanup(srv.shutdown)
+        c = http.client.HTTPConnection("127.0.0.1", srv.server_port, timeout=10)
+        c.request("GET", path); r = c.getresponse()
+        return r.status, json.loads(r.read())
+
+    def test_edmonton_only_unless_calgary_is_enabled_and_imported(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        edm, cgy = os.path.join(tmp.name, "e.db"), os.path.join(tmp.name, "c.db")
+        sqlite3.connect(edm).close()
+        with mock.patch.object(app, "DB", edm), mock.patch.object(app, "CGY_DB", cgy):
+            with mock.patch.object(app, "CITIES", {"cgy"}):
+                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg"]}))  # enabled, nothing imported yet
+                self.assertEqual(self.get("/api/stops/search?q=x&city=cgy")[0], 404)
+                sqlite3.connect(cgy).close()
+                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg", "cgy"]}))
+            with mock.patch.object(app, "CITIES", set()):
+                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg"]}))  # the default: no change for riders
+                self.assertEqual(self.get("/api/stops/cgy:6451/departures")[0], 404)
 
 
 if __name__ == "__main__":
