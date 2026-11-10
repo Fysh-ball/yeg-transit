@@ -187,7 +187,11 @@ footer a { color: var(--accent); }
 footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
 #wx { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: .95rem; color: var(--text); font-variant-numeric: tabular-nums; }
 #wx[hidden] { display: none; }
-#wx svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#wx svg { width: 28px; height: 28px; overflow: visible; --cl: #9fb3c8; --clo: #7f93a6; }
+#wx .f { stroke: var(--bg); stroke-width: 1.2; paint-order: stroke; stroke-linejoin: round; }
+#wx .s { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+#wx .sun { fill: #f7b32b; } #wx .ray { stroke: #f7b32b; } #wx .moon { fill: #f2cf6b; } #wx .cl { fill: var(--cl); }
+#wx .drop { stroke: #3d8fe6; } #wx .flake { stroke: #59b4ee; } #wx .bolt { fill: #f5a00b; } #wx .fog { stroke: var(--clo); } #wx .wind { stroke: #6f93b3; }
 #clock { display: none; }
 
 /* Wall board: read from across the room. */

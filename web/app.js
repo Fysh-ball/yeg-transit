@@ -113,19 +113,24 @@ let wx = { extra: 0, why: "" };
 const walkOf = (s) => (s.walk ? s.walk + wx.extra : 0);
 // The sky now, top of the page: one line-art symbol (inline, no emoji font) and the temperature. Keys come from walk_weather().
 const CLOUD = "M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17.3 9.6 4.2 4.2 0 0 1 17 18z";
+const RAYS = "M12 2.2v2.6M12 19.2v2.6M2.2 12h2.6M19.2 12h2.6M5.1 5.1 7 7M17 17l1.9 1.9M5.1 18.9 7 17M17 7l1.9-1.9";
+const cloud = (t = "") => `<path class="f cl" d="${CLOUD}"${t ? ` transform="${t}"` : ""}/>`;
+const SMALL = "translate(4.6 4.6) scale(.76)";
 const WX_ICON = {
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
-  moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
-  "partly-day": `<circle cx="7" cy="7" r="2.6"/><path d="M7 1.6v1M1.6 7h1M3.2 3.2l.7.7M10.8 3.2l-.7.7"/><path d="${CLOUD}" transform="translate(4.5 4.5) scale(.74)"/>`,
-  "partly-night": `<path d="M10 2.2a4.4 4.4 0 1 0 0 8.2A4.4 4.4 0 0 1 10 2.2z" transform="translate(-1.5 -.5)"/><path d="${CLOUD}" transform="translate(4.5 4.5) scale(.74)"/>`,
-  cloud: `<path d="${CLOUD}"/>`,
-  fog: `<path d="M7 13a4 4 0 0 1 .4-6.9A5 5 0 0 1 17 8a3.5 3.5 0 0 1 .5 5"/><path d="M4 16.5h16M6 20h12"/>`,
-  rain: `<path d="${CLOUD}" transform="translate(0 -3)"/><path d="M8 17.5l-1 3M12 17.5l-1 3M16 17.5l-1 3"/>`,
-  snow: '<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M9.6 4.6 12 6.6l2.4-2M9.6 19.4 12 17.4l2.4 2"/>',
-  thunder: `<path d="${CLOUD}" transform="translate(0 -3)"/><path d="m12.5 14-2.5 3.5h3.5L11 21"/>`,
-  wind: '<path d="M3 8.5h10.5a2.7 2.7 0 1 0-2.7-2.7M3 12.5h15a2.7 2.7 0 1 1-2.7 2.7M3 16.5h7"/>',
+  sun: `<circle class="f sun" cx="12" cy="12" r="4.4"/><path class="s ray" d="${RAYS}"/>`,
+  moon: '<path class="f moon" d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/>',
+  "partly-day": `<circle class="f sun" cx="8" cy="8" r="3.3"/><path class="s ray" d="M8 1.6v1.4M1.6 8H3M3.2 3.2l1 1M12.8 3.2l-1 1"/>${cloud(SMALL)}`,
+  // the moon is drawn bigger than the sun so it still reads as a moon at 24 px
+  "partly-night": `<path class="f moon" d="M11.4 2.4A5.2 5.2 0 1 0 11.4 11.6 5.2 5.2 0 0 1 11.4 2.4z" transform="translate(-3.6 -1.8) scale(1.3)"/>${cloud(SMALL)}`,
+  cloud: cloud("translate(0 .5)"),
+  fog: `${cloud("translate(0 -2.5)")}<path class="s fog" d="M4 17.4h16M7 21h10"/>`,
+  rain: `${cloud("translate(0 -3)")}<path class="s drop" d="M8 17.6l-1.1 3.2M12.4 17.6l-1.1 3.2M16.8 17.6l-1.1 3.2"/>`,
+  snow: '<path class="s flake" d="M12 2.5v19M3.8 7.2l16.4 9.6M20.2 7.2 3.8 16.8M9.5 4.6 12 6.8l2.5-2.2M9.5 19.4 12 17.2l2.5 2.2"/>',
+  thunder: `${cloud("translate(0 -3)")}<path class="f bolt" d="M13.4 13.2 9 18.6h3.2l-1.2 4 5-6h-3.3z"/>`,
+  wind: '<path class="s wind" d="M3 8.5h10.5a2.8 2.8 0 1 0-2.8-2.8M3 12.6h15a2.8 2.8 0 1 1-2.8 2.8M3 16.7h7"/>',
 };
-const WX_WORD = { sun: "Sunny", moon: "Clear night", "partly-day": "Partly cloudy", "partly-night": "Partly cloudy", cloud: "Cloudy", fog: "Fog", rain: "Rain", snow: "Snow", thunder: "Thunderstorm", wind: "Windy" };
+// What a rider sees or hears (tooltip, aria-label): plain words, never the keys above.
+const WX_WORD = { sun: "Clear", moon: "Clear", "partly-day": "Partly cloudy", "partly-night": "Partly cloudy", cloud: "Cloudy", fog: "Fog", rain: "Rain", snow: "Snow", thunder: "Thunderstorm", wind: "Windy" };
 function showWeather() {
   const el = $("#wx"), svg = WX_ICON[wx.icon];
   if (!el || !svg) { if (el) el.hidden = true; return; }
@@ -348,14 +353,18 @@ function stopHead(s) {
     </button></div>`;
 }
 
-// Street plowing in a declared snow event, in the City's own words. It is the road only: the City's map says
-// nothing about the sidewalk or the stop pad, and outside an event the server sends {event: false} and we say nothing.
-function snowLine(sn) {
+// Street plowing in a declared snow event. The road line is the City's own words (measured). The stop line is an ESTIMATE
+// from the road alone: the City's map has no sidewalk or stop pad data, and stops beside private property are the owner's.
+// ponytail: no City target time shown yet (the document says 24 or 48 h); add it once the City confirms which one applies.
+const STOP_GUESS = { done: "Street plowed. Stop likely cleared soon after, estimate.", doing: "Street being plowed now. Stop not cleared yet, estimate.", todo: "Street not plowed yet. Stop not cleared yet, estimate." };
+function snowLine(sn, name = "") {
   if (!sn?.event) return "";
   const asOf = sn.as_of ? `, as of ${new Date(sn.as_of * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "";
   const what = !sn.road ? "The City's plowing map doesn't cover this street."
     : `${esc(sn.road)}: ${sn.status ? esc(sn.status) : "no update from the City yet"}.`;
-  return `<p class="note snow">Street plowing (City of Edmonton${asOf}). ${what} Sidewalks and the stop itself aren't on the map.</p>`;
+  const guess = sn.road ? (STOP_GUESS[sn.cls] || (sn.status ? "" : STOP_GUESS.todo)) : "";
+  const first = /transit cent|lrt|station/i.test(name) ? " The City clears transit centres and LRT stations first, estimate." : "";
+  return `<p class="note snow">Street plowing (City of Edmonton${asOf}). ${what}${guess ? ` ${guess}` : ""}${first}</p>`;
 }
 
 // Why a stop shows nothing: say the walk time hid them when it did, not that no bus is coming.
@@ -374,7 +383,7 @@ async function renderStop(s, el) {
     Object.assign(s, { lat: d.stop.lat, lon: d.stop.lon, where: d.stop.where, code: d.stop.code }); // code: stops saved before it was kept // nearest group; which kerb
     save();
     const xf = await x;
-    body = alertBox(s, d.alerts || []) + snowLine(d.stop.snow) + (xf?.error ? `<p class="note">Can't check your change to ${esc(routeLabel(s.xfer.to))} right now.</p>` : xf ? xferLine(s, xf, d.now) : "") +
+    body = alertBox(s, d.alerts || []) + snowLine(d.stop.snow, s.name) + (xf?.error ? `<p class="note">Can't check your change to ${esc(routeLabel(s.xfer.to))} right now.</p>` : xf ? xferLine(s, xf, d.now) : "") +
       (grouped(s, d.departures, d.now) || none(s, d.departures));
     if (d.live_age == null) delete el.dataset.live; // ETS never answered since the server started: nothing here is live
     else el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
@@ -1244,4 +1253,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=118").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=119").catch((e) => console.warn("sw:", e.message));

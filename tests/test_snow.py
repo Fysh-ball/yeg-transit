@@ -25,7 +25,7 @@ class Snow(unittest.TestCase):
 
     def test_in_an_event_a_stop_gets_its_road_and_the_citys_words(self):
         app.SNOW.update(event=True, stat={"2sw 021 - 16": "Complete"})
-        self.assertEqual(app.stop_snow(ON_ALLARD), {"event": True, "road": "Allard Gt SW", "status": "Complete", "as_of": 1})
+        self.assertEqual(app.stop_snow(ON_ALLARD), {"event": True, "road": "Allard Gt SW", "status": "Complete", "cls": "done", "as_of": 1})
 
     def test_a_stop_off_the_map_is_unknown_not_unplowed(self):
         app.SNOW.update(event=True)

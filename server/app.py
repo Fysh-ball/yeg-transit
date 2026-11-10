@@ -859,7 +859,8 @@ def stop_snow(stop):
     if i is None or i >= len(SNOW["segs"]):
         return {"event": True, "road": None, "as_of": SNOW["as_of"]}
     rid, road = SNOW["segs"][i][:2]
-    return {"event": True, "road": road, "status": SNOW["stat"].get(rid) or None, "as_of": SNOW["as_of"]}
+    st = SNOW["stat"].get(rid) or None
+    return {"event": True, "road": road, "status": st, "cls": snow_class(st), "as_of": SNOW["as_of"]}
 
 
 FILLER = {"and", "at", "the", "of", "nw", "sw", "ne", "se"}
