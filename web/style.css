@@ -437,6 +437,7 @@ main > .stop { animation: rise .5s var(--spring) both; }
 [data-look="material"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .sub,
 [data-look="material"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .then { color: inherit; opacity: .78; }
 /* Rows on a coloured card take a tint of it, not a dark slab. */
+[data-look="material"] .stop .note.snow { color: inherit; opacity: .85; } /* as readable as .sub on a coloured card */
 :is([data-look="material"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop), [data-look="material"] .stop.walk) .deps .dep { background: var(--tint); color: inherit; }
 [data-look="material"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .deps .dep.lead { background: none; padding: 6px 2px 2px; }
 [data-look="material"] :is(body:not(.board) main > .stop:not([hidden]):not(.stop:not([hidden]) ~ .stop), body:is(.board, .wide) main > .stop) .lead .route {
