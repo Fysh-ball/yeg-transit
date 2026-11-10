@@ -7,6 +7,8 @@ services:
     # Loopback only: the host-network cloudflared publishes it (bus-pi.fysh.site on the Pi, bus.fysh.site on TrueNAS); yegbus.com is Cloudflare Pages.
     ports: ["127.0.0.1:8792:8792"]
     volumes: ["yeg-data:/data"]
+    # Cities served besides Edmonton (owner go-live 2026-11-10); empty or unset = Edmonton only.
+    environment: ["YEG_CITIES=cgy"]
     mem_limit: 512m
     cpus: 1
     # unhealthy = /api/health's 503: live times or the timetable stale. Shown in docker ps; nothing restarts on it.

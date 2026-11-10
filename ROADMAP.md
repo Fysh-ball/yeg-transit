@@ -27,10 +27,10 @@ on our box at a public address. (Outreach to Eastside Urbanism, makers of Transi
    the road the stop is on (data.edmonton.ca 8pdx-hfxi, priority roads only, about 83% of stops), as of its last
    hourly update; "not on the City's map" when the street isn't covered; nothing outside an event. Road only: the
    card says sidewalks and the stop itself aren't covered (v113). Android wraps the web app.
-16. [ ] Calgary (owner ruling 2026-11-10; unreleased behind the city picker, `YEG_CITIES=cgy` gates it; Calgary's own open data, nothing asked of Mike):
+16. [x] Calgary (owner ruling 2026-11-10, go-live approved 2026-11-10; was behind the city picker, `YEG_CITIES=cgy` gates it; Calgary's own open data, nothing asked of Mike):
    - [x] Feeds and licence read: static `npk7-z3bj`, realtime `gs4m-mdc2` (30 s), alerts `jhgn-ynqj`, all on data.calgary.ca (no published rate limit: 1 call per 5 min, 12 a day).
    - [x] Server: schedule import with calendar expansion, `cgy:` stop ids, search, near, departures and timetable as scheduled (f069ba5).
    - [x] City picker (from location and a manual switch; hidden when one city), Calgary scheduled times at phone width.
    - [x] Calgary realtime (1d2ff21): on-demand, one shared poll, 30 s cache, own Host (25 s gap, 3,000 a day, limit unknown), backoff test.
    - [x] Calgary map: buses from `am7c-qe3u` (own Host, 25 s gap, 3,000 a day, limit unknown, backoff test), trip shapes, Calgary Transit wording; no snow map for Calgary.
-   - [ ] Go-live: confirm the licence wording, Calgary attribution in footer and About, SEO copy, `check_live.py` canary stop per city, no SMS for Calgary, then `YEG_CITIES=cgy` on TrueNAS and the Pi and a version bump.
+   - [x] Go-live (v120): confirm the licence wording, Calgary attribution in footer and About, SEO copy, `check_live.py` canary stop per city, no SMS for Calgary, then `YEG_CITIES=cgy` on TrueNAS and the Pi and a version bump.

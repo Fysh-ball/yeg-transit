@@ -19,6 +19,8 @@ export async function onRequest({ request, waitUntil }) {
   if (rule) {
     const [, , name, def, max] = rule, key = new URL(url.origin + url.pathname);
     if (name) key.searchParams.set(name, String(Math.min(parseInt(url.searchParams.get(name), 10) || def, max)));
+    // the one other parameter that changes the answer: without it Calgary would be served Edmonton's buses
+    if (url.pathname === "/api/vehicles" && url.searchParams.get("city") === "cgy") key.searchParams.set("city", "cgy");
     url = key;
   }
   const hit = fresh ? await caches.default.match(url.href) : null;
