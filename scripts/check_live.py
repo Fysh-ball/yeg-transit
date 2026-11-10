@@ -27,6 +27,9 @@ HELD_AT = os.path.expanduser("~/.local/state/yeg-check-held.json")  # "trip stop
 QUIET = {"wrong": 6 * 3600, "unreachable": 3600}
 STOPS = 25  # per run: every /api call is a Cloudflare Pages Function request, 100k a day on the free plan
 OFF = 15 * 60  # seconds apart before a time counts as wrong
+CGY_STOP = "cgy:5251"  # City Hall LRT Station (NB Macleod TR @ 7 AV SE), route 10: its live_age is the Calgary trip-update feed's age
+CGY_STALE = 300  # seconds: past this a Calgary feed counts as stale (the server itself drops a fix after 120 s)
+CGY_HOURS = (6, 23)  # Mountain time: inside these an empty bus list is a fault; at night Calgary runs almost nothing
 FAR = 1500  # metres, straight line: a bus shown 1 min or less away can't be further (8 m/s for 3 min, for stale GPS)
 
 
@@ -76,6 +79,12 @@ def main(argv=sys.argv[1:]):
     except Unreachable as e:  # ETS's own feed: nothing to compare with
         print(f"UNREACHABLE {e} ({time.strftime('%H:%M')})")
         return 3 if due(["unreachable"], page) else 4
+    try:
+        cw, ck = check_calgary(site)
+    except Unreachable as e:
+        cw, ck = [f"WRONG calgary: {e}"], ["wrong calgary unreachable"]
+    wrong += cw
+    keys += ck
     print(f"{site}: {checked} live buses at {STOPS} stops, {sum(not w.startswith('HELD') for w in wrong)} wrong ({time.strftime('%H:%M')})")
     for w in wrong:
         print(w)
@@ -86,6 +95,35 @@ def main(argv=sys.argv[1:]):
     if any(k.startswith("wrong") for k in paging):
         return 1
     return 3 if paging else 4 if keys else 0
+
+
+def check_calgary(site, now=None):
+    """Calgary is live, so it gets a canary too (2026-11-10): the city is listed, its bus feed is fresh and not empty in
+    service hours, and its trip-update feed is fresh at one stop. Only asks our own site (3 calls per run), never
+    data.calgary.ca: the server's Calgary hosts keep their own 25 s gap, daily cap, backoff and Retry-After, so a
+    Calgary 429 shows up here as a stale feed, loudly, not as more calls. Returns (lines, page keys)."""
+    wrong, keys = [], []
+
+    def bad(what, line):
+        wrong.append(f"WRONG calgary {line}")
+        keys.append(f"wrong calgary {what}")
+
+    if "cgy" not in json.loads(get(f"{site}/api/cities")).get("cities", []):
+        bad("cities", "isn't listed by /api/cities, so riders can't pick it")
+        return wrong, keys
+    hour = int(time.strftime("%H", time.gmtime((now or time.time()) - 7 * 3600)))
+    # ponytail: fixed UTC-7 (MST), so the hours window is an hour late in summer; zoneinfo needs tzdata the image may lack
+    v = json.loads(get(f"{site}/api/vehicles?city=cgy"))
+    age = v.get("age")
+    if CGY_HOURS[0] <= hour < CGY_HOURS[1] and not v.get("buses"):
+        bad("buses", "bus feed is empty during the day: no buses on the map")
+    elif age is None or age > CGY_STALE:
+        bad("buses", f"bus feed is stale: its newest data is {'missing' if age is None else f'{age} s old'}")
+    d = json.loads(get(f"{site}/api/stops/{CGY_STOP}/departures?n=8"))
+    la = d.get("live_age")
+    if la is None or la > CGY_STALE:
+        bad("times", f"live times are stale at {CGY_STOP}: trip-update feed {'missing' if la is None else f'{la} s old'}")
+    return wrong, keys
 
 
 def check(SITE):

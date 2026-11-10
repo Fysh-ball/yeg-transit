@@ -41,6 +41,13 @@ def site(shows, live_age=10):  # the site's answer for stop 1407: route 002 at `
         {"trip": "T1", "route": "002", "live": True, "time": NOW + shows * 60, "sched": NOW + 43 * 60}]}).encode()
 
 
+def calgary(cities=("yeg", "cgy"), buses=1, age=20, live_age=30):  # the site's three Calgary answers, healthy by default
+    b = "https://canadabus.org/api/"
+    return {b + "cities": [json.dumps({"cities": list(cities)}).encode()],
+            b + "vehicles": [json.dumps({"now": NOW, "age": age, "buses": [[51.0, -114.0, 0, "10", "x", "t"]] * buses}).encode()],
+            b + f"stops/{check_live.CGY_STOP}/departures": [json.dumps({"now": NOW, "live_age": live_age, "departures": []}).encode()]}
+
+
 class CheckLive(unittest.TestCase):
     def setUp(self):
         d = tempfile.TemporaryDirectory()
@@ -62,9 +69,9 @@ class CheckLive(unittest.TestCase):
         with mock.patch.object(check_live.urllib.request, "urlopen", urlopen), redirect_stdout(out):
             return check_live.main(list(argv)), out.getvalue()
 
-    def answers(self, *site_answers, ets=None, vp=None):
+    def answers(self, *site_answers, ets=None, vp=None, cgy=None):
         return {check_live.RT_URL: [ets or ets_feed()], check_live.VP_URL: [vp or empty().SerializeToString()],
-                "https://canadabus.org/api/stops/1407/departures": list(site_answers)}
+                "https://canadabus.org/api/stops/1407/departures": list(site_answers), **(cgy or calgary())}
 
     def test_a_right_time_passes(self):
         self.assertEqual(self.run_check(self.answers(site(45)))[0], 0)
@@ -155,6 +162,61 @@ class CheckLive(unittest.TestCase):
         a = self.answers()
         a[check_live.RT_URL] = [OSError("reset"), OSError("reset")]
         self.assertEqual(self.run_check(a)[0], 3)
+
+
+    NOON = 1_800_000_000 + 0  # 2027-01-15 ~08:00 UTC, so 01:00 in Calgary: the night window
+    DAY = NOON + 9 * 3600  # 10:00 in Calgary
+
+    def calgary_run(self, cgy, now=None):
+        out = []
+        def urlopen(req, timeout):
+            a = cgy[req.full_url.split("?")[0]].pop(0)
+            if isinstance(a, Exception):
+                raise a
+            return io.BytesIO(a)
+        with mock.patch.object(check_live.urllib.request, "urlopen", urlopen):
+            return check_live.check_calgary("https://canadabus.org", now or self.DAY)
+
+    def test_a_healthy_calgary_passes(self):
+        self.assertEqual(self.calgary_run(calgary()), ([], []))
+        self.assertEqual(self.run_check(self.answers(site(45)))[0], 0)  # and main() still exits 0 with it
+
+    def test_an_empty_bus_list_by_day_is_wrong_but_not_at_night(self):
+        w, k = self.calgary_run(calgary(buses=0))
+        self.assertIn("empty during the day", w[0])
+        self.assertEqual(k, ["wrong calgary buses"])
+        self.assertEqual(self.calgary_run(calgary(buses=0), self.NOON), ([], []))
+
+    def test_a_stale_bus_feed_is_wrong_at_any_hour(self):
+        for now in (self.DAY, self.NOON):
+            w, k = self.calgary_run(calgary(age=900), now)
+            self.assertIn("stale", w[0])
+            self.assertEqual(k, ["wrong calgary buses"])
+        self.assertIn("missing", self.calgary_run(calgary(age=None))[0][0])
+
+    def test_stale_trip_updates_are_wrong(self):
+        for la in (None, 900):
+            w, k = self.calgary_run(calgary(live_age=la))
+            self.assertIn("live times are stale", w[0])
+            self.assertEqual(k, ["wrong calgary times"])
+
+    def test_calgary_not_listed_is_wrong_and_stops_there(self):
+        w, k = self.calgary_run(calgary(cities=("yeg",)))
+        self.assertIn("isn't listed", w[0])
+        self.assertEqual(k, ["wrong calgary cities"])
+
+    def test_a_dead_calgary_pages_through_main_and_exits_1(self):
+        code, out = self.run_check(self.answers(site(45), cgy=calgary(live_age=900)), "--page")
+        self.assertEqual(code, 1)
+        self.assertIn("WRONG calgary live times are stale", out)
+
+    def test_main_calls_only_our_site_for_calgary(self):  # never data.calgary.ca: its host caps live in the server
+        seen = []
+        orig = check_live.urllib.request.Request
+        with mock.patch.object(check_live.urllib.request, "Request", lambda u, **kw: seen.append(u) or orig(u, **kw)):
+            self.run_check(self.answers(site(45)))
+        self.assertEqual([u for u in seen if "calgary" in u.lower() and "canadabus.org" not in u], [])
+        self.assertEqual(len([u for u in seen if "cgy" in u or "cities" in u]), 3)
 
 
 if __name__ == "__main__":
