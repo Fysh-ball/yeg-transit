@@ -185,6 +185,9 @@ footer a { color: var(--accent); }
 .policy h2 { font-size: 1.05rem; margin: 22px 0 6px; }
 .policy a { color: var(--accent); }
 footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+#wx { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: .95rem; color: var(--text); font-variant-numeric: tabular-nums; }
+#wx[hidden] { display: none; }
+#wx svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 #clock { display: none; }
 
 /* Wall board: read from across the room. */

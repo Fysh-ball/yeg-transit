@@ -645,13 +645,33 @@ WEATHER = {"at": 0, "good": 0, "value": {"extra": 0, "why": "", "soon": "", "tem
 PHOTON, PHOTON_LOCK = {"cache": {}}, threading.Lock()  # cache: Photon URL -> answer, newest 500
 
 
+def weather_icon(code, wind, gusts, is_day):
+    """One symbol key for the weather now, from Open-Meteo's WMO code. Wind only wins on an otherwise dry,
+    clear-ish sky (40 km/h steady or 60 gusts): rain, snow, fog and thunder say more."""
+    if code in (95, 96, 99):
+        return "thunder"
+    if code in (71, 73, 75, 77, 85, 86):
+        return "snow"
+    if code in (51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82):
+        return "rain"
+    if code in (45, 48):
+        return "fog"
+    if (wind or 0) >= 40 or (gusts or 0) >= 60:
+        return "wind"
+    if code == 3:
+        return "cloud"
+    if code == 2:
+        return "partly-day" if is_day else "partly-night"
+    return "sun" if is_day else "moon"  # 0 and 1, and a code we don't know: a plain sky
+
+
 def walk_weather():
     """Extra walking minutes for Edmonton's weather right now (0 to 3), from Open-Meteo; cached 15 min.
     The page adds it on top of the walk time you set."""
     if time.time() - WEATHER["at"] < 900:
         return WEATHER["value"]
     url = "https://api.open-meteo.com/v1/forecast?" + urlencode({"latitude": 53.54, "longitude": -113.49, "current":
-          "temperature_2m,apparent_temperature,rain,showers,snowfall,snow_depth", "hourly": "precipitation_probability,snowfall",
+          "temperature_2m,apparent_temperature,rain,showers,snowfall,snow_depth,weather_code,wind_speed_10m,wind_gusts_10m,is_day", "hourly": "precipitation_probability,snowfall",
           "forecast_hours": 12, "timezone": "America/Edmonton"})
     try:
         r = OPEN_METEO.get_json(url, 5)
@@ -678,7 +698,8 @@ def walk_weather():
         soon = ("Snow" if any((x or 0) > 0 for x in hr.get("snowfall") or []) else "Rain") + (" soon" if wet[0] < 3 else " later")
     temp = c.get("temperature_2m")
     WEATHER.update(at=time.time(), good=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why), "soon": soon,
-                                          "temp": None if temp is None else round(temp)})
+                                          "temp": None if temp is None else round(temp),
+                                          "icon": weather_icon(c.get("weather_code"), c.get("wind_speed_10m"), c.get("wind_gusts_10m"), c.get("is_day", 1))})
     return WEATHER["value"]
 
 

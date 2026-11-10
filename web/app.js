@@ -111,8 +111,32 @@ const allRoutes = new Set(); // stop ids showing every route for now; "Buses to 
 // Snow, rain or bitter cold add up to 3 min on top of every walk time you set (from /api/weather).
 let wx = { extra: 0, why: "" };
 const walkOf = (s) => (s.walk ? s.walk + wx.extra : 0);
+// The sky now, top of the page: one line-art symbol (inline, no emoji font) and the temperature. Keys come from walk_weather().
+const CLOUD = "M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17.3 9.6 4.2 4.2 0 0 1 17 18z";
+const WX_ICON = {
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
+  "partly-day": `<circle cx="7" cy="7" r="2.6"/><path d="M7 1.6v1M1.6 7h1M3.2 3.2l.7.7M10.8 3.2l-.7.7"/><path d="${CLOUD}" transform="translate(4.5 4.5) scale(.74)"/>`,
+  "partly-night": `<path d="M10 2.2a4.4 4.4 0 1 0 0 8.2A4.4 4.4 0 0 1 10 2.2z" transform="translate(-1.5 -.5)"/><path d="${CLOUD}" transform="translate(4.5 4.5) scale(.74)"/>`,
+  cloud: `<path d="${CLOUD}"/>`,
+  fog: `<path d="M7 13a4 4 0 0 1 .4-6.9A5 5 0 0 1 17 8a3.5 3.5 0 0 1 .5 5"/><path d="M4 16.5h16M6 20h12"/>`,
+  rain: `<path d="${CLOUD}" transform="translate(0 -3)"/><path d="M8 17.5l-1 3M12 17.5l-1 3M16 17.5l-1 3"/>`,
+  snow: '<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9M9.6 4.6 12 6.6l2.4-2M9.6 19.4 12 17.4l2.4 2"/>',
+  thunder: `<path d="${CLOUD}" transform="translate(0 -3)"/><path d="m12.5 14-2.5 3.5h3.5L11 21"/>`,
+  wind: '<path d="M3 8.5h10.5a2.7 2.7 0 1 0-2.7-2.7M3 12.5h15a2.7 2.7 0 1 1-2.7 2.7M3 16.5h7"/>',
+};
+const WX_WORD = { sun: "Sunny", moon: "Clear night", "partly-day": "Partly cloudy", "partly-night": "Partly cloudy", cloud: "Cloudy", fog: "Fog", rain: "Rain", snow: "Snow", thunder: "Thunderstorm", wind: "Windy" };
+function showWeather() {
+  const el = $("#wx"), svg = WX_ICON[wx.icon];
+  if (!el || !svg) { if (el) el.hidden = true; return; }
+  const t = typeof wx.temp === "number" ? `${wx.temp}\u00b0` : "";
+  el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg>${t}`;
+  el.title = el.ariaLabel = `${WX_WORD[wx.icon]}${t ? `, ${t}` : ""}`;
+  el.hidden = false;
+}
 async function loadWeather() {
   try { wx = await api("weather"); } catch (e) { console.warn("weather:", e.message); }
+  showWeather();
 }
 function grouped(s, list, now) {
   const walk = walkOf(s) * 60, groups = new Map();
@@ -1170,4 +1194,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=115").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=116").catch((e) => console.warn("sw:", e.message));
