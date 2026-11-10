@@ -455,6 +455,7 @@ let cities = ["yeg"], city = "yeg";
 try { city = localStorage.getItem("yeg.city") || "yeg"; } catch { /* storage blocked: Edmonton */ }
 const cityAt = (p) => cities.find((c) => p.lat >= CITY[c].box[0] && p.lon >= CITY[c].box[1] && p.lat <= CITY[c].box[2] && p.lon <= CITY[c].box[3]);
 const cq = (c) => (c === "yeg" ? "" : `&city=${c}`);
+const agency = (c) => (c === "cgy" ? "Calgary Transit" : "ETS"); // who feeds the map, for the notes under it
 function drawCityPick() {
   const el = $("#city-pick");
   el.hidden = cities.length < 2;
@@ -801,14 +802,14 @@ async function openMap(dep) {
   $("#map-sheet").showModal(); fitMapBox();
   if (!await sheetMap()) return;
   const m = mapState;
-  m.trip = dep.dataset.trip; m.stop = s; m.style = label.getAttribute("style"); m.fitted = false;
+  m.trip = dep.dataset.trip; m.stop = s; m.city = s?.id.startsWith("cgy:") ? "cgy" : "yeg"; m.style = label.getAttribute("style"); m.fitted = false;
   $("#map-snow").hidden = true; m.label = label.textContent; m.bus = null; m.at = null; m.others = L.layerGroup();
   m.layer.clearLayers(); m.others.addTo(m.layer);
   m.map.invalidateSize();
   if (s && s.lat) m.map.setView([s.lat, s.lon], 15);
   // The route line first, under everything; a missing shape only costs the line.
   m.pts = null; m.color = getComputedStyle(label).backgroundColor; m.line = L.layerGroup().addTo(m.layer);
-  api(`trips/${encodeURIComponent(m.trip)}/shape`).then((pts) => {
+  api(`trips/${encodeURIComponent(m.trip)}/shape?${cq(m.city).slice(1)}`).then((pts) => {
     if (m.trip !== dep.dataset.trip || !pts.length) return;
     m.pts = pts;
     drawLine();
@@ -841,14 +842,14 @@ async function openLiveMap() {
   $("#map-note").textContent = "Finding buses...";
   $("#map-sheet").showModal(); fitMapBox();
   if (!await sheetMap()) return;
-  const m = mapState, home = stops.find((s) => s.lat);
-  m.trip = "all"; m.buses = []; m.busOpen = false; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
+  const m = mapState, home = stops.find((s) => s.lat && (s.id.startsWith("cgy:") ? "cgy" : "yeg") === city);
+  m.city = city; m.trip = "all"; m.buses = []; m.busOpen = false; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
   m.snowNo = 0; m.snowSeq = 0;
   m.stopPins = L.layerGroup().addTo(m.layer); m.stopsAt = null;
   $("#map-snow").hidden = true;
   m.map.invalidateSize();
-  m.map.setView(home ? [home.lat, home.lon] : [53.5461, -113.4938], 14); // your first stop, or downtown
-  drawSnow();
+  m.map.setView(home ? [home.lat, home.lon] : city === "cgy" ? [51.0447, -114.0719] : [53.5461, -113.4938], 14); // your first stop in this city, or downtown
+  if (city === "yeg") drawSnow(); // the snow map is Edmonton's plow data
   await placeFleet();
   if (!$("#map-sheet").open || m.trip !== "all") return; // closed, or a bus opened, while it loaded: no orphan timer
   clearInterval(m.timer);
@@ -857,7 +858,7 @@ async function openLiveMap() {
 async function placeFleet() {
   if (document.hidden) return; // a map left open in a background tab doesn't keep asking
   try {
-    const d = await api("vehicles");
+    const d = await api(`vehicles?${cq(mapState.city).slice(1)}`);
     if (mapState.trip !== "all") return;
     mapState.buses = d.buses; mapState.vpAt = d.age > 90 ? d.now - d.age : 0;
     drawFleet();
@@ -927,7 +928,7 @@ function drawFleet() { // only the buses in view: a city of pins at once makes a
     .on("popupclose", () => { m.busOpen = false; });
   $("#map-title").firstChild.textContent = m.vpAt ? "Every bus, not live" : "Every bus, live";
   $("#map-note").textContent = m.vpAt // ETS's position feed stalled: these are where buses were, not are
-    ? `Bus positions from ${clock(m.vpAt)}: ETS isn't sending new ones.` : `${m.buses.length} buses running, ${seen.length} here. ETS updates every 30 s.`;
+    ? `Bus positions from ${clock(m.vpAt)}: ${agency(m.city)} isn't sending new ones.` : `${m.buses.length} buses running, ${seen.length} here. ${agency(m.city)} updates every 30 s.`;
 }
 // Stops under the buses once zoomed in close enough to tell them apart. Asked for again only after the map moves
 // 300 m: every ask is a Pages Function call (100k a day free). Dots, not pins, so the buses stay on top.
@@ -939,7 +940,7 @@ async function drawStops() {
   if (m.stopsAt && metres(m.stopsAt, { lat: c.lat, lon: c.lng }) < 300) return;
   const at = m.stopsAt = { lat: +c.lat.toFixed(4), lon: +c.lng.toFixed(4) };
   let list;
-  try { list = await api(`stops/near?lat=${at.lat}&lon=${at.lon}&n=60`); }
+  try { list = await api(`stops/near?lat=${at.lat}&lon=${at.lon}&n=60${cq(m.city)}`); }
   catch (e) { m.stopsAt = null; console.warn("map stops:", e.message); return; }
   if (m.stopsAt !== at || m.trip !== "all") return; // moved again, or another map opened, while this was asked
   m.renderer = m.renderer || stopDots();
@@ -952,7 +953,7 @@ function busCard(pin, trip, route, head) {
   const el = document.createElement("div");
   el.className = "pin-card";
   el.innerHTML = `<b>Route ${esc(routeLabel(route))} to ${esc(headLabel(head, route))}</b><span class="sub">Loading...</span>`;
-  api(`vehicles/${encodeURIComponent(trip)}`).then((b) => {
+  api(`vehicles/${encodeURIComponent(trip)}?${cq(mapState.city).slice(1)}`).then((b) => {
     const late = b.delay == null ? "" : Math.abs(b.delay) < 60 ? "On time"
       : `${Math.round(Math.abs(b.delay) / 60)} min ${b.delay > 0 ? "late" : "early"}`;
     const lines = [late, b.full, b.next && `Next: ${esc(b.next.name)}${b.next.code ? ` (#${esc(b.next.code)})` : ""}`,
@@ -1009,7 +1010,7 @@ async function placeBus() {
   const m = mapState, s = m.stop, trip = m.trip;
   if (document.hidden) return;
   try {
-    const v = await api(`trips/${encodeURIComponent(trip)}${s ? `?stop=${encodeURIComponent(s.id)}` : ""}`);
+    const v = await api(`trips/${encodeURIComponent(trip)}?${s ? `stop=${encodeURIComponent(s.id)}` : ""}${cq(m.city)}`);
     if (m.trip !== trip) return; // another bus was opened meanwhile
     m.at = v;
     drawLine();
@@ -1027,7 +1028,7 @@ async function placeBus() {
     const km = s && s.lat ? ` It's ${(metres(v, s) / 1000).toFixed(1)} km from your stop.` : "";
     const away = v.before ? `Finishing its run before yours, then it comes to you.${km} ` : v.waiting ? "Hasn't started its trip yet. " : v.stops_away === undefined ? "" : v.stops_away === null ? "Already past your stop. "
       : v.stops_away === 0 ? "Your stop is next. " : `${v.stops_away} stop${v.stops_away > 1 ? "s" : ""} away. `;
-    $("#map-note").textContent = `${away}Position ${v.age < 90 ? `${v.age} s` : `${Math.round(v.age / 60)} min`} old, ETS updates every 30 s.`;
+    $("#map-note").textContent = `${away}Position ${v.age < 90 ? `${v.age} s` : `${Math.round(v.age / 60)} min`} old, ${agency(m.city)} updates every 30 s.`;
   } catch (e) {
     if (m.trip !== trip) return;
     $("#map-note").textContent = e.message.startsWith("404") ? "This bus hasn't sent its position yet. It may not have started its trip." : `Can't get the bus position (${e.message}).`;

@@ -32,4 +32,5 @@ on our box at a public address. (Outreach to Eastside Urbanism, makers of Transi
    - [x] Server: schedule import with calendar expansion, `cgy:` stop ids, search, near, departures and timetable as scheduled (f069ba5).
    - [x] City picker (from location and a manual switch; hidden when one city), Calgary scheduled times at phone width.
    - [x] Calgary realtime (1d2ff21): on-demand, one shared poll, 30 s cache, own Host (25 s gap, 3,000 a day, limit unknown), backoff test.
+   - [x] Calgary map: buses from `am7c-qe3u` (own Host, 25 s gap, 3,000 a day, limit unknown, backoff test), trip shapes, Calgary Transit wording; no snow map for Calgary.
    - [ ] Go-live: confirm the licence wording, Calgary attribution in footer and About, SEO copy, `check_live.py` canary stop per city, no SMS for Calgary, then `YEG_CITIES=cgy` on TrueNAS and the Pi and a version bump.

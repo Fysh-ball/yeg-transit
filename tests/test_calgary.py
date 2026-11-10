@@ -133,6 +133,66 @@ class CalgaryLive(unittest.TestCase):
         self.assertIsNone(d["live_age"])
 
 
+def vehicles(ts, *rows):
+    from google.transit import gtfs_realtime_pb2 as g
+    f = g.FeedMessage(); f.header.gtfs_realtime_version = "2.0"; f.header.timestamp = ts
+    for i, (trip, lat, lon) in enumerate(rows):
+        e = f.entity.add(); e.id = str(i); e.vehicle.trip.trip_id = trip
+        e.vehicle.position.latitude, e.vehicle.position.longitude, e.vehicle.position.bearing = lat, lon, 90
+        e.vehicle.vehicle.id = "B7"
+    return f.SerializeToString()
+
+
+class CalgaryMap(unittest.TestCase):
+    """The map: buses from the vehicle feed (route joined from trips), a trip's shape, one bus; one shared poll; 429 backs off."""
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        zp, dbp = os.path.join(tmp.name, "z.zip"), os.path.join(tmp.name, "c.db")
+        files = dict(FILES, **{"shapes.txt": "shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence\nS1,51.06,-114.06,1\nS1,51.04,-114.08,2\n"})
+        files["trips.txt"] = files["trips.txt"].replace("b1,\n", "b1,S1\n")
+        with zipfile.ZipFile(zp, "w") as z:
+            for n, t in files.items():
+                z.writestr(n, t)
+        app.import_gtfs(zp, dbp); self.db = sqlite3.connect(dbp)
+        self.now = int(datetime(2026, 11, 10, 7, 55, tzinfo=app.TZ).timestamp())
+        self.veh, self.host = app.CgyVeh(), app.Host("test", 25, 3000)
+        for patch in (mock.patch.object(app, "CGYVEH", self.veh), mock.patch.object(app, "CALGARY_VP", self.host),
+                      mock.patch.object(app.time, "time", lambda: self.now)):
+            patch.start(); self.addCleanup(patch.stop)
+
+    def ask(self, *path):
+        return app.cgy_route(self.db, list(path), {})[0]
+
+    def test_buses_shape_and_one_bus(self):
+        feed_ = vehicles(self.now - 5, ("t1", 51.05, -114.07), ("ghost", 51.0, -114.0))
+        with mock.patch.object(app, "fetch", lambda u, t: io.BytesIO(feed_)):
+            d = self.ask("vehicles")
+            self.assertEqual(d["buses"], [[51.05, -114.07, 90, "1", "FOREST LAWN", "t1"]])  # a trip we have no route for is not drawn
+            self.assertEqual(d["age"], 5)
+            self.assertEqual(self.ask("trips", "t1", "shape"), [(51.06, -114.06), (51.04, -114.08)])
+            one = self.ask("trips", "t1")
+            self.assertEqual((one["lat"], one["lon"], one["age"]), (51.05, -114.07, 5))
+            self.assertEqual(self.ask("vehicles", "t1")["bus"], "B7")
+            self.assertEqual(self.ask("trips", "nope"), {"error": "no position for this bus yet"})
+
+    def test_riders_share_one_poll_and_a_429_backs_off(self):
+        from test_outside_hosts import http_error
+        asked = []
+        def fetch(u, t):
+            asked.append(self.now)
+            if len(asked) == 1:
+                return io.BytesIO(vehicles(self.now, ("t1", 51.05, -114.07)))
+            raise http_error(429, 600)
+        with mock.patch.object(app, "fetch", fetch):
+            for _ in range(5):
+                self.ask("vehicles")
+            self.assertEqual(len(asked), 1)  # five riders, one poll
+            for _ in range(8):  # 4 min of riders: the 429 and its Retry-After 600 keep the host unasked
+                self.now += 31; d = self.ask("vehicles")
+        self.assertEqual(len(asked), 2)
+        self.assertEqual(d["buses"], [])  # the copy aged past 120 s: no bus is drawn from stale positions
+
+
 class CitiesRoute(unittest.TestCase):
     """The switch that keeps Edmonton riders unchanged, through the real HTTP Handler."""
     def get(self, path):

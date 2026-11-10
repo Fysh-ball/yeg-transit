@@ -211,6 +211,22 @@ class CgyLive:
     def __init__(self):
         self.trips, self.ts, self.fetched, self.error, self.lock = {}, 0, 0.0, None, threading.Lock()
 
+    def get(self):
+        return CALGARY_RT.get_bytes(CGY_RT_URL, 20)
+
+    def load(self, f):
+        trips = {}
+        for e in f.entity:
+            if not e.HasField("trip_update"):
+                continue
+            stops = {}
+            for u in e.trip_update.stop_time_update:
+                ev = u.departure if u.HasField("departure") else u.arrival
+                if u.stop_id not in stops:
+                    stops[u.stop_id] = None if u.schedule_relationship == SKIPPED else (ev.time or None)
+            trips[e.trip_update.trip.trip_id] = stops
+        return trips
+
     def refresh(self):
         with self.lock:  # one rider refreshes, the rest wait and read the result (single flight)
             if time.time() - self.fetched < self.FRESH:
@@ -218,27 +234,32 @@ class CgyLive:
             self.fetched = time.time()  # on every attempt: a failing host is not asked again for 30 s
             try:
                 f = gtfs_realtime_pb2.FeedMessage()
-                f.ParseFromString(CALGARY_RT.get_bytes(CGY_RT_URL, 20))
-                trips = {}
-                for e in f.entity:
-                    if not e.HasField("trip_update"):
-                        continue
-                    stops = {}
-                    for u in e.trip_update.stop_time_update:
-                        ev = u.departure if u.HasField("departure") else u.arrival
-                        if u.stop_id not in stops:
-                            stops[u.stop_id] = None if u.schedule_relationship == SKIPPED else (ev.time or None)
-                    trips[e.trip_update.trip.trip_id] = stops
-                self.trips, self.ts, self.error = trips, f.header.timestamp, None
+                f.ParseFromString(self.get())
+                self.trips, self.ts, self.error = self.load(f), f.header.timestamp, None
             except Exception as e:  # Busy included: the old copy ages out by itself
                 self.error = f"{type(e).__name__}: {e}"
-                print("calgary live poll failed:", self.error, file=sys.stderr)
+                print(f"{type(self).__name__} poll failed:", self.error, file=sys.stderr)
 
     def trip(self, trip_id):
         return self.trips.get(trip_id) if self.ts and time.time() - self.ts <= self.STALE else None
 
 
-CGYLIVE = CgyLive()
+# Calgary's bus positions, same rules as the trip updates (own Host, same unknown limit). Its vehicle timestamps are
+# garbage (2007 on 2026-11-10), so the feed's own header time is the age. trip_id -> (lat, lon, bearing, vehicle id).
+CGY_VP_URL = "https://data.calgary.ca/download/am7c-qe3u/application%2Foctet-stream"
+CALGARY_VP = Host("data.calgary.ca (vehicles)", 25, 3000)
+
+
+class CgyVeh(CgyLive):
+    def get(self):
+        return CALGARY_VP.get_bytes(CGY_VP_URL, 20)
+
+    def load(self, f):
+        return {e.vehicle.trip.trip_id: (e.vehicle.position.latitude, e.vehicle.position.longitude, e.vehicle.position.bearing,
+                                         e.vehicle.vehicle.id) for e in f.entity if e.HasField("vehicle") and e.vehicle.trip.trip_id}
+
+
+CGYLIVE, CGYVEH = CgyLive(), CgyVeh()
 
 
 def refresh_cgy():
@@ -1055,6 +1076,35 @@ def cgy_route(db, parts, q):
                           (lat - dlat, lat + dlat, lon - dlon, lon + dlon)).fetchall()
         rows.sort(key=lambda r: (r[3] - lat) ** 2 + ((r[4] - lon) * math.cos(math.radians(lat))) ** 2)
         return [cgy_stop(r) for r in rows[:min(int(q.get("n", 20)), 60)]], 0
+    if parts and parts[0] in ("vehicles", "trips"):  # the map: every bus, one bus, a trip's route line
+        if parts == ["vehicles"]:
+            CGYVEH.refresh()
+            ok = CGYVEH.ts and time.time() - CGYVEH.ts <= CgyLive.STALE
+            buses = []
+            for trip, v in (CGYVEH.trips.items() if ok else ()):
+                r = db.execute("SELECT r.short, t.headsign FROM trips t JOIN routes r USING(route_id) WHERE t.trip_id=?", (trip,)).fetchone()
+                if r:
+                    buses.append([round(v[0], 5), round(v[1], 5), round(v[2] or 0), r[0], r[1] or "", trip])
+            return {"now": int(time.time()), "age": int(time.time()) - CGYVEH.ts if CGYVEH.ts else None, "buses": buses}, 5
+        if len(parts) == 3 and parts[0] == "trips" and parts[2] == "shape":
+            return db.execute("SELECT lat, lon FROM shapes WHERE shape_id=(SELECT shape_id FROM trips WHERE trip_id=?) "
+                              "ORDER BY seq", (parts[1],)).fetchall(), 86400
+        if len(parts) == 2 and parts[0] == "trips":
+            CGYVEH.refresh()
+            v = CGYVEH.trip(parts[1])
+            if not v:
+                return {"error": "no position for this bus yet"}, 0
+            same = {t for (t,) in db.execute("SELECT trip_id FROM trips WHERE route_id=(SELECT route_id FROM trips WHERE trip_id=?)", (parts[1],))}
+            return {"lat": round(v[0], 5), "lon": round(v[1], 5), "bearing": round(v[2] or 0), "age": max(0, int(time.time()) - CGYVEH.ts),
+                    "others": [[round(o[0], 5), round(o[1], 5)] for t, o in CGYVEH.trips.items() if t != parts[1] and t in same][:40]}, 5
+        if len(parts) == 2 and parts[0] == "vehicles":
+            CGYVEH.refresh()
+            v = CGYVEH.trip(parts[1])
+            r = db.execute("SELECT r.short, t.headsign FROM trips t JOIN routes r USING(route_id) WHERE t.trip_id=?", (parts[1],)).fetchone()
+            if not v or not r:
+                return {"error": "no position for this bus now"}, 0
+            return {"route": r[0], "headsign": r[1] or "", "bus": v[3] or None,
+                    "nerd": {"Trip": parts[1], "Position": f"{v[0]:.5f}, {v[1]:.5f}", "Seen": f"{max(0, int(time.time()) - CGYVEH.ts)} s ago"}}, 5
     if len(parts) == 3 and parts[0] == "stops" and parts[1].startswith("cgy:"):
         stop = db.execute(f"SELECT * FROM {STOPS} WHERE stop_id=?", (parts[1][4:],)).fetchone()
         if not stop:
@@ -1167,7 +1217,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.json({"error": "server error"}, 500)
 
     def json_or_404(self, obj, cache=0):
-        self.json(obj, 404 if obj.get("error") == "no such stop" or obj.get("error") == "not found" else 200, cache=cache) \
+        self.json(obj, 404 if str(obj.get("error", "")).startswith(("no such stop", "not found", "no position")) else 200, cache=cache) \
             if isinstance(obj, dict) else self.json(obj, cache=cache)
 
     def route(self, db, parts, q):
