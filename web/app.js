@@ -324,6 +324,16 @@ function stopHead(s) {
     </button></div>`;
 }
 
+// Street plowing in a declared snow event, in the City's own words. It is the road only: the City's map says
+// nothing about the sidewalk or the stop pad, and outside an event the server sends {event: false} and we say nothing.
+function snowLine(sn) {
+  if (!sn?.event) return "";
+  const asOf = sn.as_of ? `, as of ${new Date(sn.as_of * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "";
+  const what = !sn.road ? "The City's plowing map doesn't cover this street."
+    : `${esc(sn.road)}: ${sn.status ? esc(sn.status) : "no update from the City yet"}.`;
+  return `<p class="note snow">Street plowing (City of Edmonton${asOf}). ${what} Sidewalks and the stop itself aren't on the map.</p>`;
+}
+
 // Why a stop shows nothing: say the walk time hid them when it did, not that no bus is coming.
 const none = (s, list) => `<p class="note">${s.walk && list.some((d) => !s.only || s.only.includes(d.route))
   ? "No bus you can still walk to in the next 3 hours." : `No ${s.only ? "buses on your routes" : "departures"} in the next 3 hours.`}</p>`;
@@ -340,7 +350,7 @@ async function renderStop(s, el) {
     Object.assign(s, { lat: d.stop.lat, lon: d.stop.lon, where: d.stop.where }); // nearest group; which kerb
     save();
     const xf = await x;
-    body = alertBox(s, d.alerts || []) + (xf?.error ? `<p class="note">Can't check your change to ${esc(routeLabel(s.xfer.to))} right now.</p>` : xf ? xferLine(s, xf, d.now) : "") +
+    body = alertBox(s, d.alerts || []) + snowLine(d.stop.snow) + (xf?.error ? `<p class="note">Can't check your change to ${esc(routeLabel(s.xfer.to))} right now.</p>` : xf ? xferLine(s, xf, d.now) : "") +
       (grouped(s, d.departures, d.now) || none(s, d.departures));
     if (d.live_age == null) delete el.dataset.live; // ETS never answered since the server started: nothing here is live
     else el.dataset.live = d.live_age > 120 ? now - d.live_age : now; // ETS's feed itself stalled: the stale pill says so
@@ -1160,4 +1170,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=112").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=113").catch((e) => console.warn("sw:", e.message));

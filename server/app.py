@@ -682,6 +682,102 @@ def walk_weather():
     return WEATHER["value"]
 
 
+# Street plowing from the City's "Snow and Ice Clearing Route Status" (data.edmonton.ca 8pdx-hfxi, updated hourly,
+# about 2,240 priority-road segments). It covers the road, never the sidewalk or the stop pad, and the City only
+# updates it in a declared snow event, so the page says "street plowing", shows the City's own words, and says
+# nothing at all outside an event. Shapes (9 MB) are fetched once a day, statuses (200 KB) every 15 min; visitors
+# never cause a call. Socrata limits: see SOCRATA above.
+SNOW_URL = "https://data.edmonton.ca/resource/8pdx-hfxi.json"
+SNOW = {"segs": [], "grid": {}, "shapes_at": 0, "stat": {}, "event": False, "as_of": None, "near": {}}
+SNOW_NEAR_M = 25  # measured 2026-11-10: 5,499 of 6,645 stops have a segment this close (5,445 within 15 m)
+
+
+def snow_cell(lat, lon):
+    return int(lat * 1000), int(lon * 1000 * 0.594)  # cos(53.5 deg): cells about 110 m square
+
+
+def snow_shapes(rows):
+    segs, grid = [], {}
+    for r in rows:
+        lines = (r.get("geometry_line") or {}).get("coordinates") or []
+        if not r.get("route_id") or not lines:
+            continue
+        i = len(segs)
+        segs.append((r["route_id"], r.get("road_on") or "", [[(p[1], p[0]) for p in line] for line in lines]))
+        for line in segs[-1][2]:
+            for lat, lon in line:
+                grid.setdefault(snow_cell(lat, lon), set()).add(i)
+    return segs, grid
+
+
+def snow_segment(lat, lon):
+    """Index of the nearest plow-route segment within SNOW_NEAR_M of a point, or None.
+    ponytail: nearest centreline wins; at a corner that is nearly always the stop's own street, since stops sit back
+    from the corner. If riders see the cross street, prefer a road whose name is in the stop's name."""
+    k, m, c = math.cos(math.radians(lat)), 111320, snow_cell(lat, lon)
+    best = (SNOW_NEAR_M, None)
+    for i in {i for a in (-1, 0, 1) for b in (-1, 0, 1) for i in SNOW["grid"].get((c[0] + a, c[1] + b), ())}:
+        for line in SNOW["segs"][i][2]:
+            for (alat, alon), (blat, blon) in zip(line, line[1:]):
+                ax, ay, bx, by = (alon - lon) * k * m, (alat - lat) * m, (blon - lon) * k * m, (blat - lat) * m
+                dx, dy = bx - ax, by - ay
+                t = max(0.0, min(1.0, -(ax * dx + ay * dy) / (dx * dx + dy * dy))) if dx or dy else 0.0
+                d = math.hypot(ax + t * dx, ay + t * dy)
+                if d <= best[0]:
+                    best = (d, i)
+    return best[1]
+
+
+def snow_refresh():
+    """One pass: shapes if a day old (from the disk copy when it is fresh), then statuses. Raises on a failed fetch."""
+    path = os.path.join(DATA, "snow_segments.json")
+    if time.time() - SNOW["shapes_at"] > 86400:
+        if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
+            with open(path) as f:
+                rows = json.load(f)
+        else:
+            rows = SOCRATA.get_json(SNOW_URL + "?$limit=5000", 60)
+            with open(path + ".new", "w") as f:
+                json.dump(rows, f)
+            os.replace(path + ".new", path)
+        SNOW["segs"], SNOW["grid"] = snow_shapes(rows)
+        SNOW["near"], SNOW["shapes_at"] = {}, time.time()
+        time.sleep(SOCRATA.gap + 0.5)  # the host's per-call gap, or the next call is refused as Busy
+    rows = SOCRATA.get_json(SNOW_URL + "?" + urlencode({"$limit": 5000, "$select": "route_id,seg_stat"}), 20)
+    stat = {r["route_id"]: (r.get("seg_stat") or "").strip() for r in rows if r.get("route_id")}
+    time.sleep(SOCRATA.gap + 0.5)
+    meta = SOCRATA.get_json("https://data.edmonton.ca/api/views/8pdx-hfxi.json", 20)
+    SNOW.update(stat=stat, as_of=meta.get("rowsUpdatedAt"),
+                event=any(s and s.upper() not in ("NA", "N/A") for s in stat.values()))
+
+
+def snow_loop():
+    wait = 0
+    while True:
+        try:
+            snow_refresh()
+            wait = 0
+        except Exception as e:
+            wait = min(3600, max(120, wait * 2))
+            print(f"snow lookup failed, again in about {wait} s:", repr(e), file=sys.stderr, flush=True)
+        time.sleep((wait or 900) * random.uniform(0.8, 1.2))
+
+
+def stop_snow(stop):
+    """{"event": False} outside a snow event; in one, the stop's road and the City's words for it, or road None
+    when the City's map doesn't cover this stop's street."""
+    if not SNOW["event"]:
+        return {"event": False}
+    sid = stop[0]
+    if sid not in SNOW["near"]:
+        SNOW["near"][sid] = snow_segment(stop[3], stop[4])
+    i = SNOW["near"][sid]
+    if i is None or i >= len(SNOW["segs"]):
+        return {"event": True, "road": None, "as_of": SNOW["as_of"]}
+    rid, road, _ = SNOW["segs"][i]
+    return {"event": True, "road": road, "status": SNOW["stat"].get(rid) or None, "as_of": SNOW["as_of"]}
+
+
 FILLER = {"and", "at", "the", "of", "nw", "sw", "ne", "se"}
 VOCAB = None  # every word in a stop name, and each two neighbours run together, for typo correction; reset by refresh_gtfs
 
@@ -945,7 +1041,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not stop:
                 return self.json({"error": "no such stop"}, 404)
             if parts[2] == "departures":
-                return self.json({"stop": {**stop_row(stop), "where": stop_where(db, stop)}, "now": int(time.time()), "live_age":
+                return self.json({"stop": {**stop_row(stop), "where": stop_where(db, stop), "snow": stop_snow(stop)}, "now": int(time.time()), "live_age":
                                   int(time.time()) - LIVE.ts if LIVE.ts else None,
                                   "departures": departures(db, stop[0], min(int(q.get("n", 8)), 30)),
                                   "alerts": stop_alerts(db, stop[0], stop[1])})
@@ -998,6 +1094,7 @@ def main():
 
     threading.Thread(target=LIVE.run, daemon=True).start()
     threading.Thread(target=nightly, daemon=True).start()
+    threading.Thread(target=snow_loop, daemon=True).start()
     port = int(os.environ.get("PORT", 8787))
     print(f"listening on :{port}", file=sys.stderr)
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()

@@ -23,3 +23,7 @@ on our box at a public address. (Outreach to Eastside Urbanism, makers of Transi
 12. [x] Grandma-easy first-stop setup (ask 144, design sample 6): three big ways in (near me, near an address, stop number), then one question a screen for routes, walk and what the stop is for (v98).
 13. [x] Cheap to host as riders grow (v99): ETS feeds asked for only when changed (304, about 2/3 less download per box); departures, bus map and timetables shared per stop at the Cloudflare edge (10 s, 5 s, 10 min), with the last good copy served if the Pi and TrueNAS are both down; the bus map stops asking in a hidden tab.
 14. [x] Stops on the live bus map (owner ask 2026-10-29): zoomed in, the stops show under the buses; tap one for its next buses and Add.
+15. [ ] Street plowing on a stop's card (owner pick 2026-11-10): in a declared snow event, the City's own status for
+   the road the stop is on (data.edmonton.ca 8pdx-hfxi, priority roads only, about 83% of stops), as of its last
+   hourly update; "not on the City's map" when the street isn't covered; nothing outside an event. Road only: the
+   card says sidewalks and the stop itself aren't covered (v113). Android wraps the web app.
