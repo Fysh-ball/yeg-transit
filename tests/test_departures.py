@@ -44,6 +44,16 @@ class Departures(unittest.TestCase):
     def test_a_bus_ahead_of_its_prediction_keeps_it(self):
         self.assertEqual(run(KM_SOUTH, eta=600), {"in": 600, "at": False})
 
+    def test_a_bus_driving_away_from_a_stop_ets_says_it_passed_is_dropped(self):  # 560 at Spruce Grove TC, 2026-11-10
+        far = (53.534, -113.5091)  # about 3 km south
+        now = int(time.time())
+        with mock.patch.dict(app.AWAY, {("t", "1797"): (1000, now - 60)}):  # 60 s ago it was 1 km out: now 3 km, ETS 20 min gone
+            self.assertFalse(run(far, eta=-1200))
+        with mock.patch.dict(app.AWAY, {("t", "1797"): (6000, now - 60)}):  # closing in from 6 km: a late bus, kept
+            self.assertTrue(run(far, eta=-1200))
+        with mock.patch.dict(app.AWAY, {}, clear=True):  # first look: nothing to compare, kept
+            self.assertTrue(run(far, eta=-1200))
+
     def test_a_stalled_feed_is_not_live(self):  # ETS's last predictions, 10 min old, are not live times
         self.assertTrue(run(None, eta=600, raw=True)["live"])
         self.assertFalse(run(None, eta=600, fed=600, raw=True)["live"])

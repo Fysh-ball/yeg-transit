@@ -408,6 +408,9 @@ BUS_SPEED = 8  # m/s, straight line: buses at WEM TC made 6.5 to 13 on 2026-10-2
 TRAINS = {"Capital", "Metro", "Valley"}
 
 
+AWAY = {}  # (trip, stop) -> (the bus's straight-line metres to the stop, epoch) at an earlier look, to see it driving away
+
+
 def departures(db, stop_id, n):
     now = int(time.time())
     here = db.execute("SELECT lat, lon FROM stops WHERE stop_id=?", (stop_id,)).fetchone()
@@ -463,6 +466,16 @@ def departures(db, stop_id, n):
                                  "AND seq>=? AND seq<=? ORDER BY seq", (d["trip"], nxt, mine)).fetchall()
                 # 704 driving in to Southgate TC showed Due 4 stops on, straight across (2026-10-23)
                 m = max(m, dist(v, way[0]) + sum(dist(a, b) for a, b in zip(way, way[1:])))
+            # ETS says it has gone and the bus is driving away: not coming (a 560 shown 22, 53, 56 min at Spruce Grove TC
+            # while it drove back east with ETS at -16 min, then vanished 41 min early: hermes-yeg-check, 2026-11-10).
+            # A late bus ETS holds at a past time is still closing in, so only a growing distance drops it.
+            prev = AWAY.get((d["trip"], stop_id))
+            if not prev or now - prev[1] >= 30:
+                if len(AWAY) > 5000:
+                    AWAY.clear()
+                AWAY[d["trip"], stop_id] = (m, now)
+            if prev and 30 <= now - prev[1] <= 900 and m - prev[0] > 1000 and t < now - 300:
+                continue
             d["time"] = t = max(t, v[3] + int(m / BUS_SPEED))
         if t >= now - 30:
             out.append(d)
