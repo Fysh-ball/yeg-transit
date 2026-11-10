@@ -125,7 +125,7 @@ const WX_ICON = {
   cloud: cloud("translate(0 .5)"),
   fog: `${cloud("translate(0 -2.5)")}<path class="s fog" d="M4 17.4h16M7 21h10"/>`,
   rain: `${cloud("translate(0 -3)")}<path class="s drop" d="M8 17.6l-1.1 3.2M12.4 17.6l-1.1 3.2M16.8 17.6l-1.1 3.2"/>`,
-  snow: '<path class="s flake" d="M12 2.5v19M3.8 7.2l16.4 9.6M20.2 7.2 3.8 16.8M9.5 4.6 12 6.8l2.5-2.2M9.5 19.4 12 17.2l2.5 2.2"/>',
+  snow: '<path class="s flake" d="M12 12L12.0 2.5M12.0 5.6L10.1 3.9M12.0 5.6L13.9 3.9M12 12L20.2 7.3M17.5 8.8L18.1 6.3M17.5 8.8L20.0 9.6M12 12L20.2 16.8M17.5 15.2L20.0 14.4M17.5 15.2L18.1 17.7M12 12L12.0 21.5M12.0 18.4L13.9 20.1M12.0 18.4L10.1 20.1M12 12L3.8 16.8M6.5 15.2L5.9 17.7M6.5 15.2L4.0 14.4M12 12L3.8 7.2M6.5 8.8L4.0 9.6M6.5 8.8L5.9 6.3"/>',
   thunder: `${cloud("translate(0 -3)")}<path class="f bolt" d="M13.4 13.2 9 18.6h3.2l-1.2 4 5-6h-3.3z"/>`,
   wind: '<path class="s wind" d="M3 8.5h10.5a2.8 2.8 0 1 0-2.8-2.8M3 12.6h15a2.8 2.8 0 1 1-2.8 2.8M3 16.7h7"/>',
 };
