@@ -408,6 +408,7 @@ BUS_SPEED = 8  # m/s, straight line: buses at WEM TC made 6.5 to 13 on 2026-10-2
 TRAINS = {"Capital", "Metro", "Valley"}
 
 
+HELD_LOGGED = {}  # (trip, stop) -> epoch of the last held-time log line, one per 5 min
 AWAY = {}  # (trip, stop) -> (the bus's straight-line metres to the stop, epoch) at an earlier look, to see it driving away
 
 
@@ -476,7 +477,15 @@ def departures(db, stop_id, n):
                 AWAY[d["trip"], stop_id] = (m, now)
             if prev and 30 <= now - prev[1] <= 900 and m - prev[0] > 1000 and t < now - 300:
                 continue
-            d["time"] = t = max(t, v[3] + int(m / BUS_SPEED))
+            held = max(t, v[3] + int(m / BUS_SPEED))
+            if held - t > 600 and now - HELD_LOGGED.get((d["trip"], stop_id), 0) >= 300:  # to replay a held time later (2026-11-10)
+                if len(HELD_LOGGED) > 5000:
+                    HELD_LOGGED.clear()
+                HELD_LOGGED[d["trip"], stop_id] = now
+                print(f"held: stop {stop_id} trip {d['trip']} route {d['route']} shows {(held - now) // 60} min, ETS {(t - now) // 60} min, "
+                      f"bus at {v[0]:.5f},{v[1]:.5f} heading {v[2]:.0f} seq {v[4]} next {nxt} mine {mine} {m / 1000:.1f} km, gps {now - v[3]} s old",
+                      file=sys.stderr, flush=True)
+            d["time"] = t = held
         if t >= now - 30:
             out.append(d)
     out.sort(key=lambda d: d["time"])

@@ -54,6 +54,17 @@ class Departures(unittest.TestCase):
         with mock.patch.dict(app.AWAY, {}, clear=True):  # first look: nothing to compare, kept
             self.assertTrue(run(far, eta=-1200))
 
+    def test_a_held_time_logs_where_the_bus_was_once_per_5_min(self):  # so the next held time can be replayed
+        import contextlib
+        err = io.StringIO()
+        with mock.patch.dict(app.HELD_LOGGED, {}, clear=True), contextlib.redirect_stderr(err):
+            run((53.471, -113.5091))  # about 10 km out, ETS says now
+            run((53.471, -113.5091))
+        lines = err.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertIn("held: stop 1797 trip t route 201", lines[0])
+        self.assertIn("bus at 53.47100,-113.50910", lines[0])
+
     def test_a_stalled_feed_is_not_live(self):  # ETS's last predictions, 10 min old, are not live times
         self.assertTrue(run(None, eta=600, raw=True)["live"])
         self.assertFalse(run(None, eta=600, fed=600, raw=True)["live"])
