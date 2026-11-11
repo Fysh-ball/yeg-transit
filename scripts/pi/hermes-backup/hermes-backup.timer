@@ -1,0 +1,11 @@
+# /etc/systemd/system/hermes-backup.timer
+[Unit]
+Description=Nightly hermes backup to the SSD
+
+[Timer]
+OnCalendar=*-*-* 03:30
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

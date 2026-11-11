@@ -1,0 +1,85 @@
+#!/bin/bash
+# hermes-backup: nightly root-only copy of hermes's keys and state to the SSD (ext4 LABEL=hermes-backup,
+# the old SSD boot disk; its boot files are renamed so it can never boot). Owner ruling 2026-11-11 via Super Senior.
+# Holds: /etc (app-commands keys and config, headscale config, alertpath-watch key, units), /var/lib/tang,
+# /var/lib/headscale (db via sqlite's online backup, so it is consistent with headscale running),
+# /var/lib/alertpath-watch, /usr/local/bin. 7 dated copies, unchanged files hardlinked between them.
+# The disk is mounted only for the run. A failure writes $STATE/last-fail; success writes $STATE/last-ok.
+# alertpath-watch mails the owner on a failed run or when last-ok is older than 36 h.
+# ponytail: same box as the originals, so this covers a dead SD card, not a dead or stolen Pi.
+# The owner's off-box Tang backup is still needed for that.
+set -euo pipefail
+DEV=${HB_DEV:-/dev/disk/by-label/hermes-backup}
+MNT=${HB_MNT:-/mnt/hermes-backup}
+STATE=${HB_STATE:-/var/lib/hermes-backup}
+KEEP=7
+read -ra SRC <<< "${HB_SRC:-/etc /var/lib/tang /var/lib/alertpath-watch /usr/local/bin}"
+HS_DIR=${HB_HS_DIR:-/var/lib/headscale}
+# Files that must come out byte-identical, checked after the copy (contents never printed).
+VERIFY_GLOBS=${HB_VERIFY:-/var/lib/tang/*.jwk /etc/app-commands/keys /etc/app-commands/config.json $HS_DIR/*_private.key}
+# The test points HB_DEV at a plain directory and skips the mount.
+MOUNT=${HB_MOUNT:-1}
+
+umask 077
+mkdir -p "$STATE"
+fail() {
+  trap - ERR
+  echo "$(date '+%F %T %Z') $*" > "$STATE/last-fail"
+  logger -t hermes-backup -p user.crit "FAILED: $*" || true
+  echo "hermes-backup FAILED: $*" >&2
+  exit 1
+}
+trap 'fail "line $LINENO (exit $?)"' ERR
+
+if [ "$MOUNT" = 1 ]; then
+  [ -b "$DEV" ] || fail "backup disk $DEV is absent (SSD unplugged?)"
+  mkdir -p "$MNT"; chmod 700 "$MNT"
+  ! mountpoint -q "$MNT" || fail "$MNT is already mounted; refusing to run on top of it"
+  mount -o noatime,nodev,nosuid,noexec "$DEV" "$MNT" || fail "mount $DEV on $MNT failed"
+  trap 'umount "$MNT" 2>/dev/null || true' EXIT
+else
+  [ -d "$DEV" ] || fail "backup dir $DEV is absent"
+  MNT=$DEV
+fi
+
+B=$MNT/hermes-backup
+mkdir -p "$B"; chmod 700 "$B"
+day=$(date +%F)
+new=$B/.partial
+rm -rf "$new"
+dated() { find "$B" -mindepth 1 -maxdepth 1 -type d -name '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort; }
+prev=$(dated | tail -1)
+link=(); [ -n "$prev" ] && link=(--link-dest="$prev")
+
+rsync -aHAX --numeric-ids --relative "${link[@]}" "${SRC[@]}" "$new/"
+rsync -aHAX --numeric-ids --relative "${link[@]}" --exclude='db.sqlite*' --exclude='.db.sqlite*' "$HS_DIR" "$new/"
+if [ -e "$HS_DIR/db.sqlite" ]; then
+  python3 -I - "$HS_DIR/db.sqlite" "$new$HS_DIR/db.sqlite" <<'PY'
+import sqlite3, sys
+src = sqlite3.connect(sys.argv[1])
+dst = sqlite3.connect(sys.argv[2])
+src.backup(dst)
+src.close()
+ok = dst.execute("pragma integrity_check").fetchone()[0]
+dst.close()
+if ok != "ok":
+    sys.exit(f"headscale db copy failed integrity_check: {ok}")
+PY
+fi
+
+n=0
+for f in $VERIFY_GLOBS; do
+  [ -e "$f" ] || continue
+  cmp -s "$f" "$new$f" || fail "copy of $f MISMATCH"
+  n=$((n+1))
+done
+[ "$n" -gt 0 ] || fail "no key files found to verify ($VERIFY_GLOBS)"
+
+rm -rf "${B:?}/$day"
+mv "$new" "$B/$day"
+for old in $(dated | head -n -$KEEP); do rm -rf "${old:?}"; done
+sync
+copies=$(dated | wc -l)
+echo "$(date '+%F %T %Z') $day: $n key files MATCH, $copies copies kept" > "$STATE/last-ok"
+rm -f "$STATE/last-fail"
+logger -t hermes-backup "ok: $day, $n key files MATCH, $copies copies kept" || true

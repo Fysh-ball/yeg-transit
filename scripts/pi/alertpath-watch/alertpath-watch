@@ -6,6 +6,8 @@ a dead relay, mailbox or TrueNAS reaches nobody. This probes the relay's livenes
 TrueNAS once a minute; after 2 failed probes in a row it sends ONE mail through Resend, and one
 more when the path is back. Nothing repeats while it stays dead. Owner ruling 2026-11-10 (via
 Super Senior): an outside heartbeat (healthchecks.io, Lumi Web) plus this.
+Second watch, same rules (owner ruling 2026-11-11): hermes-backup, mailed on a failed run or a copy
+older than 36 h.
 
 The Resend send (timeout, backoff with jitter, 429/503 Retry-After, cooldown across runs) is
 defib-tn-mail's own send(), loaded as a module, with this watcher's key, state dir and sender.
@@ -32,7 +34,10 @@ MAILBOX_URL = os.environ.get("ALERTPATH_MAILBOX_URL", "http://100.64.0.5:4223/he
 TO = os.environ.get("ALERTPATH_TO", "admin@fysh.site")
 FROM = "Prometheus alert-path watch <fysh@fysh.site>"
 DOWN_AFTER = 2   # failed probes in a row before the down mail
-DAILY_CAP = 5    # delivered mails per day (paid API): stop and log loudly past this
+DAILY_CAP = 5    # delivered mails per day (paid API), both watches together: stop and log loudly past this
+# hermes-backup's last-ok / last-fail (hermes-backup/hermes-backup). Local files, no network.
+BACKUP_STATE = os.environ.get("ALERTPATH_BACKUP_STATE", "/var/lib/hermes-backup")
+BACKUP_MAX_AGE = 36 * 3600
 
 
 def load_mailer():
@@ -66,47 +71,79 @@ def probe():
     return (not bad), ("; ".join(bad) or "ok")
 
 
-def main():
-    m = load_mailer()
-    os.makedirs(m.STATE, mode=0o700, exist_ok=True)
+def backup_probe():
+    """(ok, why) for hermes-backup: bad when the last run failed or the newest good copy is older than 36 h."""
     try:
-        st = json.loads(m.read("watch", "{}"))
+        t_ok = os.stat(os.path.join(BACKUP_STATE, "last-ok")).st_mtime
+    except FileNotFoundError:
+        t_ok = 0
+    fail_f = os.path.join(BACKUP_STATE, "last-fail")
+    try:
+        if os.stat(fail_f).st_mtime >= t_ok:
+            with open(fail_f) as f:
+                return False, f"last run failed: {f.read(500).strip()}"
+    except FileNotFoundError:
+        pass
+    if not t_ok:
+        return False, "no successful backup yet"
+    age = time.time() - t_ok
+    if age > BACKUP_MAX_AGE:
+        return False, f"newest copy is {age / 3600:.0f} h old (limit {BACKUP_MAX_AGE // 3600} h)"
+    return True, "ok"
+
+
+def watch(m, key, alive, why, down_after, name, down_text, up_text):
+    """One watched thing: a down mail after down_after bad probes, one back mail, nothing repeated."""
+    try:
+        st = json.loads(m.read(key, "{}"))
     except ValueError as e:
-        m.log(f"state unreadable ({e}); starting fresh", crit=True)
+        m.log(f"{key} state unreadable ({e}); starting fresh", crit=True)
         st = {}
     fails, down, mailed_down, owed = st.get("fails", 0), st.get("down", False), st.get("mailed_down", False), st.get("owed")
-    alive, why = probe()
     now = time.strftime("%Y-%m-%d %H:%M:%S %Z")
     if alive:
         if down:
-            m.log("alert path is back")
+            m.log(f"{name} is back")
             down, owed = False, ("up" if mailed_down else None)   # no "back" mail for a down mail that never went
         fails = 0
     else:
         fails += 1
-        m.log(f"probe {fails} failed: {why}")
-        if fails >= DOWN_AFTER and not down:
+        m.log(f"{name}: probe {fails} failed: {why}")
+        if fails >= down_after and not down:
             down, owed, st["since"], st["why"] = True, "down", now, why
     if owed:
         if m.day_count() >= DAILY_CAP:
-            m.log(f"DAILY CAP of {DAILY_CAP} alert-path mails reached; NOT mailing '{owed}'", crit=True)
+            m.log(f"DAILY CAP of {DAILY_CAP} alertpath-watch mails reached; NOT mailing '{name} {owed}'", crit=True)
         else:
             if owed == "down":
-                subject = "Prometheus alert path DOWN (seen from hermes)"
-                text = (f"The alert-path check (relay {URL}, mailbox {MAILBOX_URL}) failed {fails} times in a row, since {st.get('since')}.\n"
-                        f"Last error: {st.get('why')}\n\nEvery alert to your phone ends at that relay and mailbox on TrueNAS, "
-                        "so nothing else will reach you until it's back. One more mail comes when it recovers.\n\nFrom hermes alertpath-watch.")
+                subject, text = f"{name} DOWN (seen from hermes)", down_text(st, fails)
             else:
-                subject = "Prometheus alert path is back"
-                text = f"Relay and mailbox answer again ({now}). Down since {st.get('since')}.\n\nFrom hermes alertpath-watch."
-            if m.send(subject, text):
+                subject, text = f"{name} is back", up_text(st, now)
+            if m.send(subject, text + "\n\nFrom hermes alertpath-watch."):
                 m.write("count", f"{time.strftime('%Y-%m-%d')} {m.day_count() + 1}")
                 m.log(f"mailed {TO}: {subject}")
                 mailed_down, owed = (owed == "down"), None
             else:
                 m.log(f"MAIL NOT SENT: {subject}; retried on the next probe after the cooldown", crit=True)
     st.update(fails=fails, down=down, mailed_down=mailed_down, owed=owed)
-    m.write("watch", json.dumps(st))
+    m.write(key, json.dumps(st))
+
+
+def main():
+    m = load_mailer()
+    os.makedirs(m.STATE, mode=0o700, exist_ok=True)
+    alive, why = probe()
+    watch(m, "watch", alive, why, DOWN_AFTER, "Prometheus alert path",
+          lambda st, n: (f"The alert-path check (relay {URL}, mailbox {MAILBOX_URL}) failed {n} times in a row, since {st.get('since')}.\n"
+                         f"Last error: {st.get('why')}\n\nEvery alert to your phone ends at that relay and mailbox on TrueNAS, "
+                         "so nothing else will reach you until it's back. One more mail comes when it recovers."),
+          lambda st, now: f"Relay and mailbox answer again ({now}). Down since {st.get('since')}.")
+    ok, why = backup_probe()
+    watch(m, "backup", ok, why, 1, "hermes nightly backup",
+          lambda st, n: (f"The nightly copy of hermes's Tang keys, receiver keys and headscale state to its SSD is not good, since {st.get('since')}.\n"
+                         f"Why: {st.get('why')}\n\nhermes itself still runs. Until this is fixed, a dead SD card on hermes has no fresh copy "
+                         "of those keys there. One more mail comes when a run succeeds."),
+          lambda st, now: f"A nightly backup run succeeded again ({now}). Bad since {st.get('since')}.")
     return 0
 
 

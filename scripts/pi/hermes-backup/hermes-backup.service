@@ -1,0 +1,10 @@
+# /etc/systemd/system/hermes-backup.service
+[Unit]
+Description=Nightly root-only copy of hermes keys and state to the SSD (LABEL=hermes-backup)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/hermes-backup
+Nice=19
+IOSchedulingClass=idle
+TimeoutStartSec=30min
