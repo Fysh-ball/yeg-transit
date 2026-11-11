@@ -41,4 +41,8 @@ run $UP;                                    check "fail cleared but copy 37 h ol
 grep -q "37 h old" "$T/log"; check "staleness reason logged" $? 0
 touch "$T/hb/last-ok"
 run $UP;                                    check "fresh copy: one back mail" "$(calls)" 5
+touch -d '37 hours ago' "$T/hb/last-ok"
+run $UP;                                    check "green copy goes stale: one mail" "$(calls)" 6
+touch "$T/hb/last-ok"; touch -d '1 hour ago' "$T/hb/last-fail"
+run $UP;                                    check "last-fail older than last-ok still red (no RTC)" "$(grep -c 'last run failed' "$T/log")" 3
 [ $fail = 0 ] && echo PASS || { echo "--- log"; cat "$T/log"; exit 1; }

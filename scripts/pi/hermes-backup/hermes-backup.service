@@ -8,3 +8,6 @@ ExecStart=/usr/local/bin/hermes-backup
 Nice=19
 IOSchedulingClass=idle
 TimeoutStartSec=30min
+# A run killed by the timeout or any signal never reaches the script's own fail() or umount; do both here.
+ExecStopPost=-/bin/sh -c 'mountpoint -q /mnt/hermes-backup && umount /mnt/hermes-backup'
+ExecStopPost=/bin/sh -c '[ "$$SERVICE_RESULT" = success ] || echo "$$(date "+%%F %%T %%Z") run ended $$SERVICE_RESULT/$$EXIT_STATUS" > /var/lib/hermes-backup/last-fail'

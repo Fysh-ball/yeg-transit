@@ -36,7 +36,7 @@ if [ "$MOUNT" = 1 ]; then
   mkdir -p "$MNT"; chmod 700 "$MNT"
   ! mountpoint -q "$MNT" || fail "$MNT is already mounted; refusing to run on top of it"
   mount -o noatime,nodev,nosuid,noexec "$DEV" "$MNT" || fail "mount $DEV on $MNT failed"
-  trap 'umount "$MNT" 2>/dev/null || true' EXIT
+  trap 'umount "$MNT" || fail "umount $MNT failed; the next run refuses until it is unmounted"' EXIT
 else
   [ -d "$DEV" ] || fail "backup dir $DEV is absent"
   MNT=$DEV
@@ -49,9 +49,12 @@ new=$B/.partial
 rm -rf "$new"
 dated() { find "$B" -mindepth 1 -maxdepth 1 -type d -name '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort; }
 prev=$(dated | tail -1)
+# No RTC: a clock restored behind the newest copy would name today's copy oldest and prune it.
+[ -z "$prev" ] || [[ ! "$day" < "${prev##*/}" ]] || fail "clock reads $day, before the newest copy ${prev##*/}"
 link=(); [ -n "$prev" ] && link=(--link-dest="$prev")
 
-rsync -aHAX --numeric-ids --relative "${link[@]}" "${SRC[@]}" "$new/"
+# Exit 24 = a file vanished mid-copy (alertpath-watch rewrites its state every minute): not a failure.
+rsync -aHAX --numeric-ids --relative "${link[@]}" "${SRC[@]}" "$new/" || [ $? = 24 ]
 rsync -aHAX --numeric-ids --relative "${link[@]}" --exclude='db.sqlite*' --exclude='.db.sqlite*' "$HS_DIR" "$new/"
 if [ -e "$HS_DIR/db.sqlite" ]; then
   python3 -I - "$HS_DIR/db.sqlite" "$new$HS_DIR/db.sqlite" <<'PY'
@@ -80,6 +83,9 @@ mv "$new" "$B/$day"
 for old in $(dated | head -n -$KEEP); do rm -rf "${old:?}"; done
 sync
 copies=$(dated | wc -l)
-echo "$(date '+%F %T %Z') $day: $n key files MATCH, $copies copies kept" > "$STATE/last-ok"
+[ -d "$B/$day" ] || fail "today's copy $B/$day is gone after the prune"
+# Write then rename, so a full disk can't leave a fresh-looking empty last-ok.
+echo "$(date '+%F %T %Z') $day: $n key files MATCH, $copies copies kept" > "$STATE/last-ok.new"
+mv "$STATE/last-ok.new" "$STATE/last-ok"
 rm -f "$STATE/last-fail"
 logger -t hermes-backup "ok: $day, $n key files MATCH, $copies copies kept" || true

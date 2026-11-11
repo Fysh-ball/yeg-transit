@@ -72,18 +72,20 @@ def probe():
 
 
 def backup_probe():
-    """(ok, why) for hermes-backup: bad when the last run failed or the newest good copy is older than 36 h."""
+    """(ok, why) for hermes-backup: bad when the last run failed or the newest good copy is older than 36 h.
+    last-fail existing is enough: only a successful run removes it (no mtime compare; the Pi has no RTC)."""
     try:
-        t_ok = os.stat(os.path.join(BACKUP_STATE, "last-ok")).st_mtime
-    except FileNotFoundError:
-        t_ok = 0
-    fail_f = os.path.join(BACKUP_STATE, "last-fail")
-    try:
-        if os.stat(fail_f).st_mtime >= t_ok:
-            with open(fail_f) as f:
+        try:
+            with open(os.path.join(BACKUP_STATE, "last-fail"), errors="replace") as f:
                 return False, f"last run failed: {f.read(500).strip()}"
-    except FileNotFoundError:
-        pass
+        except FileNotFoundError:
+            pass
+        try:
+            t_ok = os.stat(os.path.join(BACKUP_STATE, "last-ok")).st_mtime
+        except FileNotFoundError:
+            t_ok = 0
+    except OSError as e:
+        return False, f"cannot read backup state in {BACKUP_STATE}: {e}"
     if not t_ok:
         return False, "no successful backup yet"
     age = time.time() - t_ok
@@ -133,18 +135,28 @@ def main():
     m = load_mailer()
     os.makedirs(m.STATE, mode=0o700, exist_ok=True)
     alive, why = probe()
+    try:
+        watch_alertpath(m, alive, why)
+    finally:   # an error in the first watch must not silence the second
+        watch_backup(m)
+    return 0
+
+
+def watch_alertpath(m, alive, why):
     watch(m, "watch", alive, why, DOWN_AFTER, "Prometheus alert path",
           lambda st, n: (f"The alert-path check (relay {URL}, mailbox {MAILBOX_URL}) failed {n} times in a row, since {st.get('since')}.\n"
                          f"Last error: {st.get('why')}\n\nEvery alert to your phone ends at that relay and mailbox on TrueNAS, "
                          "so nothing else will reach you until it's back. One more mail comes when it recovers."),
           lambda st, now: f"Relay and mailbox answer again ({now}). Down since {st.get('since')}.")
+
+
+def watch_backup(m):
     ok, why = backup_probe()
     watch(m, "backup", ok, why, 1, "hermes nightly backup",
           lambda st, n: (f"The nightly copy of hermes's Tang keys, receiver keys and headscale state to its SSD is not good, since {st.get('since')}.\n"
                          f"Why: {st.get('why')}\n\nhermes itself still runs. Until this is fixed, a dead SD card on hermes has no fresh copy "
                          "of those keys there. One more mail comes when a run succeeds."),
           lambda st, now: f"A nightly backup run succeeded again ({now}). Bad since {st.get('since')}.")
-    return 0
 
 
 if __name__ == "__main__":
