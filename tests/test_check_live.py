@@ -196,11 +196,16 @@ class CheckLive(unittest.TestCase):
             self.assertEqual(k, ["wrong calgary buses"])
         self.assertIn("missing", self.calgary_run(calgary(age=None))[0][0])
 
-    def test_stale_trip_updates_are_wrong(self):
+    def test_stale_trip_updates_are_wrong_by_day_but_an_empty_night_file_is_not(self):
         for la in (None, 900):
-            w, k = self.calgary_run(calgary(live_age=la))
+            w, k = self.calgary_run(calgary(live_age=la), self.DAY)
             self.assertIn("live times are stale", w[0])
             self.assertEqual(k, ["wrong calgary times"])
+            self.assertEqual(self.calgary_run(calgary(live_age=la), self.NOON), ([], []))
+
+    def test_a_dead_calgary_at_night_still_shows_through_the_bus_feed(self):
+        w, k = self.calgary_run(calgary(age=None, live_age=None), self.NOON)
+        self.assertEqual(k, ["wrong calgary buses"])
 
     def test_calgary_not_listed_is_wrong_and_stops_there(self):
         w, k = self.calgary_run(calgary(cities=("yeg",)))
@@ -221,7 +226,15 @@ class CheckLive(unittest.TestCase):
         sleep.assert_not_called()
 
     def test_a_dead_calgary_pages_through_main_and_exits_1(self):
-        code, out = self.run_check(self.answers(site(45), cgy=calgary(live_age=900)), "--page")
+        self.dead_calgary_by_day_pages(900)
+
+    def test_a_missing_trip_update_feed_by_day_pages_through_main(self):  # the 2026-11-11 night alert's text, by day
+        self.dead_calgary_by_day_pages(None)
+
+    def dead_calgary_by_day_pages(self, la):
+        # Pinned to 10:00 in Calgary: the trip-update check runs in service hours only, and main reads the real clock.
+        with mock.patch.object(check_live.time, "time", return_value=self.DAY):
+            code, out = self.run_check(self.answers(site(45), cgy=calgary(live_age=la)), "--page")
         self.assertEqual(code, 1)
         self.assertIn("WRONG calgary live times are stale", out)
 

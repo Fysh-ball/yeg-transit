@@ -123,7 +123,10 @@ def check_calgary(site, now=None):
             found.append(("buses", "bus feed is empty during the day: no buses on the map"))
         elif age is None or age > CGY_STALE:
             found.append(("buses", f"bus feed is stale: its newest data is {'missing' if age is None else f'{age} s old'}"))
-        if la is None or la > CGY_STALE:
+        # Service hours only: after the last trip Calgary's trip-update file is fresh but holds no trips, and the
+        # server reports an empty file as live_age None, the same as a dead one (01:45 MST, 2026-11-11, paged his phone).
+        # A dead Calgary host at night still shows here through the bus feed, which is checked at every hour.
+        if CGY_HOURS[0] <= hour < CGY_HOURS[1] and (la is None or la > CGY_STALE):
             found.append(("times", f"live times are stale at {CGY_STOP}: trip-update feed {'missing' if la is None else f'{la} s old'}"))
         return found
 
