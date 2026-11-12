@@ -28,12 +28,13 @@ VP_URL = "https://gtfs.edmonton.ca/TMGTFSRealTimeWebService/Vehicle/VehiclePosit
 RETRY = 20  # seconds before the one retry of a failed fetch
 STATE = os.path.expanduser("~/.local/state/yeg-check-paged.json")  # page key -> when it last paged
 HELD_AT = os.path.expanduser("~/.local/state/yeg-check-held.json")  # "trip stop" -> the time the site showed, HELD
-QUIET = {"wrong": 6 * 3600, "unreachable": 3600}
+QUIET = {"wrong": 6 * 3600, "unreachable": 3600, "upstream": 6 * 3600}
 STOPS = 25  # per run: every /api call is a Cloudflare Pages Function request, 100k a day on the free plan
 OFF = 15 * 60  # seconds apart before a time counts as wrong
 CGY_STOP = "cgy:5251"  # City Hall LRT Station (NB Macleod TR @ 7 AV SE), route 10: its live_age is the Calgary trip-update feed's age
 CGY_STALE = 300  # seconds: past this a Calgary feed counts as stale (the server itself drops a fix after 120 s)
 CGY_RETRY = 35  # seconds before the second look: past the server's 30 s freshness, so its next poll runs
+CGY_HOST = "data.calgary.ca"  # the server's Calgary feeds: their staleness is theirs, so it waits like any outside host
 CGY_HOURS = (6, 23)  # Mountain time: inside these an empty bus list is a fault; at night Calgary runs almost nothing
 HOSTS = os.path.expanduser("~/.local/state/yeg-check-hosts.json")  # {"hosts": HOST, "down": DOWN}
 DOWN_FOR = (30 * 60, 14 * 60)  # seconds failing before a page: an outside host, our own site (its next 15-min run)
@@ -88,11 +89,11 @@ def get(url):
 
 
 def waiting(keys, own):
-    """The keys to page now: "unreachable <host> ..." only once it has failed in every run for DOWN_FOR. Per key, not
-    per host: our site's Edmonton stops can answer while its Calgary call 503s (2026-11-12)."""
+    """The keys to page now: "unreachable <host> ..." and "upstream <host> ..." only once failing in every run for
+    DOWN_FOR. Per key, not per host: our site's Edmonton stops can answer while its Calgary call 503s (2026-11-12)."""
     global DOWN
     now, kept = time.time(), []
-    DOWN = {k: DOWN.get(k, now) for k in keys if k.startswith("unreachable ")}
+    DOWN = {k: DOWN.get(k, now) for k in keys if k.startswith(("unreachable ", "upstream "))}
     for k in keys:
         if k in DOWN:
             host, need = k.split(" ")[1], DOWN_FOR[k.split(" ")[1] == own]
@@ -211,8 +212,11 @@ def check_calgary(site, now=None):
     if found:
         time.sleep(CGY_RETRY)
         found = read()
+    # A stale or empty Calgary feed is Calgary's own host (6 of 27 pages in the week to 2026-11-12, each gone within the
+    # hour): it pages through main only once it has held for 30 min, as ETS's feed does.
     for what, line in found:
-        bad(what, line)
+        wrong.append(f"WRONG calgary {line}")
+        keys.append(f"upstream {CGY_HOST} {what}")
     return wrong, keys
 
 

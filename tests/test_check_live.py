@@ -228,26 +228,26 @@ class CheckLive(unittest.TestCase):
     def test_an_empty_bus_list_by_day_is_wrong_but_not_at_night(self):
         w, k = self.calgary_run(calgary(buses=0))
         self.assertIn("empty during the day", w[0])
-        self.assertEqual(k, ["wrong calgary buses"])
+        self.assertEqual(k, ["upstream data.calgary.ca buses"])
         self.assertEqual(self.calgary_run(calgary(buses=0), self.NOON), ([], []))
 
     def test_a_stale_bus_feed_is_wrong_at_any_hour(self):
         for now in (self.DAY, self.NOON):
             w, k = self.calgary_run(calgary(age=900), now)
             self.assertIn("stale", w[0])
-            self.assertEqual(k, ["wrong calgary buses"])
+            self.assertEqual(k, ["upstream data.calgary.ca buses"])
         self.assertIn("missing", self.calgary_run(calgary(age=None))[0][0])
 
     def test_stale_trip_updates_are_wrong_by_day_but_an_empty_night_file_is_not(self):
         for la in (None, 900):
             w, k = self.calgary_run(calgary(live_age=la), self.DAY)
             self.assertIn("live times are stale", w[0])
-            self.assertEqual(k, ["wrong calgary times"])
+            self.assertEqual(k, ["upstream data.calgary.ca times"])
             self.assertEqual(self.calgary_run(calgary(live_age=la), self.NOON), ([], []))
 
     def test_a_dead_calgary_at_night_still_shows_through_the_bus_feed(self):
         w, k = self.calgary_run(calgary(age=None, live_age=None), self.NOON)
-        self.assertEqual(k, ["wrong calgary buses"])
+        self.assertEqual(k, ["upstream data.calgary.ca buses"])
 
     def test_calgary_not_listed_is_wrong_and_stops_there(self):
         w, k = self.calgary_run(calgary(cities=("yeg",)))
@@ -267,7 +267,7 @@ class CheckLive(unittest.TestCase):
             self.calgary_run(calgary())
         sleep.assert_not_called()
 
-    def test_a_dead_calgary_pages_through_main_and_exits_1(self):
+    def test_a_dead_calgary_pages_through_main_after_30_min(self):
         self.dead_calgary_by_day_pages(900)
 
     def test_a_missing_trip_update_feed_by_day_pages_through_main(self):  # the 2026-11-11 night alert's text, by day
@@ -275,10 +275,16 @@ class CheckLive(unittest.TestCase):
 
     def dead_calgary_by_day_pages(self, la):
         # Pinned to 10:00 in Calgary: the trip-update check runs in service hours only, and main reads the real clock.
-        with mock.patch.object(check_live.time, "time", return_value=self.DAY):
-            code, out = self.run_check(self.answers(site(45), cgy=calgary(live_age=la)), "--page")
-        self.assertEqual(code, 1)
-        self.assertIn("WRONG calgary live times are stale", out)
+        # Calgary's own feed: logged at once, paged once it has held 30 min (6 one-run pages, week to 2026-11-12).
+        for t, want in ((self.DAY, 4), (self.DAY + 900, 4), (self.DAY + 1800, 3)):
+            code, out = self.at(t, self.answers(site(45), cgy=calgary(live_age=la)), "--page")
+            self.assertEqual(code, want, t - self.DAY)
+            self.assertIn("WRONG calgary live times are stale", out)
+        self.assertEqual(self.at(self.DAY + 2700, self.answers(site(45)), "--page")[0], 0)  # mended: forgotten
+        self.assertEqual(check_live.DOWN, {})
+        code, out = self.at(self.DAY + 3600, self.answers(site(45), cgy=calgary(live_age=la)), "--page")
+        self.assertEqual(code, 4)  # a new blip waits again
+        self.assertIn("UPSTREAM data.calgary.ca failing 0 min: pages at 30 min", out)
 
     def test_main_calls_only_our_site_for_calgary(self):  # never data.calgary.ca: its host caps live in the server
         seen = []
