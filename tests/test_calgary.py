@@ -103,6 +103,24 @@ class CalgaryLive(unittest.TestCase):
         with mock.patch.object(app, "fetch", lambda u, t: io.BytesIO(feed("t1", "6451", 0, self.now, skip=True))):
             self.assertEqual(self.ask()["departures"], [])
 
+    def test_a_rider_never_waits_for_a_slow_poll_when_a_copy_is_held(self):
+        # 2026-11-12: Calgary's feed took 5 to 11 s, the edge waits 4 s (Pi) then 6 s, so riders got 503
+        import threading
+        sched = self.now + 300
+        self.live.trips, self.live.ts, self.live.fetched = {"t1": {"6451": sched + 40}}, self.now - 40, self.now - 40
+        gate = threading.Event()
+        def fetch(u, t):
+            gate.wait(5); return io.BytesIO(feed("t1", "6451", sched + 240, self.now))
+        with mock.patch.object(app, "fetch", fetch):
+            t0 = time.monotonic(); d = self.ask(); took = time.monotonic() - t0
+            self.assertLess(took, 1)
+            self.assertEqual([(x["time"], x["live"]) for x in d["departures"]], [(sched + 40, True)])  # the held copy
+            gate.set()
+            for _ in range(50):
+                if self.live.ts == self.now: break
+                time.sleep(0.1)
+            self.assertEqual(self.live.ts, self.now)  # the poll behind it landed
+
     def test_riders_share_one_poll_for_30_s(self):
         asked = []
         def fetch(u, t):

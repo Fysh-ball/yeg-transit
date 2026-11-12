@@ -229,7 +229,18 @@ class CgyLive:
         return trips
 
     def refresh(self):
-        with self.lock:  # one rider refreshes, the rest wait and read the result (single flight)
+        if time.time() - self.fetched < self.FRESH:
+            return
+        if not self.ts:  # nothing to show yet: this rider waits for the first copy
+            return self._poll()
+        # A copy is held: no rider waits for Calgary's host (its feed takes 5 to 11 s when it is slow, longer than the edge
+        # waits for us, 2026-11-12: Pi 4 s, TrueNAS 6 s, so riders got 503). The poll runs behind, the answer uses the held copy.
+        if self.lock.acquire(blocking=False):  # else a poll is already running
+            self.lock.release()
+            threading.Thread(target=self._poll, daemon=True).start()
+
+    def _poll(self):
+        with self.lock:  # one poll at a time; a late second caller finds it fresh and leaves
             if time.time() - self.fetched < self.FRESH:
                 return
             self.fetched = time.time()  # on every attempt: a failing host is not asked again for 30 s
