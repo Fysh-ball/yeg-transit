@@ -158,8 +158,9 @@ def plug_status():
                                        "stored TP-Link account or password is wrong for "
                                        "this device, so a fire could not cut power")
     if r.returncode == 78:
-        return "NOT CONFIGURED", ("plug credentials are not installed, so a fire would "
-                                  "send Wake-on-LAN and then STOP without cutting power")
+        # Owner 2026-11-12: "I can manually defib it on my side". WoL only by choice.
+        return "NOT CONFIGURED", ("WoL only, by the owner's choice: a fire sends "
+                                  "Wake-on-LAN and stops; the power cut is his, by hand")
     if r.returncode == 3:
         return "WRONG DEVICE", f"refusing to trust this address: {msg}"
     return "UNREACHABLE", f"kasa-plug exit {r.returncode}: {msg}"
