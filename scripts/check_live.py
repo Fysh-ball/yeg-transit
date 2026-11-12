@@ -7,6 +7,10 @@ Exit 1: a wrong time. Exit 3: the site or ETS didn't answer, twice 20 s apart (a
 wrong time; 2026-10-26 11:16). With --page (the 15-min timer), exit 1 only for a stop and route not already paged in
 the last 6 h, and exit 3 at most once an hour; every WRONG line is still printed, and a fault already paged exits 4,
 so a timer that keeps failing never reads as green. Without it, every wrong time fails.
+A host that doesn't answer (5xx, 429, timeout) pages only once it has failed for a while, and is backed off between
+runs (2026-11-12: a one-run 503 paged his phone 4 times in 3 days). Our own site, canadabus.org, pages from its second
+failing run (about 15 min), since riders get that error too; ETS's feed, which is outside, after 30 min. Exit 4 while
+it waits. Without --page a failure fails at once, though the backoff still holds.
 
 Two ways a time goes wrong, both seen on the 918B loop at WEM on 2026-10-22:
 - far off ETS's own time for that bus at that stop (we showed 33 min, ETS said 8);
@@ -15,7 +19,7 @@ And one ETS agrees with, so only GPS shows it: Due with the bus far away (a 902 
 along its route with ETS still holding it at its first stop, 2026-10-23).
 The server may push a time later than ETS when the bus can't drive there that fast, so only big gaps count.
 """
-import json, math, os, sys, time, urllib.request
+import email.utils, json, math, os, random, sys, time, urllib.error, urllib.parse, urllib.request
 
 from google.transit import gtfs_realtime_pb2
 
@@ -31,23 +35,72 @@ CGY_STOP = "cgy:5251"  # City Hall LRT Station (NB Macleod TR @ 7 AV SE), route 
 CGY_STALE = 300  # seconds: past this a Calgary feed counts as stale (the server itself drops a fix after 120 s)
 CGY_RETRY = 35  # seconds before the second look: past the server's 30 s freshness, so its next poll runs
 CGY_HOURS = (6, 23)  # Mountain time: inside these an empty bus list is a fault; at night Calgary runs almost nothing
+HOSTS = os.path.expanduser("~/.local/state/yeg-check-hosts.json")  # {"hosts": HOST, "down": DOWN}
+DOWN_FOR = (30 * 60, 14 * 60)  # seconds failing before a page: an outside host, our own site (its next 15-min run)
+HOST = {}  # host -> {since, fails, until}, failing hosts only: the backoff
+DOWN = {}  # "unreachable <host> [what]" -> first run it failed in; gone after a run without it: the wait to page
 FAR = 1500  # metres, straight line: a bus shown 1 min or less away can't be further (8 m/s for 3 min, for stale GPS)
 
 
 class Unreachable(Exception):
-    pass
+    def __init__(self, host, msg):
+        super().__init__(msg)
+        self.host = host
+
+
+def retry_after(e):
+    """A 429/503's own wait in seconds, 0 if it gave none."""
+    if not isinstance(e, urllib.error.HTTPError) or e.code not in (429, 503):
+        return 0
+    v = (e.headers.get("Retry-After") if e.headers else None) or ""
+    if v.strip().isdigit():
+        return min(int(v), 86400)
+    try:
+        return max(0, min(email.utils.parsedate_to_datetime(v).timestamp() - time.time(), 86400))
+    except (TypeError, ValueError):
+        return 0
 
 
 def get(url):
+    """One retry, RETRY s plus jitter later, unless the host asked for longer. A host that fails is not asked again
+    until its backoff ends: about 10 min, doubling per failed run to 2 h, jittered, never sooner than its Retry-After.
+    ponytail: per-run state on disk, so two runs at once could both ask; the 15-min timer never overlaps."""
+    host = urllib.parse.urlsplit(url).netloc
+    h, now = HOST.get(host), time.time()
+    if h and now < h["until"]:
+        raise Unreachable(host, f"not asking {host}: failing {round((now - h['since']) / 60)} min, "
+                                f"backing off {round((h['until'] - now) / 60)} min more")
     for wait in (RETRY, None):
         try:
-            return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit-check/1"}),
+            body = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit-check/1"}),
                                           timeout=20).read()
+            HOST.pop(host, None)
+            return body
         except (OSError, ValueError) as e:  # URLError, HTTPError, timeouts and resets are all OSError
-            if wait is None:
+            ra = retry_after(e)
+            if wait is None or ra > wait:
+                h = HOST.setdefault(host, {"since": time.time(), "fails": 0})
+                h["fails"] += 1
+                h["until"] = time.time() + max(ra, min(600 * 2 ** (h["fails"] - 1), 7200) * random.uniform(0.8, 1.2))
                 # No < or >: the popup reads its text as markup and drops "<urlopen error ...>" whole (2026-10-26 00:30).
-                raise Unreachable(f"no answer from {url.split('/api/')[0]} ({str(e).strip('<>')})") from None
-            time.sleep(wait)
+                raise Unreachable(host, f"no answer from {url.split('/api/')[0]} ({str(e).strip('<>')})") from None
+            time.sleep(wait + random.uniform(0, 5))
+
+
+def waiting(keys, own):
+    """The keys to page now: "unreachable <host> ..." only once it has failed in every run for DOWN_FOR. Per key, not
+    per host: our site's Edmonton stops can answer while its Calgary call 503s (2026-11-12)."""
+    global DOWN
+    now, kept = time.time(), []
+    DOWN = {k: DOWN.get(k, now) for k in keys if k.startswith("unreachable ")}
+    for k in keys:
+        if k in DOWN:
+            host, need = k.split(" ")[1], DOWN_FOR[k.split(" ")[1] == own]
+            if now - DOWN[k] < need:
+                print(f"UPSTREAM {host} failing {round((now - DOWN[k]) / 60)} min: pages at {need // 60} min, not before")
+                continue
+        kept.append(k)
+    return kept
 
 
 def due(keys, page):
@@ -73,17 +126,38 @@ def due(keys, page):
 
 
 def main(argv=sys.argv[1:]):
+    global HOST, DOWN
+    try:
+        with open(HOSTS) as f:
+            j = json.load(f)
+        HOST, DOWN = j["hosts"], j["down"]
+    except (OSError, ValueError, KeyError, TypeError):
+        HOST, DOWN = {}, {}
+    try:
+        return run(argv)
+    finally:
+        try:
+            os.makedirs(os.path.dirname(HOSTS), exist_ok=True)
+            with open(HOSTS, "w") as f:
+                json.dump({"hosts": HOST, "down": DOWN}, f)
+        except OSError as e:
+            print("can't save which hosts are failing, so the next run asks them again:", e)
+
+
+def run(argv):
     page = "--page" in argv
     site = next((a for a in argv if not a.startswith("--")), "https://canadabus.org").rstrip("/")
+    own = urllib.parse.urlsplit(site).netloc
+    hold = (lambda ks: waiting(ks, own)) if page else (lambda ks: ks)
     try:
         wrong, keys, checked = check(site)
     except Unreachable as e:  # ETS's own feed: nothing to compare with
         print(f"UNREACHABLE {e} ({time.strftime('%H:%M')})")
-        return 3 if due(["unreachable"], page) else 4
+        return 3 if due(hold([f"unreachable {e.host}"]), page) else 4
     try:
         cw, ck = check_calgary(site)
-    except Unreachable as e:
-        cw, ck = [f"WRONG calgary: {e}"], ["wrong calgary unreachable"]
+    except Unreachable as e:  # a host not answering, not a wrong time: pages once it lasts
+        cw, ck = [f"UNREACHABLE calgary: {e}"], [f"unreachable {e.host} calgary"]
     wrong += cw
     keys += ck
     print(f"{site}: {checked} live buses at {STOPS} stops, {sum(not w.startswith('HELD') for w in wrong)} wrong ({time.strftime('%H:%M')})")
@@ -92,7 +166,7 @@ def main(argv=sys.argv[1:]):
     if not checked and not any(k.startswith("unreachable") for k in keys):
         print("WRONG nothing to check: no live buses came back")  # a check that saw nothing must not pass
         keys.append("wrong nothing")
-    paging = due(sorted(set(keys)), page)
+    paging = due(hold(sorted(set(keys))), page)
     if any(k.startswith("wrong") for k in paging):
         return 1
     return 3 if paging else 4 if keys else 0
@@ -186,7 +260,7 @@ def check(SITE):
             d = json.loads(get(f"{SITE}/api/stops/{stop}/departures?n=30"))
         except Unreachable as e:
             wrong.append(f"UNREACHABLE stop {stop}: {e}")
-            keys.append("unreachable")
+            keys.append(f"unreachable {e.host}")
             break  # the rest would each wait out the same retry
         if (d.get("live_age") or 0) > 120:  # both origins down: the edge's last copy, aged (5212/906 at -3 min, 2026-10-26)
             wrong.append(f"UNREACHABLE stop {stop}: only the edge's copy answers, live times {d['live_age'] // 60} min old")

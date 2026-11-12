@@ -56,6 +56,7 @@ class CheckLive(unittest.TestCase):
         self.addCleanup(d.cleanup)
         for p in (mock.patch.object(check_live, "STATE", os.path.join(d.name, "paged.json")),
                   mock.patch.object(check_live, "HELD_AT", os.path.join(d.name, "held.json")),
+                  mock.patch.object(check_live, "HOSTS", os.path.join(d.name, "hosts.json")),
                   mock.patch.object(check_live.time, "sleep", lambda s: None)):
             p.start()
             self.addCleanup(p.stop)
@@ -154,11 +155,52 @@ class CheckLive(unittest.TestCase):
         self.assertEqual(self.run_check(self.answers(TimeoutError("The read operation timed out"), site(45)))[0], 0)
 
     def test_a_timeout_twice_is_unreachable_not_wrong(self):  # 2026-10-26 11:16, a laptop switching networks
-        code, out = self.run_check(self.answers(TimeoutError("timed out"), urllib.error.URLError("no route")), "--page")
+        code, out = self.run_check(self.answers(TimeoutError("timed out"), urllib.error.URLError("no route")))
         self.assertEqual(code, 3)
         self.assertIn("UNREACHABLE", out)
         self.assertNotIn("WRONG", out)
         self.assertNotIn("<", out)  # the popup reads markup: "<urlopen error" made it fail to show (00:30)
+
+    def at(self, t, answers, *argv):
+        with mock.patch.object(check_live.time, "time", return_value=t):
+            return self.run_check(answers, *argv)
+
+    def test_a_503_from_our_site_logs_and_pages_only_on_its_second_failing_run(self):  # 2026-11-12 16:02, his phone
+        e503 = lambda: urllib.error.HTTPError("https://canadabus.org/api/cities", 503, "Service Unavailable", {}, None)
+        cgy = {"https://canadabus.org/api/cities": [e503(), e503()]}
+        code, out = self.at(NOW, self.answers(site(45), cgy=cgy), "--page")
+        self.assertEqual(code, 4)  # not green, not paged
+        self.assertIn("UNREACHABLE calgary: no answer from https://canadabus.org (HTTP Error 503", out)
+        self.assertIn("UPSTREAM canadabus.org failing 0 min: pages at 14 min", out)
+        self.assertNotIn("WRONG", out)
+        cgy = {"https://canadabus.org/api/cities": [e503(), e503()]}  # still failing at the next 15-min run: pages
+        self.assertEqual(self.at(NOW + 900, self.answers(site(45), cgy=cgy), "--page")[0], 3)
+        # it answers again: forgotten, so a later blip waits again
+        self.assertEqual(self.at(NOW + 1800, self.answers(site(45)), "--page")[0], 0)
+        self.assertEqual((check_live.HOST, check_live.DOWN), ({}, {}))
+
+    def test_ets_down_waits_30_min_and_is_backed_off_between_runs(self):
+        a = self.answers()
+        a[check_live.RT_URL] = [OSError("reset"), OSError("reset")]
+        self.assertEqual(self.at(NOW, a, "--page")[0], 4)
+        h = check_live.HOST["gtfs.edmonton.ca"]
+        self.assertTrue(480 <= h["until"] - NOW <= 720, h)  # about 10 min, jittered: the next run asks again
+        a = self.answers()
+        a[check_live.RT_URL] = [OSError("reset"), OSError("reset")]
+        self.assertEqual(self.at(NOW + 900, a, "--page")[0], 4)  # 15 min: still waiting
+        self.assertTrue(960 <= check_live.HOST["gtfs.edmonton.ca"]["until"] - (NOW + 900) <= 1440)  # doubled
+        a = self.answers()
+        code, out = self.at(NOW + 1800, a, "--page")  # 30 min, still in its backoff: pages without asking it
+        self.assertEqual(code, 3)
+        self.assertIn("not asking gtfs.edmonton.ca", out)
+        self.assertEqual(len(a[check_live.RT_URL]), 1)  # never fetched
+
+    def test_a_retry_after_is_honoured_not_retried_sooner(self):
+        a = self.answers()
+        a[check_live.RT_URL] = [urllib.error.HTTPError(check_live.RT_URL, 429, "Too Many", {"Retry-After": "3600"}, None),
+                                AssertionError("retried inside its Retry-After")]
+        self.assertEqual(self.at(NOW, a)[0], 3)
+        self.assertGreaterEqual(check_live.HOST["gtfs.edmonton.ca"]["until"], NOW + 3600)
 
     def test_ets_down_is_unreachable(self):
         a = self.answers()
