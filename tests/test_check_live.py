@@ -208,8 +208,8 @@ class CheckLive(unittest.TestCase):
         self.assertEqual(self.run_check(a)[0], 3)
 
 
-    NOON = 1_800_000_000 + 0  # 2027-01-15 ~08:00 UTC, so 01:00 in Calgary: the night window
-    DAY = NOON + 9 * 3600  # 10:00 in Calgary
+    NOON = 1_800_000_000 + 0  # 2027-01-15 ~08:00 UTC, so 02:00 in Calgary (UTC-6): the night window
+    DAY = NOON + 9 * 3600  # 11:00 in Calgary
 
     def calgary_run(self, cgy, now=None):
         out = []
@@ -230,6 +230,11 @@ class CheckLive(unittest.TestCase):
         self.assertIn("empty during the day", w[0])
         self.assertEqual(k, ["upstream data.calgary.ca buses"])
         self.assertEqual(self.calgary_run(calgary(buses=0), self.NOON), ([], []))
+
+    def test_the_day_window_is_alberta_utc_minus_6(self):
+        # 12:30 UTC is 06:30 on Alberta's permanent UTC-6 (05:30 on the old MST): inside the day window.
+        w, k = self.calgary_run(calgary(buses=0), self.NOON + 4 * 3600 + 1800)
+        self.assertIn("empty during the day", w[0])
 
     def test_a_stale_bus_feed_is_wrong_at_any_hour(self):
         for now in (self.DAY, self.NOON):
@@ -274,7 +279,7 @@ class CheckLive(unittest.TestCase):
         self.dead_calgary_by_day_pages(None)
 
     def dead_calgary_by_day_pages(self, la):
-        # Pinned to 10:00 in Calgary: the trip-update check runs in service hours only, and main reads the real clock.
+        # Pinned to 11:00 in Calgary: the trip-update check runs in service hours only, and main reads the real clock.
         # Calgary's own feed: logged at once, paged once it has held 30 min (6 one-run pages, week to 2026-11-12).
         for t, want in ((self.DAY, 4), (self.DAY + 900, 4), (self.DAY + 1800, 3)):
             code, out = self.at(t, self.answers(site(45), cgy=calgary(live_age=la)), "--page")

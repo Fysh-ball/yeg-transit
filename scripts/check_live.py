@@ -35,7 +35,7 @@ CGY_STOP = "cgy:5251"  # City Hall LRT Station (NB Macleod TR @ 7 AV SE), route 
 CGY_STALE = 300  # seconds: past this a Calgary feed counts as stale (the server itself drops a fix after 120 s)
 CGY_RETRY = 35  # seconds before the second look: past the server's 30 s freshness, so its next poll runs
 CGY_HOST = "data.calgary.ca"  # the server's Calgary feeds: their staleness is theirs, so it waits like any outside host
-CGY_HOURS = (6, 23)  # Mountain time: inside these an empty bus list is a fault; at night Calgary runs almost nothing
+CGY_HOURS = (6, 23)  # Alberta time (UTC-6): inside these an empty bus list is a fault; at night Calgary runs almost nothing
 HOSTS = os.path.expanduser("~/.local/state/yeg-check-hosts.json")  # {"hosts": HOST, "down": DOWN}
 DOWN_FOR = (30 * 60, 14 * 60)  # seconds failing before a page: an outside host, our own site (its next 15-min run)
 HOST = {}  # host -> {since, fails, until}, failing hosts only: the backoff
@@ -187,8 +187,8 @@ def check_calgary(site, now=None):
     if "cgy" not in json.loads(get(f"{site}/api/cities")).get("cities", []):
         bad("cities", "isn't listed by /api/cities, so riders can't pick it")
         return wrong, keys
-    hour = int(time.strftime("%H", time.gmtime((now or time.time()) - 7 * 3600)))
-    # ponytail: fixed UTC-7 (MST), so the hours window is an hour late in summer; zoneinfo needs tzdata the image may lack
+    # Alberta is on permanent UTC-6 since 2026-11-01; a fixed offset, so no tzdata needed.
+    hour = int(time.strftime("%H", time.gmtime((now or time.time()) - 6 * 3600)))
 
     def read():
         v = json.loads(get(f"{site}/api/vehicles?city=cgy"))
