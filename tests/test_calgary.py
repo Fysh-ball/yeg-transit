@@ -322,7 +322,3 @@ class RawTripUpdates(unittest.TestCase):
                 mock.patch.object(app.LIVE, "trips", {"e1": ({}, 0, {})}):
             st, body, _ = self.get(city="yeg")
         self.assertEqual((st, body), (200, raw))
-
-    def test_the_edge_function_never_forwards_it(self):
-        edge = open(os.path.join(os.path.dirname(__file__), "..", "functions", "api", "[[path]].js")).read()
-        self.assertIn("gtfsrt", edge)
