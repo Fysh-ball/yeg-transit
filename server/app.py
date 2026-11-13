@@ -91,6 +91,7 @@ class Unchanged(Exception):
 
 
 SEEN = {}  # feed url -> Last-Modified of the copy we hold
+RAW = {}  # feed url -> the bytes of that copy, as the feed sent them (re-served on /api/gtfsrt/tripupdates)
 
 
 def feed_of(url):
@@ -102,8 +103,9 @@ def feed_of(url):
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=20) as r:
             f = gtfs_realtime_pb2.FeedMessage()
-            f.ParseFromString(r.read())
-            SEEN[url] = r.headers.get("Last-Modified")  # only once parsed, so a bad copy is fetched again
+            body = r.read()
+            f.ParseFromString(body)
+            SEEN[url], RAW[url] = r.headers.get("Last-Modified"), body  # only once parsed, so a bad copy is fetched again
             return f
     except urllib.error.HTTPError as e:
         if e.code == 304:
@@ -211,6 +213,7 @@ class CgyLive:
 
     def __init__(self):
         self.trips, self.ts, self.fetched, self.error, self.lock = {}, 0, 0.0, None, threading.Lock()
+        self.raw = b""  # the last copy that parsed, as Calgary sent it
 
     def get(self):
         return CALGARY_RT.get_bytes(CGY_RT_URL, 20)
@@ -250,6 +253,7 @@ class CgyLive:
                 body = self.get()
                 f.ParseFromString(body)
                 self.trips, self.ts, self.error = self.load(f), f.header.timestamp, None
+                self.raw = body
             except Exception as e:  # Busy included: the old copy ages out by itself
                 self.error = f"{type(e).__name__}: {e}"
                 # the length shows a cut-short file (Calgary's came back 253,952 / 491,520 / 1,007,616 bytes, 2026-11-10)
@@ -1217,6 +1221,8 @@ class Handler(SimpleHTTPRequestHandler):
         if "q" in q:  # typed search text: no stop, street or place name is longer, and fuzzy matching costs per word
             q["q"] = q["q"][:80]
         parts = u.path.split("/")[2:]
+        if parts[:2] == ["gtfsrt", "tripupdates"]:
+            return self.gtfsrt(q)
         if q.get("city") == "cgy" or (len(parts) > 1 and unquote(parts[1]).startswith("cgy:")):
             return self.cgy(parts, q)
         try:
@@ -1230,6 +1236,31 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             print("api error:", repr(e), file=sys.stderr)
             self.json({"error": "server error"}, 500)
+
+    def gtfsrt(self, q):
+        """The trip updates as the city sent them, for our own trip planner (Bramble). Tailnet only: the public host and the
+        Cloudflare tunnel add cf-* or x-forwarded-for headers to every request, so any request carrying one is refused.
+        503 when the copy is older than 120 s or empty: the planner must never plan on a stale or cut-short feed."""
+        if any(k.lower().startswith("cf-") or k.lower() == "x-forwarded-for" for k in self.headers.keys()):
+            return self.json({"error": "not found"}, 404)  # ponytail: a header test, not a firewall; a bind to the tailnet address is the upgrade
+        city = q.get("city")
+        if city == "yeg":
+            raw, ts, n = RAW.get(RT_URL), LIVE.ts, len(LIVE.trips)
+        elif city == "cgy" and "cgy" in CITIES:
+            CGYLIVE.refresh()
+            raw, ts, n = CGYLIVE.raw, CGYLIVE.ts, len(CGYLIVE.trips)
+        else:
+            return self.json({"error": "city must be yeg or cgy"}, 400)
+        if not raw or not n or time.time() - ts > 120:
+            return self.json({"error": "no fresh trip updates"}, 503, headers={"Retry-After": "15", "X-No-Failover": "1"})
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-protobuf")
+        self.send_header("X-Feed-Timestamp", str(ts))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(raw)
 
     def cgy(self, parts, q):
         """Calgary: its own database and ids ("cgy:<stop_id>"), scheduled plus on-demand realtime (CGYLIVE), none of Edmonton's

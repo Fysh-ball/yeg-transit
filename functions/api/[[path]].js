@@ -14,6 +14,8 @@ const FLYING = new Map(); // shared URL -> its origin call in progress, so a cro
 
 export async function onRequest({ request, waitUntil }) {
   let url = new URL(request.url);
+  // The raw feed for our own trip planner is tailnet-only: never passed through the public edge (the server refuses it too).
+  if (url.pathname.startsWith("/api/gtfsrt")) return Response.json({ error: "not found" }, { status: 404, headers: { "cache-control": "no-store" } });
   const rule = request.method === "GET" && FRESH.find(([re]) => re.test(url.pathname));
   const fresh = rule?.[1];
   if (rule) {

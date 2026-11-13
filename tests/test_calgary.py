@@ -275,3 +275,54 @@ class WeatherPerCity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RawTripUpdates(unittest.TestCase):
+    """/api/gtfsrt/tripupdates: the city's own bytes, for the trip planner. Tailnet only, never stale."""
+    def get(self, headers=None, city="cgy"):
+        import http.client, threading
+        srv = app.ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.server_close); self.addCleanup(srv.shutdown)
+        c = http.client.HTTPConnection("127.0.0.1", srv.server_port, timeout=10)
+        c.request("GET", f"/api/gtfsrt/tripupdates?city={city}", headers=headers or {}); r = c.getresponse()
+        return r.status, r.read(), r
+
+    def held(self, age):
+        raw = feed("t1", "6451", 1000, int(time.time()) - age)
+        live = app.CgyLive(); live.raw, live.ts, live.trips, live.fetched = raw, int(time.time()) - age, {"t1": {}}, time.time()
+        return raw, live
+
+    def test_serves_the_exact_bytes_with_the_feed_time(self):
+        raw, live = self.held(10)
+        with mock.patch.object(app, "CITIES", {"cgy"}), mock.patch.object(app, "CGYLIVE", live):
+            st, body, r = self.get()
+        self.assertEqual((st, body), (200, raw))
+        self.assertEqual(r.getheader("X-Feed-Timestamp"), str(live.ts))
+
+    def test_503_when_stale_or_empty_and_400_for_an_unknown_city(self):
+        _, live = self.held(200)
+        with mock.patch.object(app, "CITIES", {"cgy"}), mock.patch.object(app, "CGYLIVE", live), \
+                mock.patch.object(app.CgyLive, "refresh", lambda self: None):
+            self.assertEqual(self.get()[0], 503)
+            live.ts, live.trips = int(time.time()), {}
+            self.assertEqual(self.get()[0], 503)
+            self.assertEqual(self.get(city="xx")[0], 400)
+
+    def test_a_request_through_cloudflare_is_refused(self):
+        raw, live = self.held(10)
+        with mock.patch.object(app, "CITIES", {"cgy"}), mock.patch.object(app, "CGYLIVE", live):
+            for h in ({"Cf-Connecting-Ip": "1.2.3.4"}, {"CF-Ray": "x"}, {"X-Forwarded-For": "1.2.3.4"}):
+                self.assertEqual(self.get(h)[0], 404, h)
+            self.assertEqual(self.get()[0], 200)  # the same request with no proxy header is served
+
+    def test_edmonton_serves_the_copy_it_polled(self):
+        raw = feed("e1", "1", 5, int(time.time()))
+        with mock.patch.dict(app.RAW, {app.RT_URL: raw}), mock.patch.object(app.LIVE, "ts", int(time.time())), \
+                mock.patch.object(app.LIVE, "trips", {"e1": ({}, 0, {})}):
+            st, body, _ = self.get(city="yeg")
+        self.assertEqual((st, body), (200, raw))
+
+    def test_the_edge_function_never_forwards_it(self):
+        edge = open(os.path.join(os.path.dirname(__file__), "..", "functions", "api", "[[path]].js")).read()
+        self.assertIn("gtfsrt", edge)
