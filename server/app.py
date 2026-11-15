@@ -81,9 +81,9 @@ class Host:
 
 # Limits: data.edmonton.ca (Socrata) publishes no number for calls without an app token (unknown), so 2 a second and
 # 5,000 a day; Photon's public API is fair-use with no number (unknown), so 1 a second and 5,000 a day; Open-Meteo's
-# free tier is 600 a minute and 10,000 a day (open-meteo.com/en/terms), we need 1 per 15 min per city (2 cities: about
-# 200 a day), capped at 1 per 10 s so two cities' first looks don't block each other.
-SOCRATA, PHOTON_HOST, OPEN_METEO = Host("data.edmonton.ca", 0.5, 5000), Host("photon.komoot.io", 1, 5000), Host("api.open-meteo.com", 10, 500)
+# free tier is 600 a minute and 10,000 a day (open-meteo.com/en/terms), we need at most 1 per 15 min per city (96 a day
+# each, only when riders look), capped at 1 per 10 s and 2,000 a day, a fifth of the limit.
+SOCRATA, PHOTON_HOST, OPEN_METEO = Host("data.edmonton.ca", 0.5, 5000), Host("photon.komoot.io", 1, 5000), Host("api.open-meteo.com", 10, 2000)
 
 
 class Unchanged(Exception):
@@ -137,18 +137,18 @@ def import_gtfs(zpath, dbpath):
     z = zipfile.ZipFile(zpath)
     rows = lambda name: csv.DictReader(io.TextIOWrapper(z.open(name), encoding="utf-8-sig"))
     db.executemany("INSERT INTO stops VALUES(?,?,?,?,?)",
-                   ((r["stop_id"], r["stop_code"] or r["stop_id"], r["stop_name"], float(r["stop_lat"]), float(r["stop_lon"]))
-                    for r in rows("stops.txt") if r["location_type"] in ("", "0")))
+                   ((r["stop_id"], r.get("stop_code") or r["stop_id"], r["stop_name"], float(r["stop_lat"]), float(r["stop_lon"]))
+                    for r in rows("stops.txt") if r.get("location_type", "") in ("", "0")))  # optional columns: feeds differ
     db.executemany("INSERT INTO routes VALUES(?,?,?,?,?)",
-                   ((r["route_id"], r["route_short_name"], r["route_long_name"], r["route_color"], r["route_text_color"])
+                   ((r["route_id"], r.get("route_short_name", ""), r.get("route_long_name", ""), r.get("route_color", ""), r.get("route_text_color", ""))
                     for r in rows("routes.txt")))
     db.executemany("INSERT INTO trips VALUES(?,?,?,?,?,?)",
-                   ((r["trip_id"], r["route_id"], r["service_id"], r["trip_headsign"], r.get("shape_id"), r.get("block_id") or None)
+                   ((r["trip_id"], r["route_id"], r["service_id"], r.get("trip_headsign", ""), r.get("shape_id"), r.get("block_id") or None)
                     for r in rows("trips.txt")))
     db.executemany("INSERT INTO stop_times VALUES(?,?,?,?,?)",
                    ((r["trip_id"], r["stop_id"], secs(r["departure_time"] or r["arrival_time"]), r.get("stop_headsign") or None,
                      int(r["stop_sequence"]))
-                    for r in rows("stop_times.txt") if r["pickup_type"] != "1"))
+                    for r in rows("stop_times.txt") if r.get("pickup_type") != "1" and (r["departure_time"] or r["arrival_time"])))  # untimed stops: no departure to show
     # ETS ships calendar_dates only; Calgary ships weekly ranges (calendar.txt) plus calendar_dates exceptions (2026-11-10).
     days, sd = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"), set()
     if "calendar.txt" in z.namelist():
@@ -176,6 +176,9 @@ def import_gtfs(zpath, dbpath):
         (SELECT DISTINCT st.stop_id, r.short FROM stop_times st JOIN trips USING(trip_id) JOIN routes r USING(route_id)
          ORDER BY st.stop_id, r.short) GROUP BY stop_id;
       CREATE UNIQUE INDEX sr_stop ON stop_routes(stop_id);
+      -- No headsign (Grande Prairie, 2026-11-15): the trip's last stop says where it goes.
+      UPDATE trips SET headsign=(SELECT s.name FROM stop_times st JOIN stops s USING(stop_id) WHERE st.trip_id=trips.trip_id
+                                 ORDER BY st.seq DESC LIMIT 1) WHERE coalesce(headsign, '')='';
     """)
     db.commit()
     db.close()
@@ -196,14 +199,41 @@ def refresh_gtfs():
 # Calgary (unreleased). The portal's limit is unknown (none published), so a conservative
 # one call per 5 min and 12 a day; the zip is fetched once a night. Off unless YEG_CITIES contains "cgy".
 CGY_DB = os.path.join(DATA, "gtfs-cgy.db")
-CGY_URL = "https://data.calgary.ca/download/npk7-z3bj/application%2Fzip"
 CALGARY = Host("data.calgary.ca", 300, 12)
 CITIES = set(filter(None, os.environ.get("YEG_CITIES", "").split(",")))
+
+# Every city besides Edmonton, from feeds.json (one list, read by Bramble Maps too). A city is served when YEG_CITIES names
+# it, it has no "hold" (unconfirmed terms: Medicine Hat, 2026-11-15), and its database is imported. Only Calgary is live.
+FEEDS = {c: f for c, f in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "feeds.json"),
+                                         encoding="utf-8"))["cities"].items() if not f.get("hold")}
+
+
+def city_db(c):
+    return CGY_DB if c == "cgy" else os.path.join(DATA, f"gtfs-{c}.db")
+
+
+def served():
+    """The cities a rider can pick now, in feeds.json order."""
+    return [c for c in FEEDS if c in CITIES and os.path.exists(city_db(c))]
+
+
+# A timetable zip host other than Calgary's: none publishes a limit (unknown), so the Calgary rule, one call per 5 min, and
+# a daily cap of 3 per feed it serves (12 at least). One Host per hostname: BC Transit serves about 40 towns from one.
+FEED_HOSTS = {}
+
+
+def feed_host(c):
+    if c == "cgy":
+        return CALGARY
+    name = urlparse(FEEDS[c]["gtfs"]).hostname
+    if name not in FEED_HOSTS:
+        FEED_HOSTS[name] = Host(name, 300, max(12, 3 * sum(urlparse(f["gtfs"]).hostname == name for f in FEEDS.values())))
+    return FEED_HOSTS[name]
 
 # Calgary live times: a second Host, since the zip's 12 a day cannot carry a feed that changes every 30 s. The portal
 # publishes no limit (unknown), so: asked only when a rider's request finds our copy over 30 s old (no riders, no calls),
 # one call per 25 s at most, 3,000 a day (a 30 s cadence all day is 2,880), and the Host's backoff and Retry-After.
-CGY_RT_URL = "https://data.calgary.ca/download/gs4m-mdc2/application%2Foctet-stream"
+CGY_RT_URL = FEEDS["cgy"]["rt"]["trip_updates"]
 CALGARY_RT = Host("data.calgary.ca (realtime)", 25, 3000)
 
 
@@ -265,7 +295,7 @@ class CgyLive:
 
 # Calgary's bus positions, same rules as the trip updates (own Host, same unknown limit). Its vehicle timestamps are
 # garbage (2007 on 2026-11-10), so the feed's own header time is the age. trip_id -> (lat, lon, bearing, vehicle id).
-CGY_VP_URL = "https://data.calgary.ca/download/am7c-qe3u/application%2Foctet-stream"
+CGY_VP_URL = FEEDS["cgy"]["rt"]["vehicles"]
 CALGARY_VP = Host("data.calgary.ca (vehicles)", 25, 3000)
 
 
@@ -281,12 +311,29 @@ class CgyVeh(CgyLive):
 CGYLIVE, CGYVEH = CgyLive(), CgyVeh()
 
 
-def refresh_cgy():
-    zpath = os.path.join(DATA, "CT_GTFS.zip")
+class NoLive(CgyLive):
+    """A city that publishes no live times: never asked, never fresh, so every departure stays scheduled."""
+    def refresh(self):
+        pass
+
+
+NOLIVE = NoLive()
+
+
+def city_zip(c):
+    return os.path.join(DATA, FEEDS[c].get("zip", f"{c}.zip"))
+
+
+def refresh_city(c):
+    zpath = city_zip(c)
     with open(zpath + ".part", "wb") as f:
-        f.write(CALGARY.get_bytes(CGY_URL, 120))
-    import_gtfs(zpath + ".part", CGY_DB)  # first: an error page served as 200 must not replace the last good zip
+        f.write(feed_host(c).get_bytes(FEEDS[c]["gtfs"], 120))
+    import_gtfs(zpath + ".part", city_db(c))  # first: an error page served as 200 must not replace the last good zip
     os.replace(zpath + ".part", zpath)
+
+
+def refresh_cgy():
+    refresh_city("cgy")
 
 
 class Live:
@@ -414,20 +461,20 @@ class Live:
 LIVE = Live()
 
 
-def service_days(now):
+def service_days(now, tz=TZ):
     """(yyyymmdd, epoch of that day's local noon minus 12h) for yesterday..tomorrow; GTFS times run past 24:00."""
     out = []
     for off in (-1, 0, 1):
         d = (now + timedelta(days=off)).date()
-        noon = datetime(d.year, d.month, d.day, 12, tzinfo=TZ)
+        noon = datetime(d.year, d.month, d.day, 12, tzinfo=tz)
         out.append((d.strftime("%Y%m%d"), int(noon.timestamp()) - 43200))
     return out
 
 
-def scheduled(db, stop_id, start, end):
+def scheduled(db, stop_id, start, end, tz=TZ):
     """Scheduled departures at stop_id with epoch in [start, end)."""
     out = []
-    for date, base in service_days(datetime.fromtimestamp(start, TZ)):
+    for date, base in service_days(datetime.fromtimestamp(start, tz), tz):
         lo, hi = start - base, end - base
         if hi < 0 or lo > 30 * 3600:
             continue
@@ -788,7 +835,7 @@ def stop_where(db, stop):
 
 NO_WEATHER = {"extra": 0, "why": "", "soon": "", "temp": None}
 WEATHER = {}  # city -> {"at", "good", "value"}: one answer per city, each cached 15 min
-CITY_XY = {"yeg": (53.54, -113.49), "cgy": (51.05, -114.07)}  # both Mountain time
+CITY_XY = {"yeg": (53.54, -113.49), **{c: tuple(f["centre"]) for c, f in FEEDS.items()}}
 PHOTON, PHOTON_LOCK = {"cache": {}}, threading.Lock()  # cache: Photon URL -> answer, newest 500
 
 
@@ -820,7 +867,7 @@ def walk_weather(city="yeg"):
         return w["value"]
     url = "https://api.open-meteo.com/v1/forecast?" + urlencode({"latitude": CITY_XY[city][0], "longitude": CITY_XY[city][1], "current":
           "temperature_2m,apparent_temperature,rain,showers,snowfall,snow_depth,weather_code,wind_speed_10m,wind_gusts_10m,is_day", "hourly": "precipitation_probability,snowfall",
-          "forecast_hours": 12, "timezone": "America/Edmonton"})
+          "forecast_hours": 12, "timezone": FEEDS[city]["tz"] if city in FEEDS else "America/Edmonton"})
     try:
         r = OPEN_METEO.get_json(url, 5)
         c, hr = r["current"], r.get("hourly") or {}
@@ -1080,15 +1127,25 @@ def stop_row(r):
             "alert": next((a["head"] for a in LIVE.alerts.get(r[0], []) if not 0 < a["until"] < time.time()), "")}  # "Closure of stop 1321..." in search results
 
 
+def city_stop(c, r):
+    return {"id": f"{c}:" + r[0], "code": r[1], "name": r[2], "lat": r[3], "lon": r[4], "routes": (r[5] or "") if len(r) > 5 else "",
+            "alert": "", "city": c}
+
+
 def cgy_stop(r):
-    return {"id": "cgy:" + r[0], "code": r[1], "name": r[2], "lat": r[3], "lon": r[4], "routes": (r[5] or "") if len(r) > 5 else "",
-            "alert": "", "city": "cgy"}
+    return city_stop("cgy", r)
 
 
 def cgy_route(db, parts, q):
-    """(json, cache seconds) for Calgary's few routes: search, near, a stop's departures and timetable."""
+    return city_route("cgy", db, parts, q)
+
+
+def city_route(c, db, parts, q):
+    """(json, cache seconds) for a feeds.json city's few routes: search, near, a stop's departures and timetable."""
+    live, veh = (CGYLIVE, CGYVEH) if c == "cgy" else (NOLIVE, NOLIVE)  # only Calgary is live
+    tz = ZoneInfo(FEEDS[c]["tz"])
     if parts == ["weather"]:
-        return walk_weather("cgy"), 600
+        return walk_weather(c), 600
     if parts == ["stops", "search"]:
         text = q["q"].strip()
         words = [w for w in re.split(r"\W+", text.lower()) if w and w not in FILLER]
@@ -1104,54 +1161,54 @@ def cgy_route(db, parts, q):
             hub = ("transit centre", "station")
             rows.sort(key=lambda r: (text not in (r[0], r[1]), not r[2].lower().startswith(words[0]),
                                      not any(h in r[2].lower() for h in hub), len(r[2])))
-        return [cgy_stop(r) for r in rows[:30]], 300
+        return [city_stop(c, r) for r in rows[:30]], 300
     if parts == ["stops", "near"]:
         lat, lon = float(q["lat"]), float(q["lon"])
         dlat, dlon = 0.006, 0.006 / math.cos(math.radians(lat))
         rows = db.execute(f"SELECT * FROM {STOPS} WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
                           (lat - dlat, lat + dlat, lon - dlon, lon + dlon)).fetchall()
         rows.sort(key=lambda r: (r[3] - lat) ** 2 + ((r[4] - lon) * math.cos(math.radians(lat))) ** 2)
-        return [cgy_stop(r) for r in rows[:min(int(q.get("n", 20)), 60)]], 0
+        return [city_stop(c, r) for r in rows[:min(int(q.get("n", 20)), 60)]], 0
     if parts and parts[0] in ("vehicles", "trips"):  # the map: every bus, one bus, a trip's route line
         if parts == ["vehicles"]:
-            CGYVEH.refresh()
-            ok = CGYVEH.ts and time.time() - CGYVEH.ts <= CgyLive.STALE
+            veh.refresh()
+            ok = veh.ts and time.time() - veh.ts <= CgyLive.STALE
             buses = []
-            for trip, v in (CGYVEH.trips.items() if ok else ()):
+            for trip, v in (veh.trips.items() if ok else ()):
                 r = db.execute("SELECT r.short, t.headsign FROM trips t JOIN routes r USING(route_id) WHERE t.trip_id=?", (trip,)).fetchone()
                 if r:
                     buses.append([round(v[0], 5), round(v[1], 5), round(v[2] or 0), r[0], r[1] or "", trip])
-            return {"now": int(time.time()), "age": int(time.time()) - CGYVEH.ts if CGYVEH.ts else None, "buses": buses}, 5
+            return {"now": int(time.time()), "age": int(time.time()) - veh.ts if veh.ts else None, "buses": buses}, 5
         if len(parts) == 3 and parts[0] == "trips" and parts[2] == "shape":
             return db.execute("SELECT lat, lon FROM shapes WHERE shape_id=(SELECT shape_id FROM trips WHERE trip_id=?) "
                               "ORDER BY seq", (parts[1],)).fetchall(), 86400
         if len(parts) == 2 and parts[0] == "trips":
-            CGYVEH.refresh()
-            v = CGYVEH.trip(parts[1])
+            veh.refresh()
+            v = veh.trip(parts[1])
             if not v:
                 return {"error": "no position for this bus yet"}, 0
             same = {t for (t,) in db.execute("SELECT trip_id FROM trips WHERE route_id=(SELECT route_id FROM trips WHERE trip_id=?)", (parts[1],))}
-            return {"lat": round(v[0], 5), "lon": round(v[1], 5), "bearing": round(v[2] or 0), "age": max(0, int(time.time()) - CGYVEH.ts),
-                    "others": [[round(o[0], 5), round(o[1], 5)] for t, o in CGYVEH.trips.items() if t != parts[1] and t in same][:40]}, 5
+            return {"lat": round(v[0], 5), "lon": round(v[1], 5), "bearing": round(v[2] or 0), "age": max(0, int(time.time()) - veh.ts),
+                    "others": [[round(o[0], 5), round(o[1], 5)] for t, o in veh.trips.items() if t != parts[1] and t in same][:40]}, 5
         if len(parts) == 2 and parts[0] == "vehicles":
-            CGYVEH.refresh()
-            v = CGYVEH.trip(parts[1])
+            veh.refresh()
+            v = veh.trip(parts[1])
             r = db.execute("SELECT r.short, t.headsign FROM trips t JOIN routes r USING(route_id) WHERE t.trip_id=?", (parts[1],)).fetchone()
             if not v or not r:
                 return {"error": "no position for this bus now"}, 0
             return {"route": r[0], "headsign": r[1] or "", "bus": v[3] or None,
-                    "nerd": {"Trip": parts[1], "Position": f"{v[0]:.5f}, {v[1]:.5f}", "Seen": f"{max(0, int(time.time()) - CGYVEH.ts)} s ago"}}, 5
-    if len(parts) == 3 and parts[0] == "stops" and parts[1].startswith("cgy:"):
-        stop = db.execute(f"SELECT * FROM {STOPS} WHERE stop_id=?", (parts[1][4:],)).fetchone()
+                    "nerd": {"Trip": parts[1], "Position": f"{v[0]:.5f}, {v[1]:.5f}", "Seen": f"{max(0, int(time.time()) - veh.ts)} s ago"}}, 5
+    if len(parts) == 3 and parts[0] == "stops" and parts[1].startswith(c + ":"):
+        stop = db.execute(f"SELECT * FROM {STOPS} WHERE stop_id=?", (parts[1][len(c) + 1:],)).fetchone()
         if not stop:
             return {"error": "no such stop"}, 0
         now = int(time.time())
         if parts[2] == "departures":
-            CGYLIVE.refresh()
+            live.refresh()
             deps = []
-            for d in scheduled(db, stop[0], now - 600, now + 3 * 3600):
+            for d in scheduled(db, stop[0], now - 600, now + 3 * 3600, tz):
                 d.pop("seq", None)
-                st = CGYLIVE.trip(d["trip"])
+                st = live.trip(d["trip"])
                 t = st.get(stop[0], d["sched"]) if st else d["sched"]  # a stop the feed does not list stays scheduled
                 if st and stop[0] in st and t is None:
                     continue  # skipped stop
@@ -1159,15 +1216,15 @@ def cgy_route(db, parts, q):
                 if d["time"] >= now - 30:
                     deps.append(d)
             deps.sort(key=lambda d: d["time"])
-            age = now - CGYLIVE.ts if CGYLIVE.ts and CGYLIVE.trips else None
-            return {"stop": {**cgy_stop(stop), "where": "", "snow": {"event": False}}, "now": now,
+            age = now - live.ts if live.ts and live.trips else None
+            return {"stop": {**city_stop(c, stop), "where": "", "snow": {"event": False}}, "now": now,
                     "live_age": age if age is not None and age <= CgyLive.STALE else None,
                     "departures": deps[:min(int(q.get("n", 8)), 30)], "alerts": []}, 0
         if parts[2] == "timetable":
             hours = min(int(q.get("hours", 30)), 48)
             rows = [[d["sched"], d["route"], d["headsign"], d["color"], d["text_color"]]
-                    for d in scheduled(db, stop[0], now, now + hours * 3600)]
-            return {"stop": cgy_stop(stop), "from": now, "to": now + hours * 3600, "rows": rows}, 0
+                    for d in scheduled(db, stop[0], now, now + hours * 3600, tz)]
+            return {"stop": city_stop(c, stop), "from": now, "to": now + hours * 3600, "rows": rows}, 0
     return {"error": "not found"}, 0
 
 
@@ -1223,8 +1280,10 @@ class Handler(SimpleHTTPRequestHandler):
         parts = u.path.split("/")[2:]
         if parts[:2] == ["gtfsrt", "tripupdates"]:
             return self.gtfsrt(q)
-        if q.get("city") == "cgy" or (len(parts) > 1 and unquote(parts[1]).startswith("cgy:")):
-            return self.cgy(parts, q)
+        c = q.get("city") if q.get("city") in FEEDS else next(
+            (x for x in FEEDS if len(parts) > 1 and unquote(parts[1]).startswith(x + ":")), None)
+        if c:
+            return self.city(c, parts, q)
         try:
             db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
             try:
@@ -1262,21 +1321,21 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(raw)
 
-    def cgy(self, parts, q):
-        """Calgary: its own database and ids ("cgy:<stop_id>"), scheduled plus on-demand realtime (CGYLIVE), none of Edmonton's
-        live, snow, places or alert code. Edmonton's routes never see this."""
-        if "cgy" not in CITIES or not os.path.exists(CGY_DB):
+    def city(self, c, parts, q):
+        """A feeds.json city: its own database and ids ("cgy:<stop_id>"), scheduled plus, for Calgary, on-demand realtime,
+        none of Edmonton's live, snow, places or alert code. Edmonton's routes never see this."""
+        if c not in served():
             return self.json({"error": "not available"}, 404)
         try:
-            db = sqlite3.connect(f"file:{CGY_DB}?mode=ro", uri=True)
+            db = sqlite3.connect(f"file:{city_db(c)}?mode=ro", uri=True)
             try:
-                return self.json_or_404(*cgy_route(db, [unquote(x) for x in parts], q))
+                return self.json_or_404(*city_route(c, db, [unquote(x) for x in parts], q))
             finally:
                 db.close()
         except (ValueError, KeyError) as e:
             self.json({"error": f"bad request: {e}"}, 400)
         except Exception as e:
-            print("api error (cgy):", repr(e), file=sys.stderr)
+            print(f"api error ({c}):", repr(e), file=sys.stderr)
             self.json({"error": "server error"}, 500)
 
     def json_or_404(self, obj, cache=0):
@@ -1295,7 +1354,10 @@ class Handler(SimpleHTTPRequestHandler):
         if parts == ["version"]:
             return self.json({"sha": SHA})
         if parts == ["cities"]:  # the cities this box serves; the page shows a picker only when there is more than one
-            return self.json({"cities": ["yeg"] + (["cgy"] if "cgy" in CITIES and os.path.exists(CGY_DB) else [])}, cache=60)
+            # info: what the page needs to draw each city (feeds.json); live false means scheduled times only, labelled so
+            cs = served()
+            return self.json({"cities": ["yeg"] + cs, "info": {c: {k: FEEDS[c][k] for k in ("name", "agency", "box", "centre", "live", "credit")}
+                                                               for c in cs}}, cache=60)
         if parts == ["vehicles"]:
             # age: how old the positions are; a failing ETS feed leaves the last ones in place, so the map must say so
             return self.json({"now": int(time.time()), "age": int(time.time()) - LIVE.vp_ts if LIVE.vp_ts else None,
@@ -1471,17 +1533,24 @@ def main():
             except Exception as e:
                 print("GTFS refresh failed:", repr(e), file=sys.stderr)
 
-    if "cgy" in CITIES:  # its own thread: Calgary being down or slow never touches Edmonton
-        def cgy_loop():
-            if not os.path.exists(CGY_DB):
-                first_import(lambda: import_gtfs(os.path.join(DATA, "CT_GTFS.zip"), CGY_DB) if os.path.exists(os.path.join(DATA, "CT_GTFS.zip")) else refresh_cgy())
-            while True:
-                time.sleep(24 * 3600)
+    def city_loop(c):  # one thread per city: a city down or slow never touches Edmonton or the others
+        if not os.path.exists(city_db(c)):
+            first_import(lambda: import_gtfs(city_zip(c), city_db(c)) if os.path.exists(city_zip(c)) else refresh_city(c))
+        while True:
+            time.sleep(24 * 3600)
+            for _ in range(50):  # a host serving many feeds takes one call per 5 min: wait our turn (under 6 h), not a day
                 try:
-                    refresh_cgy()
+                    refresh_city(c)
+                    break
+                except Busy:
+                    time.sleep(feed_host(c).gap * random.uniform(1, 2))
                 except Exception as e:
-                    print("Calgary GTFS refresh failed:", repr(e), file=sys.stderr)
-        threading.Thread(target=cgy_loop, daemon=True).start()
+                    print(f"{FEEDS[c]['name']} GTFS refresh failed:", repr(e), file=sys.stderr)
+                    break
+
+    for c in FEEDS:
+        if c in CITIES:
+            threading.Thread(target=city_loop, args=(c,), daemon=True).start()
     threading.Thread(target=LIVE.run, daemon=True).start()
     threading.Thread(target=nightly, daemon=True).start()
     threading.Thread(target=snow_loop, daemon=True).start()

@@ -133,7 +133,7 @@ input {
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { min-height: 36px; padding: 4px 12px; font-weight: 700; border-radius: 999px; }
 #groups { margin: 12px 0 0; }
-#groups[hidden] { display: none; }
+#groups[hidden], #live-map[hidden] { display: none; }
 .board #groups { display: none; }
 .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); border-color: transparent; }
 .skeleton { height: 1.1em; border-radius: 6px; background: var(--card-2); margin: 14px 0; }

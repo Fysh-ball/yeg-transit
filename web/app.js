@@ -390,7 +390,7 @@ async function renderStop(s, el) {
     if (!s.tt || s.tt.to - now < 12 * 3600) refreshTimetable(s).catch((e) => console.warn("timetable:", e.message));
   } catch (e) {
     if (e.message.startsWith("404 no such stop")) { // dropped by the agency: old saved times would send people to a dead stop (not any 404: an edge or proxy one is just down)
-      body = `<div class="alert"><b>${agency(s.id.startsWith("cgy:") ? "cgy" : "yeg")} no longer lists this stop.</b> It may have closed or been renumbered.
+      body = `<div class="alert"><b>${agency(cityOf(s.id))} no longer lists this stop.</b> It may have closed or been renumbered.
         ${s.lat ? `<button data-near-stop="${esc(s.id)}">Stops near here</button>` : ""}</div>`;
       el.innerHTML = stopHead(s) + body;
       return;
@@ -434,7 +434,7 @@ async function renderAll() {
   $("#offline").hidden = !off;
   $("#offline").textContent = !off ? "" : navigator.onLine ? "Live times are down right now. Showing saved scheduled times instead." : "No connection. Showing saved scheduled times instead of live times.";
   const at = [...main.children].filter((c) => !c.hidden && c.dataset.live).map((c) => +c.dataset.live); // ETS's own last update, not ours
-  $("#updated").textContent = !stops.length || off ? "" : at.length ? `Live times, updated ${clock(Math.min(...at))}` : stops.length && stops.every((s) => s.id.startsWith("cgy:")) ? "No live times from Calgary right now: scheduled times." : "No live times from ETS right now: scheduled times.";
+  $("#updated").textContent = !stops.length || off ? "" : at.length ? `Live times, updated ${clock(Math.min(...at))}` : offAir(stops);
   checkStale();
 }
 
@@ -450,19 +450,30 @@ function metres(a, b) {
 let here = null; // last "near me" fix; ranks typed results closest first
 // Cities: the server lists the ones it serves (/api/cities). A single city hides the picker, so a box without Calgary
 // shows riders no change. Near me picks the city from where you are; the picker is the manual switch.
-const CITY = { yeg: { name: "Edmonton", box: [52.9, -114.2, 54.0, -112.8] }, cgy: { name: "Calgary", box: [50.6, -114.5, 51.4, -113.6] } };
+// Edmonton is built in; every other city comes from the server's feeds.json (/api/cities info: name, agency, box, centre,
+// live, credit). live false: the agency publishes no live times, so every time is scheduled and the page says so.
+const CITY = { yeg: { name: "Edmonton", agency: "ETS", box: [52.9, -114.2, 54.0, -112.8], centre: [53.5461, -113.4938], live: true } };
+const cityOf = (id) => (/^[a-z]{3}:/.test(id || "") ? id.slice(0, 3) : "yeg"); // "cgy:6451", "yqf:123"; Edmonton's ids are bare
+function offAir(stops) { // the line under the stops when no time on screen is live
+  const cs = [...new Set(stops.map((s) => cityOf(s.id)))];
+  if (cs.length === 1 && cs[0] !== "yeg") return CITY[cs[0]]?.live === false ? `Scheduled times only: ${agency(cs[0])} doesn't publish live times.` : `No live times from ${CITY[cs[0]]?.name || "this city"} right now: scheduled times.`;
+  return "No live times from ETS right now: scheduled times.";
+}
 let cities = ["yeg"], city = "yeg";
 try { city = localStorage.getItem("yeg.city") || "yeg"; } catch { /* storage blocked: Edmonton */ }
 const cityAt = (p) => cities.find((c) => p.lat >= CITY[c].box[0] && p.lon >= CITY[c].box[1] && p.lat <= CITY[c].box[2] && p.lon <= CITY[c].box[3]);
 const cq = (c) => (c === "yeg" ? "" : `&city=${c}`);
-const agency = (c) => (c === "cgy" ? "Calgary Transit" : "ETS"); // who feeds the map, for the notes under it
+const agency = (c) => CITY[c]?.agency || "the transit agency"; // who feeds the map, for the notes under it
 function drawCityPick() {
   const el = $("#city-pick");
   el.hidden = cities.length < 2;
   el.innerHTML = `<select id="city-sel" aria-label="City">${cities.map((c) => `<option value="${c}"${c === city ? " selected" : ""}>${CITY[c].name}</option>`).join("")}</select>`;
   $("#q").placeholder = city === "yeg" ? "Address, place or stop #" : "Stop name or number";
-  // Calgary's exact line (licence v2.1, read 2026-11-10): "Contains information licensed under the Open Government Licence \u2013 City of Calgary." Shown only where Calgary is served; the licence link goes on About at go-live.
-  const credit = cities.includes("cgy") ? "Contains information licensed under the Open Government Licence \u2013 City of Edmonton and the Open Government Licence \u2013 City of Calgary. Not an official ETS or Calgary Transit app." : "";
+  $("#live-map").hidden = CITY[city]?.live === false; // no bus positions to show
+  // Each city's exact line from feeds.json (Calgary's: licence v2.1, read 2026-11-10), shown only where that city is served.
+  const more = cities.filter((c) => c !== "yeg"), ags = cities.map(agency);
+  const credit = more.length ? `Contains information licensed under the Open Government Licence \u2013 City of Edmonton. ${more.map((c) => CITY[c].credit).join(" ")} `
+    + `Not an official app of ${ags.slice(0, -1).join(", ")} or ${ags.at(-1)}.` : "";
   for (const id of ["#credit", "#legal"]) if (credit) $(id).firstChild.textContent = credit;
 }
 function setCity(c, quiet = false) {
@@ -476,7 +487,8 @@ function setCity(c, quiet = false) {
   if ($("#q").value.trim()) suggest($("#q").value.trim());
 }
 async function loadCities() {
-  try { cities = (await api("cities")).cities.filter((c) => CITY[c]); } catch (e) { console.warn("cities:", e.message); }
+  try { const d = await api("cities"); Object.assign(CITY, d.info || {}); cities = d.cities.filter((c) => CITY[c]); } catch (e) { console.warn("cities:", e.message); }
+  if (stops.some((s) => cityOf(s.id) !== "yeg")) renderAll(); // cards drawn before this answer named the city wrong ("this city")
   if (!cities.includes(city)) { city = "yeg"; loadWeather().then(() => renderAll()); } // a saved city we no longer serve: its weather was asked for
   drawCityPick();
   autoCity();
@@ -820,7 +832,7 @@ async function openMap(dep) {
   $("#map-sheet").showModal(); fitMapBox();
   if (!await sheetMap()) return;
   const m = mapState;
-  m.trip = dep.dataset.trip; m.stop = s; m.city = s?.id.startsWith("cgy:") ? "cgy" : "yeg"; m.style = label.getAttribute("style"); m.fitted = false;
+  m.trip = dep.dataset.trip; m.stop = s; m.city = cityOf(s?.id); m.style = label.getAttribute("style"); m.fitted = false;
   $("#map-snow").hidden = true; m.label = label.textContent; m.bus = null; m.at = null; m.others = L.layerGroup();
   m.layer.clearLayers(); m.others.addTo(m.layer);
   m.map.invalidateSize();
@@ -860,13 +872,13 @@ async function openLiveMap() {
   $("#map-note").textContent = "Finding buses...";
   $("#map-sheet").showModal(); fitMapBox();
   if (!await sheetMap()) return;
-  const m = mapState, home = stops.find((s) => s.lat && (s.id.startsWith("cgy:") ? "cgy" : "yeg") === city);
+  const m = mapState, home = stops.find((s) => s.lat && cityOf(s.id) === city);
   m.city = city; m.trip = "all"; m.buses = []; m.busOpen = false; m.layer.clearLayers(); m.fleet = L.layerGroup().addTo(m.layer);
   m.snowNo = 0; m.snowSeq = 0;
   m.stopPins = L.layerGroup().addTo(m.layer); m.stopsAt = null;
   $("#map-snow").hidden = true;
   m.map.invalidateSize();
-  m.map.setView(home ? [home.lat, home.lon] : city === "cgy" ? [51.0447, -114.0719] : [53.5461, -113.4938], 14); // your first stop in this city, or downtown
+  m.map.setView(home ? [home.lat, home.lon] : CITY[city].centre, 14); // your first stop in this city, or downtown
   if (city === "yeg") drawSnow(); // the snow map is Edmonton's plow data
   await placeFleet();
   if (!$("#map-sheet").open || m.trip !== "all") return; // closed, or a bus opened, while it loaded: no orphan timer

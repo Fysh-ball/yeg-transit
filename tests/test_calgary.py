@@ -228,13 +228,40 @@ class CitiesRoute(unittest.TestCase):
         sqlite3.connect(edm).close()
         with mock.patch.object(app, "DB", edm), mock.patch.object(app, "CGY_DB", cgy):
             with mock.patch.object(app, "CITIES", {"cgy"}):
-                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg"]}))  # enabled, nothing imported yet
+                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg"], "info": {}}))  # enabled, nothing imported yet
                 self.assertEqual(self.get("/api/stops/search?q=x&city=cgy")[0], 404)
                 sqlite3.connect(cgy).close()
-                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg", "cgy"]}))
+                st, body = self.get("/api/cities")
+                self.assertEqual((st, body["cities"], body["info"]["cgy"]["live"]), (200, ["yeg", "cgy"], True))
             with mock.patch.object(app, "CITIES", set()):
-                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg"]}))  # the default: no change for riders
+                self.assertEqual(self.get("/api/cities"), (200, {"cities": ["yeg"], "info": {}}))  # the default: no change for riders
                 self.assertEqual(self.get("/api/stops/cgy:6451/departures")[0], 404)
+
+
+class ScheduledCity(unittest.TestCase):
+    """A feeds.json city with no live feed (Red Deer, 2026-11-15): its own prefix, scheduled times only, optional GTFS
+    columns missing (Medicine Hat's stops.txt has no location_type), and a city on hold never served."""
+    def test_scheduled_only_city(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        zp, dbp = os.path.join(tmp.name, "z.zip"), os.path.join(tmp.name, "r.db")
+        with zipfile.ZipFile(zp, "w") as z:
+            for n, t in FILES.items():
+                if n not in ("stops.txt", "stop_times.txt"):
+                    z.writestr(n, t)
+            z.writestr("stops.txt", "stop_id,stop_name,stop_lat,stop_lon\n6451,Gaetz Ave,52.27,-113.81\n")
+            z.writestr("stop_times.txt", "trip_id,arrival_time,departure_time,stop_id,stop_sequence\n"
+                       "t1,08:00:00,08:00:00,6451,1\nt1,,,6451,2\n")  # an untimed stop is left out, not a crash
+        app.import_gtfs(zp, dbp)
+        db = sqlite3.connect(dbp)
+        self.addCleanup(db.close)
+        now = int(datetime(2026, 11, 10, 7, 30, tzinfo=app.TZ).timestamp())
+        with mock.patch.object(app.time, "time", lambda: now):
+            deps, _ = app.city_route("yqf", db, ["stops", "yqf:6451", "departures"], {})
+            buses, _ = app.city_route("yqf", db, ["vehicles"], {})
+        self.assertEqual((deps["stop"]["id"], deps["stop"]["city"], deps["live_age"]), ("yqf:6451", "yqf", None))
+        self.assertEqual([(d["route"], d["live"], d["time"]) for d in deps["departures"]], [("1", False, now + 1800)])
+        self.assertEqual(buses["buses"], [])
+        self.assertNotIn("yxh", app.FEEDS)  # Medicine Hat: on hold until its terms are confirmed
 
 
 class WeatherPerCity(unittest.TestCase):
@@ -256,7 +283,7 @@ class WeatherPerCity(unittest.TestCase):
         e, seen = self.ask("yeg", -3.4)
         self.assertIn("latitude=53.54", seen[0])
         c, seen = self.ask("cgy", 6.2)
-        self.assertIn("latitude=51.05", seen[0])
+        self.assertIn("latitude=51.0447", seen[0])  # feeds.json centre
         self.assertEqual((e["temp"], c["temp"]), (-3, 6))
         again, seen = self.ask("yeg", 99)  # inside 15 min: no second call, and Calgary's answer didn't overwrite it
         self.assertEqual((again["temp"], seen), (-3, []))

@@ -1,0 +1,53 @@
+{
+  "about": "hold: a reason the city is not served yet (the server skips it). Cities served besides Edmonton (yeg, built in). One list for this server and Bramble Maps. Code: the city's airport code, also the stop id prefix ('yqf:123'). live: true only where the agency publishes GTFS-RT we read; every other city shows scheduled times, labelled so. box: lat_min, lon_min, lat_max, lon_max. checked: when the static url last answered with a valid feed.",
+  "cities": {
+    "cgy": {
+      "name": "Calgary", "agency": "Calgary Transit", "prov": "AB", "tz": "America/Edmonton",
+      "gtfs": "https://data.calgary.ca/download/npk7-z3bj/application%2Fzip", "zip": "CT_GTFS.zip",
+      "live": true,
+      "rt": {"trip_updates": "https://data.calgary.ca/download/gs4m-mdc2/application%2Foctet-stream",
+             "vehicles": "https://data.calgary.ca/download/am7c-qe3u/application%2Foctet-stream"},
+      "centre": [51.0447, -114.0719], "box": [50.6, -114.5, 51.4, -113.6],
+      "licence": "Open Government Licence - City of Calgary",
+      "credit": "Contains information licensed under the Open Government Licence – City of Calgary.",
+      "checked": "2026-11-10"
+    },
+    "yqf": {
+      "name": "Red Deer", "agency": "Red Deer Transit", "prov": "AB", "tz": "America/Edmonton",
+      "gtfs": "https://data.reddeer.ca/datasets/gtfsdatafeed/download/zip",
+      "live": false,
+      "centre": [52.2681, -113.8112], "box": [52.15, -113.94, 52.37, -113.67],
+      "licence": "Open Government Licence - The City of Red Deer (data.reddeer.ca/About)",
+      "credit": "Contains information licensed under the Open Government Licence – The City of Red Deer.",
+      "checked": "2026-11-15"
+    },
+    "yql": {
+      "name": "Lethbridge", "agency": "Lethbridge Transit", "prov": "AB", "tz": "America/Edmonton",
+      "gtfs": "https://gis.lethbridge.ca/OpenData/DataSets/GTFS_Transit_Data.zip",
+      "live": false,
+      "centre": [49.6956, -112.8451], "box": [49.6, -112.99, 49.79, -112.7],
+      "licence": "City of Lethbridge Open Data License v2.0 (opendata.lethbridge.ca/pages/open-data-license, read 2026-11-15): any lawful purpose, royalty-free; no use suggesting City endorsement; no logo",
+      "credit": "Contains information licensed under the City of Lethbridge Open Data License.",
+      "checked": "2026-11-15"
+    },
+    "yxh": {
+      "name": "Medicine Hat", "agency": "Medicine Hat Transit", "prov": "AB", "tz": "America/Edmonton",
+      "gtfs": "https://medicinehat.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/",
+      "live": false,
+      "centre": [50.0405, -110.6766], "box": [49.94, -110.81, 50.11, -110.55],
+      "licence": "none found (feed_info names only the vendor, Consat; the city has a GIS licence only)",
+      "hold": "terms unconfirmed: the public site carries ads; not served until the city confirms reuse",
+      "credit": "Transit data from the City of Medicine Hat.",
+      "checked": "2026-11-15"
+    },
+    "yqu": {
+      "name": "Grande Prairie", "agency": "Grande Prairie Transit", "prov": "AB", "tz": "America/Edmonton",
+      "gtfs": "https://gpt.mapstrat.com/current/google_transit.zip",
+      "live": false,
+      "centre": [55.1707, -118.7947], "box": [55.09, -118.94, 55.25, -118.68],
+      "licence": "CDLA-Permissive-1.0 (as listed by Transitland)",
+      "credit": "Transit data from the City of Grande Prairie.",
+      "checked": "2026-11-15"
+    }
+  }
+}
