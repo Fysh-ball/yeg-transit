@@ -122,3 +122,22 @@ class ConditionalTimetable(unittest.TestCase):
         self.assertEqual(len(calls), 1)  # the 304 imported nothing
         self.assertEqual(host.until, 0)  # and started no cooldown
         self.assertTrue(os.path.exists(os.path.join(tmp.name, "yyt.zip")))
+
+
+class HostQueue(unittest.TestCase):
+    """35 BC towns, one host: take_turn queues them one per gap, waits out a cooldown, and never raises Busy (2026-11-15:
+    on prod they retried on Busy and their backoff grew to 960 s)."""
+    def test_callers_wait_their_turn_then_call(self):
+        clock, slept, called = [1000.0], [], []
+        host = app.Host("test", 300, 100)
+        def sleep(s):
+            slept.append(s); clock[0] += s
+        def call():
+            host.at = clock[0]; called.append(clock[0]); return "ok"  # what a real _get records
+        with mock.patch.object(app.time, "time", lambda: clock[0]), mock.patch.object(app.random, "uniform", lambda a, b: 0):
+            self.assertEqual(host.take_turn(call, sleep), "ok")  # never asked before: no wait
+            host.take_turn(call, sleep)
+            host.until = clock[0] + 900  # an upstream error cooled the host down
+            host.take_turn(call, sleep)
+        self.assertEqual(slept, [0, 300, 900])
+        self.assertEqual(called, [1000, 1300, 2200])

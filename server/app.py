@@ -41,6 +41,15 @@ class Host:
     def __init__(self, name, gap, daily):
         self.name, self.gap, self.daily = name, gap, daily
         self.lock, self.at, self.wait, self.until, self.day, self.count = threading.Lock(), 0.0, 0, 0.0, "", 0
+        self.turn = threading.Lock()  # callers queued by take_turn
+
+    def take_turn(self, call, sleep=time.sleep):
+        """Queue callers that would all hit this host at once (BC Transit's 35 towns, one host): each waits its turn, then
+        for the gap or a cooldown to pass, then calls. Waiting at our own gate is not the host failing: no Busy retries,
+        no backoff growing from them (2026-11-15, prod: 33 towns retrying on Busy pushed their backoff to 960 s)."""
+        with self.turn:
+            sleep(max(0, self.at + self.gap - time.time(), self.until - time.time()) + random.uniform(0, 2))
+            return call()
 
     def get_json(self, url, timeout):
         return self._get(url, timeout, json.load)
@@ -370,10 +379,16 @@ def refresh_city(c):
         seen = {}
     body, seen = feed_host(c).get_changed(FEEDS[c]["gtfs"], 120, seen)
     if body is None:
-        return print(f"{FEEDS[c]['name']} GTFS unchanged (304)", file=sys.stderr)
+        return print(f"{c}: GTFS unchanged (304)", file=sys.stderr)
+    # The .part is written only once the whole body is in: a timed-out download leaves none behind (2026-11-15, the Pi kept
+    # an empty yqu.zip.part from the old order, open then fetch).
     with open(zpath + ".part", "wb") as f:
         f.write(body)
-    import_gtfs(zpath + ".part", city_db(c))  # first: an error page served as 200 must not replace the last good zip
+    try:
+        import_gtfs(zpath + ".part", city_db(c))  # first: an error page served as 200 must not replace the last good zip
+    except Exception:
+        os.remove(zpath + ".part")
+        raise
     os.replace(zpath + ".part", zpath)
     with open(zpath + ".seen", "w") as f:
         json.dump(seen, f)
@@ -1560,7 +1575,7 @@ class Handler(SimpleHTTPRequestHandler):
         pass
 
 
-def first_import(load, sleep=time.sleep):
+def first_import(load, sleep=time.sleep, name="ETS"):
     """No database yet: nothing to serve until an import works. Retry here, not by exiting: a crash loop re-downloads
     ETS's 18 MB zip every restart. 1 min, 2, 4 ... up to 1 h (+-20% jitter). ETS publishes no limit for it (unknown)."""
     wait = 60
@@ -1568,7 +1583,7 @@ def first_import(load, sleep=time.sleep):
         try:
             return load()
         except Exception as e:
-            print(f"first GTFS import failed, retrying in about {wait} s:", repr(e), file=sys.stderr, flush=True)
+            print(f"{name}: first GTFS import failed, retrying in about {wait} s:", repr(e), file=sys.stderr, flush=True)
             sleep(wait * random.uniform(0.8, 1.2))
             wait = min(3600, wait * 2)
 
@@ -1593,18 +1608,14 @@ def main():
 
     def city_loop(c):  # one thread per city: a city down or slow never touches Edmonton or the others
         if not os.path.exists(city_db(c)):
-            first_import(lambda: import_gtfs(city_zip(c), city_db(c)) if os.path.exists(city_zip(c)) else refresh_city(c))
+            first_import(lambda: import_gtfs(city_zip(c), city_db(c)) if os.path.exists(city_zip(c))
+                         else feed_host(c).take_turn(lambda: refresh_city(c)), name=c)
         while True:
             time.sleep(24 * 3600)
-            for _ in range(50):  # a host serving many feeds takes one call per 5 min: wait our turn (under 6 h), not a day
-                try:
-                    refresh_city(c)
-                    break
-                except Busy:
-                    time.sleep(feed_host(c).gap * random.uniform(1, 2))
-                except Exception as e:
-                    print(f"{FEEDS[c]['name']} GTFS refresh failed:", repr(e), file=sys.stderr)
-                    break
+            try:  # a host serving many feeds takes one call per 5 min: wait in its queue, not a day
+                feed_host(c).take_turn(lambda: refresh_city(c))
+            except Exception as e:
+                print(f"{c}: GTFS refresh failed:", repr(e), file=sys.stderr)
 
     for c in FEEDS:
         if c in CITIES:
