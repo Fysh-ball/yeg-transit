@@ -1220,6 +1220,591 @@
    "credit": "Transit data from T3 Transit.",
    "checked": "2026-11-15",
    "hold": "terms unconfirmed: no licence found; not served until confirmed"
+  },
+  "got": {
+   "name": "GO Transit (Greater Toronto)",
+   "agency": "GO Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://assets.metrolinx.com/raw/upload/Documents/Metrolinx/Open%20Data/GO-GTFS.zip",
+   "live": false,
+   "centre": [
+    43.6452,
+    -79.3806
+   ],
+   "box": [
+    42.93,
+    -81.06,
+    44.42,
+    -78.21
+   ],
+   "licence": "Metrolinx Access and Use Agreement (gotransit.com/en/partner-with-us/software-developers, read 2026-11-15): use, reproduce, redistribute; legend required",
+   "credit": "Data used in this product or service is provided with the permission of Metrolinx. Metrolinx makes no representations or warranties of any kind, express or implied, with respect to the Data and assumes no responsibility for the accuracy or currency of the data used in this product or service.",
+   "checked": "2026-11-15",
+   "hold": "ships with the TTC: until then downtown Toronto phones would auto-pick GO trains instead of their bus"
+  },
+  "brm": {
+   "name": "Brampton",
+   "agency": "Brampton Transit",
+   "prov": "ON",
+   "tz": "America/New_York",
+   "gtfs": "https://www.arcgis.com/sharing/rest/content/items/a355aabd5a8c490186bdce559c9c75fb/data",
+   "live": false,
+   "centre": [
+    43.7176,
+    -79.7196
+   ],
+   "box": [
+    43.5,
+    -79.94,
+    43.94,
+    -79.45
+   ],
+   "licence": "CC BY (ArcGIS item a355aabd licenseInfo, read 2026-11-15)",
+   "credit": "Transit data from Brampton Transit (CC BY).",
+   "checked": "2026-11-15",
+   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+  },
+  "ysc": {
+   "name": "Sherbrooke",
+   "agency": "Société de transport de Sherbrooke",
+   "prov": "QC",
+   "tz": "America/Toronto",
+   "gtfs": "https://gtfs.sts.qc.ca:8443/gtfs/client/GTFS_clients.zip",
+   "live": false,
+   "centre": [
+    45.3814,
+    -71.9306
+   ],
+   "box": [
+    45.26,
+    -72.16,
+    45.53,
+    -71.74
+   ],
+   "licence": "CC BY 4.0 (donneesquebec.ca dataset page, read 2026-11-15)",
+   "credit": "Données de la Société de transport de Sherbrooke (CC BY 4.0, Données Québec).",
+   "checked": "2026-11-15"
+  },
+  "yxk": {
+   "name": "Rimouski",
+   "agency": "Société des transports de Rimouski",
+   "prov": "QC",
+   "tz": "America/Montreal",
+   "gtfs": "https://www.donneesquebec.ca/recherche/dataset/d2d92b84-4361-42f0-81eb-3c395bc54597/resource/bd4021ba-d3ae-4d3b-b8fd-016405166761/download/gtfsrimouskibus.zip",
+   "live": false,
+   "centre": [
+    48.4503,
+    -68.5216
+   ],
+   "box": [
+    48.38,
+    -68.67,
+    48.52,
+    -68.42
+   ],
+   "licence": "CC BY 4.0 (donneesquebec.ca dataset page, read 2026-11-15)",
+   "credit": "Données de la Ville de Rimouski (CC BY 4.0, Données Québec).",
+   "checked": "2026-11-15"
+  },
+  "yhm": {
+   "name": "Hamilton",
+   "agency": "Hamilton Street Railway",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://opendata.hamilton.ca/GTFS-Static/google_transit.zip",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://opendata.hamilton.ca/GTFS-RT/GTFS_TripUpdates.pb",
+    "vehicles": "https://opendata.hamilton.ca/GTFS-RT/GTFS_VehiclePositions.pb",
+    "alerts": "https://opendata.hamilton.ca/GTFS-RT/GTFS_ServiceAlerts.pb"
+   },
+   "centre": [
+    43.2537,
+    -79.8674
+   ],
+   "box": [
+    43.11,
+    -80.21,
+    43.39,
+    -79.56
+   ],
+   "licence": "City of Hamilton Open Data Licence (read 2026-11-15): commercial use allowed; attribution required",
+   "credit": "Contains public sector Data made available under the City of Hamilton’s Open Data Licence.",
+   "checked": "2026-11-15"
+  },
+  "ykf": {
+   "name": "Waterloo Region",
+   "agency": "Grand River Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://webapps.regionofwaterloo.ca/api/grt-routes/api/staticfeeds/1",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://webapps.regionofwaterloo.ca/api/grt-routes/api/tripupdates",
+    "vehicles": "https://webapps.regionofwaterloo.ca/api/grt-routes/api/vehiclepositions",
+    "alerts": "https://webapps.regionofwaterloo.ca/api/grt-routes/api/alerts"
+   },
+   "centre": [
+    43.3903,
+    -80.4035
+   ],
+   "box": [
+    43.29,
+    -80.8,
+    43.65,
+    -80.19
+   ],
+   "licence": "Region of Waterloo Open Data Licence v2.0 (read 2026-11-15): credit optional",
+   "credit": "Contains information provided by the Regional Municipality of Waterloo under licence.",
+   "checked": "2026-11-15"
+  },
+  "bar": {
+   "name": "Barrie",
+   "agency": "Barrie Transit",
+   "prov": "ON",
+   "tz": "America/New_York",
+   "gtfs": "https://www.myridebarrie.ca/gtfs/Google_transit.zip",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://www.myridebarrie.ca/gtfs/GTFS_TripUpdates.pb",
+    "vehicles": "https://www.myridebarrie.ca/gtfs/GTFS_VehiclePositions.pb",
+    "alerts": "https://www.myridebarrie.ca/gtfs/GTFS_ServiceAlerts.pb"
+   },
+   "centre": [
+    44.3876,
+    -79.6904
+   ],
+   "box": [
+    44.27,
+    -79.82,
+    44.47,
+    -79.53
+   ],
+   "licence": "Barrie GTFS Licence (barrie.ca, read 2026-11-15): use, reproduce, redistribute",
+   "credit": "Transit data from Barrie Transit.",
+   "checked": "2026-11-15"
+  },
+  "bur": {
+   "name": "Burlington",
+   "agency": "Burlington Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://opendata.burlington.ca/gtfs-rt/GTFS_Data.zip",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://opendata.burlington.ca/gtfs-rt/GTFS_TripUpdates.pb",
+    "vehicles": "https://opendata.burlington.ca/gtfs-rt/GTFS_VehiclePositions.pb",
+    "alerts": "https://opendata.burlington.ca/gtfs-rt/GTFS_ServiceAlerts.pb"
+   },
+   "centre": [
+    43.3795,
+    -79.7606
+   ],
+   "box": [
+    43.21,
+    -79.97,
+    43.46,
+    -79.65
+   ],
+   "licence": "Open Data Burlington Terms of Use (PDF, read 2026-11-15): credit not required",
+   "credit": "Transit data from the City of Burlington.",
+   "checked": "2026-11-15"
+  },
+  "dur": {
+   "name": "Durham Region",
+   "agency": "Durham Region Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://maps.durham.ca/OpenDataGTFS/GTFS_Durham_TXT.zip",
+   "live": false,
+   "centre": [
+    43.8892,
+    -78.8773
+   ],
+   "box": [
+    43.72,
+    -79.34,
+    44.49,
+    -78.5
+   ],
+   "licence": "Region of Durham Open Data Licence v1.0 (durham.ca, read 2026-11-15): commercial use allowed, credit optional",
+   "credit": "Contains public sector information made available under The Regional Municipality of Durham's Open Data Licence.",
+   "checked": "2026-11-15",
+   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+  },
+  "yrk": {
+   "name": "York Region",
+   "agency": "York Region Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://www.yrt.ca/google/google_transit.zip",
+   "live": false,
+   "centre": [
+    43.7982,
+    -79.4203
+   ],
+   "box": [
+    43.68,
+    -79.74,
+    44.37,
+    -79.13
+   ],
+   "licence": "YRT Open Data Licence (yrt.ca, read 2026-11-15): commercial use allowed, credit optional",
+   "credit": "Contains public transit Information made available under YRT's Open Data Licence.",
+   "checked": "2026-11-15",
+   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+  },
+  "mis": {
+   "name": "Mississauga",
+   "agency": "MiWay",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://www.miapp.ca/GTFS/google_transit.zip",
+   "live": false,
+   "centre": [
+    43.5944,
+    -79.6467
+   ],
+   "box": [
+    43.42,
+    -79.88,
+    43.89,
+    -79.43
+   ],
+   "licence": "City of Mississauga open data Terms of Use (read 2026-11-15): credit not required",
+   "credit": "Transit data from MiWay, City of Mississauga.",
+   "checked": "2026-11-15",
+   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+  },
+  "ysb": {
+   "name": "Greater Sudbury",
+   "agency": "Greater Sudbury Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://www.greatersudbury.ca/image/opendata/gtfs.zip",
+   "live": false,
+   "centre": [
+    46.4926,
+    -80.9916
+   ],
+   "box": [
+    46.35,
+    -81.28,
+    46.77,
+    -80.77
+   ],
+   "licence": "City of Greater Sudbury Open Data Licence (read 2026-11-15): commercial use allowed",
+   "credit": "Contains information licensed under the Open Data Licence – City of Greater Sudbury.",
+   "checked": "2026-11-15"
+  },
+  "tcl": {
+   "name": "Collines-de-l'Outaouais",
+   "agency": "Transcollines",
+   "prov": "QC",
+   "tz": "America/Montreal",
+   "gtfs": "https://github.com/transcollines/gtfs/raw/master/transcollines-qc-ca.zip",
+   "live": false,
+   "centre": [
+    45.4416,
+    -75.7283
+   ],
+   "box": [
+    45.36,
+    -77.16,
+    45.97,
+    -75.54
+   ],
+   "licence": "Transcollines conditions d'utilisation (read 2026-11-15): commercial use allowed",
+   "credit": "Le présent service intègre des données ouvertes du réseau Transcollines de la MRC des Collines-de-l'Outaouais. La MRC des Collines-de-l'Outaouais n'est pas responsable de l'exactitude de l'information générée par cette application.",
+   "checked": "2026-11-15",
+   "hold": "required credit must carry the feed's last-update date (AAAA-MM-JJ); needs a dated credit first"
+  },
+  "ynd": {
+   "name": "Gatineau",
+   "agency": "Société de transport de l'Outaouais",
+   "prov": "QC",
+   "tz": "America/Montreal",
+   "gtfs": "https://contenu.sto.ca/GTFS/GTFS.zip",
+   "live": false,
+   "centre": [
+    45.4203,
+    -75.7055
+   ],
+   "box": [
+    45.33,
+    -75.97,
+    45.64,
+    -75.31
+   ],
+   "licence": "STO conditions d'utilisation (read 2026-11-15): commercial use allowed",
+   "credit": "Le présent service intègre les données ouvertes fournies par la Société de transport de l'Outaouais (STO). La STO n'est pas responsable de l'exactitude de l'information générée par cette application.",
+   "checked": "2026-11-15",
+   "hold": "required credit must carry the feed's last-update date (AAAA-MM-JJ); needs a dated credit first"
+  },
+  "yul": {
+   "name": "Montréal",
+   "agency": "Société de transport de Montréal",
+   "prov": "QC",
+   "tz": "America/Montreal",
+   "gtfs": "https://www.stm.info/sites/default/files/gtfs/gtfs_stm.zip",
+   "live": false,
+   "centre": [
+    45.4825,
+    -73.5802
+   ],
+   "box": [
+    45.35,
+    -74.05,
+    45.75,
+    -73.4
+   ],
+   "licence": "CC BY 4.0 (stm.info/fr/a-propos/developpeurs, read 2026-11-15); metro times may not be used for a metro-schedule app",
+   "credit": "Données de la Société de transport de Montréal (CC BY 4.0).",
+   "checked": "2026-11-15",
+   "hold": "STM bars building a metro-schedule app from its metro times; needs metro routes left out first"
+  },
+  "lvl": {
+   "name": "Laval",
+   "agency": "Société de transport de Laval",
+   "prov": "QC",
+   "tz": "America/Montreal",
+   "gtfs": "https://www.stlaval.ca/datas/opendata/GTF_STL.zip",
+   "live": false,
+   "centre": [
+    45.5601,
+    -73.6824
+   ],
+   "box": [
+    45.46,
+    -73.99,
+    45.75,
+    -73.45
+   ],
+   "licence": "STL conditions (read 2026-11-15): no commercial or quasi-commercial use without written permission",
+   "credit": "Données de la STL.",
+   "checked": "2026-11-15",
+   "hold": "needs STL's written permission"
+  },
+  "lev": {
+   "name": "Lévis",
+   "agency": "Société de transport de Lévis",
+   "prov": "QC",
+   "tz": "America/Montreal",
+   "gtfs": "https://www.stlevis.ca/sites/default/files/public/assets/gtfs/transit/gtfs_stlevis.zip",
+   "live": false,
+   "centre": [
+    46.7802,
+    -71.2785
+   ],
+   "box": [
+    46.5,
+    -71.49,
+    46.88,
+    -71.02
+   ],
+   "licence": "STLévis conditions (read 2026-11-15): no commercial or quasi-commercial use without written permission; page also says CC BY 4.0",
+   "credit": "Données de la STLévis.",
+   "checked": "2026-11-15",
+   "hold": "needs STLévis's written permission (terms conflict)"
+  },
+  "ygk": {
+   "name": "Kingston",
+   "agency": "Kingston Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://api.cityofkingston.ca/gtfs/gtfs.zip",
+   "live": false,
+   "centre": [
+    44.2237,
+    -76.5264
+   ],
+   "box": [
+    44.17,
+    -76.75,
+    44.33,
+    -76.36
+   ],
+   "licence": "City of Kingston Data Licensing Agreement (sign-up form)",
+   "credit": "Transit data from Kingston Transit.",
+   "checked": "2026-11-15",
+   "hold": "needs Kingston's Data Licensing Agreement signed"
+  },
+  "yow": {
+   "name": "Ottawa",
+   "agency": "OC Transpo",
+   "prov": "ON",
+   "tz": "Canada/Eastern",
+   "gtfs": "https://oct-gtfs-emasagcnfmcgeham.z01.azurefd.net/public-access/GTFSExport.zip",
+   "live": false,
+   "centre": [
+    45.4038,
+    -75.7355
+   ],
+   "box": [
+    45.08,
+    -76.12,
+    45.57,
+    -75.26
+   ],
+   "licence": "City of Ottawa Open Data Terms of Use (named by OC Transpo; page not readable 2026-11-15)",
+   "credit": "Transit data from OC Transpo.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
+  },
+  "blv": {
+   "name": "Belleville",
+   "agency": "Belleville Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://metrolinx.tmix.se/gtfs/gtfs-belleville.zip",
+   "live": false,
+   "centre": [
+    44.1877,
+    -77.4018
+   ],
+   "box": [
+    44.09,
+    -77.51,
+    44.25,
+    -77.26
+   ],
+   "licence": "terms not found 2026-11-15",
+   "credit": "Transit data from Belleville Transit.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
+  },
+  "ycc": {
+   "name": "Cornwall",
+   "agency": "Cornwall Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://metrolinx.tmix.se/gtfs/gtfs-cornwall.zip",
+   "live": false,
+   "centre": [
+    45.0182,
+    -74.7289
+   ],
+   "box": [
+    44.96,
+    -74.85,
+    45.11,
+    -74.59
+   ],
+   "licence": "terms not found 2026-11-15",
+   "credit": "Transit data from Cornwall Transit.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
+  },
+  "yqg": {
+   "name": "Windsor",
+   "agency": "Transit Windsor",
+   "prov": "ON",
+   "tz": "America/New_York",
+   "gtfs": "https://opendata.citywindsor.ca/Uploads/google_transit.zip",
+   "live": false,
+   "centre": [
+    42.2461,
+    -83.0178
+   ],
+   "box": [
+    41.99,
+    -83.19,
+    42.39,
+    -82.53
+   ],
+   "licence": "terms not found 2026-11-15",
+   "credit": "Transit data from Transit Windsor.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
+  },
+  "oak": {
+   "name": "Oakville",
+   "agency": "Oakville Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://www.arcgis.com/sharing/rest/content/items/d78a1c1ad6a940009de8b68839a8f606/data",
+   "live": false,
+   "centre": [
+    43.4558,
+    -79.6824
+   ],
+   "box": [
+    43.32,
+    -79.91,
+    43.58,
+    -79.55
+   ],
+   "licence": "Town of Oakville open data licence not confirmed for the transit feed",
+   "credit": "Transit data from Oakville Transit.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
+  },
+  "mil": {
+   "name": "Milton",
+   "agency": "Milton Transit",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://metrolinx.tmix.se/gtfs/gtfs-milton.zip",
+   "live": false,
+   "centre": [
+    43.5247,
+    -79.8684
+   ],
+   "box": [
+    43.42,
+    -79.99,
+    43.66,
+    -79.71
+   ],
+   "licence": "terms not found 2026-11-15",
+   "credit": "Transit data from Milton Transit.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
+  },
+  "srl": {
+   "name": "Sorel-Tracy",
+   "agency": "Société de transport collectif de Pierre-De Saurel",
+   "prov": "QC",
+   "tz": "America/Toronto",
+   "gtfs": "https://zenbus.net/gtfs/static/download.zip?dataset=pierre-de-saurel",
+   "live": false,
+   "centre": [
+    46.0252,
+    -73.1069
+   ],
+   "box": [
+    45.47,
+    -73.6,
+    46.1,
+    -73.01
+   ],
+   "licence": "terms not found 2026-11-15",
+   "credit": "Données de la STC Pierre-De Saurel.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
+  },
+  "yuy": {
+   "name": "Rouyn-Noranda",
+   "agency": "Ville de Rouyn-Noranda",
+   "prov": "QC",
+   "tz": "Canada/Eastern",
+   "gtfs": "https://www.donneesquebec.ca/recherche/dataset/41ae2192-51ec-4e20-9a1a-6dd1ffd43777/resource/c08636e0-5ce0-4bcf-9fb3-e3be76665c84/download/gtfs.zip",
+   "live": false,
+   "centre": [
+    48.2379,
+    -78.9875
+   ],
+   "box": [
+    48.14,
+    -79.21,
+    48.34,
+    -78.91
+   ],
+   "licence": "terms not found 2026-11-15",
+   "credit": "Données de la Ville de Rouyn-Noranda.",
+   "checked": "2026-11-15",
+   "hold": "terms not found 2026-11-15"
   }
  }
 }

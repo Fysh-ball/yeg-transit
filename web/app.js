@@ -461,7 +461,10 @@ function offAir(stops) { // the line under the stops when no time on screen is l
 }
 let cities = ["yeg"], city = "yeg";
 try { city = localStorage.getItem("yeg.city") || "yeg"; } catch { /* storage blocked: Edmonton */ }
-const cityAt = (p) => cities.find((c) => p.lat >= CITY[c].box[0] && p.lon >= CITY[c].box[1] && p.lat <= CITY[c].box[2] && p.lon <= CITY[c].box[3]);
+// nearest centre (the busiest stop) among the boxes holding the point: GTA boxes overlap (GO covers them all, MiWay's holds Brampton)
+const off = (c, p) => (CITY[c].centre[0] - p.lat) ** 2 + ((CITY[c].centre[1] - p.lon) * Math.cos(p.lat * Math.PI / 180)) ** 2;
+const cityAt = (p) => cities.filter((c) => p.lat >= CITY[c].box[0] && p.lon >= CITY[c].box[1] && p.lat <= CITY[c].box[2] && p.lon <= CITY[c].box[3])
+  .sort((a, b) => off(a, p) - off(b, p))[0];
 const cq = (c) => (c === "yeg" ? "" : `&city=${c}`);
 const agency = (c) => CITY[c]?.agency || "the transit agency"; // who feeds the map, for the notes under it
 function drawCityPick() {
@@ -1319,4 +1322,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=122").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=123").catch((e) => console.warn("sw:", e.message));
