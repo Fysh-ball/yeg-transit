@@ -118,7 +118,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=10",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=10",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=10",
@@ -144,7 +144,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=11",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=11",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=11",
@@ -170,7 +170,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=12",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=12",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=12",
@@ -196,7 +196,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=13",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=13",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=13",
@@ -222,7 +222,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=14",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=14",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=14",
@@ -248,7 +248,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=15",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=15",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=15",
@@ -326,7 +326,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=18",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=18",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=18",
@@ -378,7 +378,7 @@
    "prov": "BC",
    "tz": "America/Edmonton",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=21",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=21",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=21",
@@ -404,7 +404,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=22",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=22",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=22",
@@ -456,7 +456,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=26",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=26",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=26",
@@ -534,7 +534,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=29",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=29",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=29",
@@ -690,7 +690,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=36",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=36",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=36",
@@ -716,7 +716,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=37",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=37",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=37",
@@ -768,7 +768,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=39",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=39",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=39",
@@ -794,7 +794,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=41",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=41",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=41",
@@ -820,7 +820,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=43",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=43",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=43",
@@ -846,7 +846,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=44",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=44",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=44",
@@ -872,7 +872,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=45",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=45",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=45",
@@ -898,7 +898,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=46",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=46",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=46",
@@ -924,7 +924,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=47",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=47",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=47",
@@ -950,7 +950,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=48",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=48",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=48",
@@ -976,7 +976,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=50",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=50",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=50",
@@ -1002,7 +1002,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=51",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=51",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=51",
