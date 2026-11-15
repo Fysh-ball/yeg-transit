@@ -398,3 +398,18 @@ class RawTripUpdates(unittest.TestCase):
                 mock.patch.object(app.LIVE, "trips", {"e1": ({}, 0, {})}):
             st, body, _ = self.get(city="yeg")
         self.assertEqual((st, body), (200, raw))
+
+
+class DatedCredit(unittest.TestCase):
+    """STO and Transcollines require the date of the timetable in use in their credit."""
+
+    def test_updated_is_the_import_date(self):
+        with tempfile.TemporaryDirectory() as d:
+            db = os.path.join(d, "gtfs-ynd.db")
+            open(db, "w").close()
+            when = time.mktime((2026, 11, 3, 12, 0, 0, 0, 0, -1))
+            os.utime(db, (when, when))
+            dated = {"credit": "Données de la STO. Dernière mise à jour : {updated}."}  # ynd's form; held, so not in FEEDS
+            with mock.patch.object(app, "city_db", lambda c: db), mock.patch.dict(app.FEEDS, ynd=dated):
+                self.assertEqual(app.credit("ynd"), "Données de la STO. Dernière mise à jour : 2026-11-03.")
+                self.assertNotIn("{", app.credit("yyj"))  # a credit without the placeholder is left alone

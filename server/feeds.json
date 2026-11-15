@@ -1516,9 +1516,9 @@
     -75.54
    ],
    "licence": "Transcollines conditions d'utilisation (read 2026-11-15): commercial use allowed",
-   "credit": "Le présent service intègre des données ouvertes du réseau Transcollines de la MRC des Collines-de-l'Outaouais. La MRC des Collines-de-l'Outaouais n'est pas responsable de l'exactitude de l'information générée par cette application.",
+   "credit": "Le présent service intègre des données ouvertes du réseau Transcollines de la MRC des Collines-de-l'Outaouais. La MRC des Collines-de-l'Outaouais n'est pas responsable de l'exactitude de l'information générée par cette application. Dernière mise à jour : {updated}.",
    "checked": "2026-11-15",
-   "hold": "required credit must carry the feed's last-update date (AAAA-MM-JJ); needs a dated credit first"
+   "hold": "ships with Ottawa: its box covers downtown Ottawa, where it has stops, so Ottawa phones would get Gatineau buses while OC Transpo is held (dated credit is in)"
   },
   "ynd": {
    "name": "Gatineau",
@@ -1538,9 +1538,9 @@
     -75.31
    ],
    "licence": "STO conditions d'utilisation (read 2026-11-15): commercial use allowed",
-   "credit": "Le présent service intègre les données ouvertes fournies par la Société de transport de l'Outaouais (STO). La STO n'est pas responsable de l'exactitude de l'information générée par cette application.",
+   "credit": "Le présent service intègre les données ouvertes fournies par la Société de transport de l'Outaouais (STO). La STO n'est pas responsable de l'exactitude de l'information générée par cette application. Dernière mise à jour : {updated}.",
    "checked": "2026-11-15",
-   "hold": "required credit must carry the feed's last-update date (AAAA-MM-JJ); needs a dated credit first"
+   "hold": "ships with Ottawa: its box covers downtown Ottawa, where it has stops, so Ottawa phones would get Gatineau buses while OC Transpo is held (dated credit is in)"
   },
   "yul": {
    "name": "Montréal",

@@ -234,6 +234,13 @@ def city_db(c):
     return CGY_DB if c == "cgy" else os.path.join(DATA, f"gtfs-{c}.db")
 
 
+def credit(c):
+    """feeds.json credit; {updated} becomes the date of the timetable in use (the db is replaced whole on import, so its
+    mtime). STO and Transcollines require "Dernière mise à jour : AAAA-MM-JJ" in their credit."""
+    t = FEEDS[c]["credit"]
+    return t.replace("{updated}", time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(city_db(c))))) if "{updated}" in t else t
+
+
 def served():
     """The cities a rider can pick now, in feeds.json order."""
     return [c for c in FEEDS if c in CITIES and os.path.exists(city_db(c))]
@@ -1428,8 +1435,8 @@ class Handler(SimpleHTTPRequestHandler):
             # info: what the page needs to draw each city (feeds.json); live false means scheduled times only, labelled so.
             # rt: the agency publishes a live feed (we may not read it yet), so the page can't say it publishes none.
             cs = served()
-            return self.json({"cities": ["yeg"] + cs, "info": {c: {**{k: FEEDS[c][k] for k in ("name", "agency", "box", "centre", "live",
-                                                                                              "credit")}, "rt": "rt" in FEEDS[c]}
+            return self.json({"cities": ["yeg"] + cs, "info": {c: {**{k: FEEDS[c][k] for k in ("name", "agency", "box", "centre", "live")},
+                                                               "credit": credit(c), "rt": "rt" in FEEDS[c]}
                                                                for c in cs}}, cache=60)
         if parts == ["vehicles"]:
             # age: how old the positions are; a failing ETS feed leaves the last ones in place, so the map must say so
