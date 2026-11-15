@@ -1,53 +1,1026 @@
 {
-  "about": "hold: a reason the city is not served yet (the server skips it). Cities served besides Edmonton (yeg, built in). One list for this server and Bramble Maps. Code: the city's airport code, also the stop id prefix ('yqf:123'). live: true only where the agency publishes GTFS-RT we read; every other city shows scheduled times, labelled so. box: lat_min, lon_min, lat_max, lon_max. checked: when the static url last answered with a valid feed.",
-  "cities": {
-    "cgy": {
-      "name": "Calgary", "agency": "Calgary Transit", "prov": "AB", "tz": "America/Edmonton",
-      "gtfs": "https://data.calgary.ca/download/npk7-z3bj/application%2Fzip", "zip": "CT_GTFS.zip",
-      "live": true,
-      "rt": {"trip_updates": "https://data.calgary.ca/download/gs4m-mdc2/application%2Foctet-stream",
-             "vehicles": "https://data.calgary.ca/download/am7c-qe3u/application%2Foctet-stream"},
-      "centre": [51.0447, -114.0719], "box": [50.6, -114.5, 51.4, -113.6],
-      "licence": "Open Government Licence - City of Calgary",
-      "credit": "Contains information licensed under the Open Government Licence – City of Calgary.",
-      "checked": "2026-11-10"
-    },
-    "yqf": {
-      "name": "Red Deer", "agency": "Red Deer Transit", "prov": "AB", "tz": "America/Edmonton",
-      "gtfs": "https://data.reddeer.ca/datasets/gtfsdatafeed/download/zip",
-      "live": false,
-      "centre": [52.2681, -113.8112], "box": [52.15, -113.94, 52.37, -113.67],
-      "licence": "Open Government Licence - The City of Red Deer (data.reddeer.ca/About)",
-      "credit": "Contains information licensed under the Open Government Licence – The City of Red Deer.",
-      "checked": "2026-11-15"
-    },
-    "yql": {
-      "name": "Lethbridge", "agency": "Lethbridge Transit", "prov": "AB", "tz": "America/Edmonton",
-      "gtfs": "https://gis.lethbridge.ca/OpenData/DataSets/GTFS_Transit_Data.zip",
-      "live": false,
-      "centre": [49.6956, -112.8451], "box": [49.6, -112.99, 49.79, -112.7],
-      "licence": "City of Lethbridge Open Data License v2.0 (opendata.lethbridge.ca/pages/open-data-license, read 2026-11-15): any lawful purpose, royalty-free; no use suggesting City endorsement; no logo",
-      "credit": "Contains information licensed under the City of Lethbridge Open Data License.",
-      "checked": "2026-11-15"
-    },
-    "yxh": {
-      "name": "Medicine Hat", "agency": "Medicine Hat Transit", "prov": "AB", "tz": "America/Edmonton",
-      "gtfs": "https://medicinehat.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/",
-      "live": false,
-      "centre": [50.0405, -110.6766], "box": [49.94, -110.81, 50.11, -110.55],
-      "licence": "none found (feed_info names only the vendor, Consat; the city has a GIS licence only)",
-      "hold": "terms unconfirmed: no licence on the feed; not served until the city confirms we may republish it",
-      "credit": "Transit data from the City of Medicine Hat.",
-      "checked": "2026-11-15"
-    },
-    "yqu": {
-      "name": "Grande Prairie", "agency": "Grande Prairie Transit", "prov": "AB", "tz": "America/Edmonton",
-      "gtfs": "https://gpt.mapstrat.com/current/google_transit.zip",
-      "live": false,
-      "centre": [55.1707, -118.7947], "box": [55.09, -118.94, 55.25, -118.68],
-      "licence": "CDLA-Permissive-1.0 (as listed by Transitland)",
-      "credit": "Transit data from the City of Grande Prairie.",
-      "checked": "2026-11-15"
-    }
+ "about": "hold: a reason the city is not served yet (the server skips it). Cities served besides Edmonton (yeg, built in). One list for this server and Bramble Maps. Code: the city's airport code, also the stop id prefix ('yqf:123'). live: true only where the agency publishes GTFS-RT we read; every other city shows scheduled times, labelled so. box: lat_min, lon_min, lat_max, lon_max. checked: when the static url last answered with a valid feed.",
+ "cities": {
+  "cgy": {
+   "name": "Calgary",
+   "agency": "Calgary Transit",
+   "prov": "AB",
+   "tz": "America/Edmonton",
+   "gtfs": "https://data.calgary.ca/download/npk7-z3bj/application%2Fzip",
+   "zip": "CT_GTFS.zip",
+   "live": true,
+   "rt": {
+    "trip_updates": "https://data.calgary.ca/download/gs4m-mdc2/application%2Foctet-stream",
+    "vehicles": "https://data.calgary.ca/download/am7c-qe3u/application%2Foctet-stream"
+   },
+   "centre": [
+    51.0447,
+    -114.0719
+   ],
+   "box": [
+    50.6,
+    -114.5,
+    51.4,
+    -113.6
+   ],
+   "licence": "Open Government Licence - City of Calgary",
+   "credit": "Contains information licensed under the Open Government Licence – City of Calgary.",
+   "checked": "2026-11-10"
+  },
+  "yqf": {
+   "name": "Red Deer",
+   "agency": "Red Deer Transit",
+   "prov": "AB",
+   "tz": "America/Edmonton",
+   "gtfs": "https://data.reddeer.ca/datasets/gtfsdatafeed/download/zip",
+   "live": false,
+   "centre": [
+    52.2681,
+    -113.8112
+   ],
+   "box": [
+    52.15,
+    -113.94,
+    52.37,
+    -113.67
+   ],
+   "licence": "Open Government Licence - The City of Red Deer (data.reddeer.ca/About)",
+   "credit": "Contains information licensed under the Open Government Licence – The City of Red Deer.",
+   "checked": "2026-11-15"
+  },
+  "yql": {
+   "name": "Lethbridge",
+   "agency": "Lethbridge Transit",
+   "prov": "AB",
+   "tz": "America/Edmonton",
+   "gtfs": "https://gis.lethbridge.ca/OpenData/DataSets/GTFS_Transit_Data.zip",
+   "live": false,
+   "centre": [
+    49.6956,
+    -112.8451
+   ],
+   "box": [
+    49.6,
+    -112.99,
+    49.79,
+    -112.7
+   ],
+   "licence": "City of Lethbridge Open Data License v2.0 (opendata.lethbridge.ca/pages/open-data-license, read 2026-11-15): any lawful purpose, royalty-free; no use suggesting City endorsement; no logo",
+   "credit": "Contains information licensed under the City of Lethbridge Open Data License.",
+   "checked": "2026-11-15"
+  },
+  "yxh": {
+   "name": "Medicine Hat",
+   "agency": "Medicine Hat Transit",
+   "prov": "AB",
+   "tz": "America/Edmonton",
+   "gtfs": "https://medicinehat.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/",
+   "live": false,
+   "centre": [
+    50.0405,
+    -110.6766
+   ],
+   "box": [
+    49.94,
+    -110.81,
+    50.11,
+    -110.55
+   ],
+   "licence": "none found (feed_info names only the vendor, Consat; the city has a GIS licence only)",
+   "hold": "terms unconfirmed: no licence on the feed; not served until the city confirms we may republish it",
+   "credit": "Transit data from the City of Medicine Hat.",
+   "checked": "2026-11-15"
+  },
+  "yqu": {
+   "name": "Grande Prairie",
+   "agency": "Grande Prairie Transit",
+   "prov": "AB",
+   "tz": "America/Edmonton",
+   "gtfs": "https://gpt.mapstrat.com/current/google_transit.zip",
+   "live": false,
+   "centre": [
+    55.1707,
+    -118.7947
+   ],
+   "box": [
+    55.09,
+    -118.94,
+    55.25,
+    -118.68
+   ],
+   "licence": "CDLA-Permissive-1.0 (as listed by Transitland)",
+   "credit": "Transit data from the City of Grande Prairie.",
+   "checked": "2026-11-15"
+  },
+  "cwv": {
+   "name": "Cowichan Valley",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=10",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=10",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=10",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=10"
+   },
+   "centre": [
+    48.7747,
+    -123.7016
+   ],
+   "box": [
+    48.37,
+    -124.3,
+    49.05,
+    -123.28
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ypb": {
+   "name": "Port Alberni",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=11",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=11",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=11",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=11"
+   },
+   "centre": [
+    49.2448,
+    -124.7952
+   ],
+   "box": [
+    49.17,
+    -124.93,
+    49.33,
+    -124.7
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ybl": {
+   "name": "Campbell River",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=12",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=12",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=12",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=12"
+   },
+   "centre": [
+    49.9665,
+    -125.2098
+   ],
+   "box": [
+    49.82,
+    -125.37,
+    50.11,
+    -125.05
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ycw": {
+   "name": "Fraser Valley (Chilliwack)",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=13",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=13",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=13",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=13"
+   },
+   "centre": [
+    49.1339,
+    -122.3051
+   ],
+   "box": [
+    48.95,
+    -122.97,
+    49.43,
+    -121.34
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yve": {
+   "name": "Vernon & Shuswap",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=14",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=14",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=14",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=14"
+   },
+   "centre": [
+    50.289,
+    -119.2596
+   ],
+   "box": [
+    49.89,
+    -119.57,
+    50.98,
+    -118.88
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yyf": {
+   "name": "South Okanagan (Penticton)",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=15",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=15",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=15",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=15"
+   },
+   "centre": [
+    49.4744,
+    -119.5861
+   ],
+   "box": [
+    48.97,
+    -120.59,
+    49.94,
+    -119.37
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "crv": {
+   "name": "Creston Valley",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Creston",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=16",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=16",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=16",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=16"
+   },
+   "centre": [
+    49.0958,
+    -116.5118
+   ],
+   "box": [
+    49.04,
+    -116.63,
+    49.23,
+    -116.39
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yzt": {
+   "name": "Mount Waddington",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=17",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=17",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=17",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=17"
+   },
+   "centre": [
+    50.7217,
+    -127.4982
+   ],
+   "box": [
+    50.52,
+    -127.67,
+    50.78,
+    -126.93
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "snc": {
+   "name": "Sunshine Coast",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=18",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=18",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=18",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=18"
+   },
+   "centre": [
+    49.4723,
+    -123.76
+   ],
+   "box": [
+    49.34,
+    -123.99,
+    49.56,
+    -123.39
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ycg": {
+   "name": "West Kootenay (Nelson)",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=20",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=20",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=20",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=20"
+   },
+   "centre": [
+    49.4905,
+    -117.2954
+   ],
+   "box": [
+    49.02,
+    -118.22,
+    50.35,
+    -116.82
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yxc": {
+   "name": "East Kootenay (Cranbrook)",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Edmonton",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=21",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=21",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=21",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=21"
+   },
+   "centre": [
+    49.5123,
+    -115.7649
+   ],
+   "box": [
+    49.44,
+    -116.21,
+    50.75,
+    -114.79
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yxs": {
+   "name": "Prince George",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=22",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=22",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=22",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=22"
+   },
+   "centre": [
+    53.9131,
+    -122.7473
+   ],
+   "box": [
+    53.77,
+    -127.25,
+    54.84,
+    -122.66
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ypr": {
+   "name": "Prince Rupert",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=23",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=23",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=23",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=23"
+   },
+   "centre": [
+    54.3135,
+    -130.3254
+   ],
+   "box": [
+    54.17,
+    -130.43,
+    54.38,
+    -130.19
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yxt": {
+   "name": "Terrace & Kitimat",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=26",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=26",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=26",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=26"
+   },
+   "centre": [
+    54.0533,
+    -128.6543
+   ],
+   "box": [
+    53.92,
+    -128.79,
+    55.4,
+    -127.09
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ydq": {
+   "name": "Dawson Creek",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Dawson_Creek",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=27",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=27",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=27",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=27"
+   },
+   "centre": [
+    55.7568,
+    -120.2237
+   ],
+   "box": [
+    55.69,
+    -120.34,
+    55.83,
+    -120.13
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yxj": {
+   "name": "Fort St. John",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Dawson_Creek",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=28",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=28",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=28",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=28"
+   },
+   "centre": [
+    56.2461,
+    -120.8477
+   ],
+   "box": [
+    56.18,
+    -120.95,
+    56.32,
+    -120.72
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ypw": {
+   "name": "Powell River",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=29",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=29",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=29",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=29"
+   },
+   "centre": [
+    49.8463,
+    -124.5196
+   ],
+   "box": [
+    49.6,
+    -124.84,
+    50.03,
+    -124.1
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yyd": {
+   "name": "Smithers",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=31",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=31",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=31",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=31"
+   },
+   "centre": [
+    54.7804,
+    -127.167
+   ],
+   "box": [
+    54.63,
+    -127.41,
+    55.07,
+    -126.97
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yqz": {
+   "name": "Quesnel",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=32",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=32",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=32",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=32"
+   },
+   "centre": [
+    52.979,
+    -122.4963
+   ],
+   "box": [
+    52.89,
+    -123.66,
+    53.16,
+    -121.43
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ywl": {
+   "name": "Williams Lake",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=33",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=33",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=33",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=33"
+   },
+   "centre": [
+    52.1298,
+    -122.1345
+   ],
+   "box": [
+    52.06,
+    -122.25,
+    52.22,
+    -121.91
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "omh": {
+   "name": "100 Mile House",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=34",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=34",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=34",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=34"
+   },
+   "centre": [
+    51.639,
+    -121.2973
+   ],
+   "box": [
+    51.58,
+    -121.46,
+    51.79,
+    -121.21
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "clw": {
+   "name": "Clearwater",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=35",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=35",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=35",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=35"
+   },
+   "centre": [
+    51.6504,
+    -120.0402
+   ],
+   "box": [
+    50.61,
+    -120.45,
+    51.73,
+    -119.65
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yrv": {
+   "name": "Revelstoke",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=36",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=36",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=36",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=36"
+   },
+   "centre": [
+    50.9598,
+    -118.1637
+   ],
+   "box": [
+    50.9,
+    -118.31,
+    51.07,
+    -118.08
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ymr": {
+   "name": "Merritt",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=37",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=37",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=37",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=37"
+   },
+   "centre": [
+    50.1121,
+    -120.7884
+   ],
+   "box": [
+    50.05,
+    -120.96,
+    50.23,
+    -120.67
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ash": {
+   "name": "Ashcroft & Clinton",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=38",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=38",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=38",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=38"
+   },
+   "centre": [
+    50.7251,
+    -121.2794
+   ],
+   "box": [
+    50.66,
+    -121.66,
+    51.14,
+    -121.2
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ssi": {
+   "name": "Salt Spring Island",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=39",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=39",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=39",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=39"
+   },
+   "centre": [
+    48.8533,
+    -123.4999
+   ],
+   "box": [
+    48.72,
+    -123.65,
+    48.96,
+    -123.37
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ycd": {
+   "name": "Nanaimo",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=41",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=41",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=41",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=41"
+   },
+   "centre": [
+    49.1634,
+    -123.9357
+   ],
+   "box": [
+    48.73,
+    -124.81,
+    49.51,
+    -123.62
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "sqm": {
+   "name": "Squamish",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=43",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=43",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=43",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=43"
+   },
+   "centre": [
+    49.6973,
+    -123.1561
+   ],
+   "box": [
+    49.65,
+    -123.24,
+    49.82,
+    -123.02
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "whi": {
+   "name": "Whistler",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=44",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=44",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=44",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=44"
+   },
+   "centre": [
+    50.1163,
+    -122.9565
+   ],
+   "box": [
+    50.03,
+    -123.12,
+    50.21,
+    -122.85
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yqq": {
+   "name": "Comox Valley",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=45",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=45",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=45",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=45"
+   },
+   "centre": [
+    49.6683,
+    -124.98
+   ],
+   "box": [
+    49.41,
+    -125.23,
+    49.92,
+    -124.65
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yka": {
+   "name": "Kamloops",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=46",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=46",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=46",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=46"
+   },
+   "centre": [
+    50.6756,
+    -120.3271
+   ],
+   "box": [
+    50.58,
+    -120.5,
+    50.91,
+    -120.0
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "ylw": {
+   "name": "Kelowna",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=47",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=47",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=47",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=47"
+   },
+   "centre": [
+    49.9394,
+    -119.3939
+   ],
+   "box": [
+    49.7,
+    -119.87,
+    50.12,
+    -119.27
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yyj": {
+   "name": "Victoria",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=48",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=48",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=48",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=48"
+   },
+   "centre": [
+    48.4244,
+    -123.3653
+   ],
+   "box": [
+    48.29,
+    -123.88,
+    48.75,
+    -123.21
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "pmb": {
+   "name": "Pemberton",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=50",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=50",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=50",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=50"
+   },
+   "centre": [
+    50.3213,
+    -122.8063
+   ],
+   "box": [
+    50.06,
+    -123.04,
+    50.38,
+    -122.58
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
+  },
+  "yaz": {
+   "name": "West Coast (Tofino)",
+   "agency": "BC Transit",
+   "prov": "BC",
+   "tz": "America/Vancouver",
+   "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=51",
+   "live": false,
+   "rt": {
+    "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=51",
+    "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=51",
+    "alerts": "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=51"
+   },
+   "centre": [
+    49.1527,
+    -125.9084
+   ],
+   "box": [
+    48.89,
+    -125.99,
+    49.2,
+    -125.44
+   ],
+   "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
+   "credit": "Transit data from BC Transit.",
+   "checked": "2026-11-15"
   }
+ }
 }

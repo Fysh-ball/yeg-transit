@@ -467,12 +467,12 @@ const agency = (c) => CITY[c]?.agency || "the transit agency"; // who feeds the 
 function drawCityPick() {
   const el = $("#city-pick");
   el.hidden = cities.length < 2;
-  el.innerHTML = `<select id="city-sel" aria-label="City">${cities.map((c) => `<option value="${c}"${c === city ? " selected" : ""}>${CITY[c].name}</option>`).join("")}</select>`;
+  el.innerHTML = `<select id="city-sel" aria-label="City">${[...cities].sort((a, b) => CITY[a].name.localeCompare(CITY[b].name)).map((c) => `<option value="${c}"${c === city ? " selected" : ""}>${CITY[c].name}</option>`).join("")}</select>`;
   $("#q").placeholder = city === "yeg" ? "Address, place or stop #" : "Stop name or number";
   $("#live-map").hidden = CITY[city]?.live === false; // no bus positions to show
   // Each city's exact line from feeds.json (Calgary's: licence v2.1, read 2026-11-10), shown only where that city is served.
-  const more = cities.filter((c) => c !== "yeg"), ags = cities.map(agency);
-  const credit = more.length ? `Contains information licensed under the Open Government Licence \u2013 City of Edmonton. ${more.map((c) => CITY[c].credit).join(" ")} `
+  const more = cities.filter((c) => c !== "yeg"), ags = [...new Set(cities.map(agency))]; // BC Transit runs about 35 towns: named once
+  const credit = more.length ? `Contains information licensed under the Open Government Licence \u2013 City of Edmonton. ${[...new Set(more.map((c) => CITY[c].credit))].join(" ")} `
     + `Not an official app of ${ags.slice(0, -1).join(", ")} or ${ags.at(-1)}.` : "";
   for (const id of ["#credit", "#legal"]) if (credit) $(id).firstChild.textContent = credit;
 }
