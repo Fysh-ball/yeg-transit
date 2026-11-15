@@ -1021,6 +1021,205 @@
    "licence": "BC Transit Open Data Terms of Use (bctransit.com/open-data/terms-of-use, read 2026-11-15): use, reproduce, redistribute; must name BC Transit as the source; no BC Transit marks or domain",
    "credit": "Transit data from BC Transit.",
    "checked": "2026-11-15"
+  },
+  "ywg": {
+   "name": "Winnipeg",
+   "agency": "Winnipeg Transit",
+   "prov": "MB",
+   "tz": "America/Winnipeg",
+   "gtfs": "http://gtfs.winnipegtransit.com/google_transit.zip",
+   "live": false,
+   "centre": [
+    49.8839,
+    -97.1321
+   ],
+   "box": [
+    49.71,
+    -97.4,
+    50.02,
+    -96.88
+   ],
+   "licence": "not found (winnipegtransit.com has no open-data terms page, 2026-11-15)",
+   "credit": "Transit data from Winnipeg Transit.",
+   "checked": "2026-11-15",
+   "hold": "terms unconfirmed: no licence found for the GTFS; not served until confirmed"
+  },
+  "yqr": {
+   "name": "Regina",
+   "agency": "Regina Transit",
+   "prov": "SK",
+   "tz": "America/Regina",
+   "gtfs": "https://opengis.regina.ca/reginagtfs/google_transit.zip",
+   "live": false,
+   "centre": [
+    50.4472,
+    -104.6106
+   ],
+   "box": [
+    50.35,
+    -104.83,
+    50.56,
+    -104.42
+   ],
+   "licence": "not found (open.regina.ca terms page no longer resolves, 2026-11-15)",
+   "credit": "Transit data from the City of Regina.",
+   "checked": "2026-11-15",
+   "hold": "terms unconfirmed: the city's open data terms page is gone; not served until confirmed"
+  },
+  "yxe": {
+   "name": "Saskatoon",
+   "agency": "Saskatoon Transit",
+   "prov": "SK",
+   "tz": "America/Regina",
+   "gtfs": "https://apps5.saskatoon.ca/data/gtfs/google_transit.zip",
+   "live": false,
+   "centre": [
+    52.1124,
+    -106.5977
+   ],
+   "box": [
+    52.03,
+    -106.84,
+    52.25,
+    -106.45
+   ],
+   "licence": "Saskatoon Transit developer page (saskatoontransit.ca/node/562, read 2026-11-15): 'available at no charge and can be implemented in both for-profit and non-profit applications'; refers to the City of Saskatoon Open Data Terms of Use (not found online)",
+   "credit": "Transit data from Saskatoon Transit.",
+   "checked": "2026-11-15"
+  },
+  "yhz": {
+   "name": "Halifax",
+   "agency": "Halifax Transit",
+   "prov": "NS",
+   "tz": "America/Halifax",
+   "gtfs": "http://gtfs.halifax.ca/static/google_transit.zip",
+   "live": false,
+   "rt": {
+    "trip_updates": "http://gtfs.halifax.ca/realtime/TripUpdate/TripUpdates.pb",
+    "vehicles": "http://gtfs.halifax.ca/realtime/Vehicle/VehiclePositions.pb",
+    "alerts": "http://gtfs.halifax.ca/realtime/Alert/Alerts.pb"
+   },
+   "centre": [
+    44.6456,
+    -63.5732
+   ],
+   "box": [
+    44.52,
+    -63.94,
+    44.94,
+    -63.2
+   ],
+   "licence": "Open Government Licence - Halifax (data-hrm.hub.arcgis.com/pages/open-data-licence, read 2026-11-15): use, including commercial, copy, publish, distribute; acknowledge the source",
+   "credit": "Contains information licensed under the Open Government Licence – Halifax.",
+   "checked": "2026-11-15"
+  },
+  "yyt": {
+   "name": "St. John's",
+   "agency": "Metrobus",
+   "prov": "NL",
+   "tz": "America/St_Johns",
+   "gtfs": "http://www.metrobustransit.ca/google/google_transit.zip",
+   "live": false,
+   "centre": [
+    47.5338,
+    -52.7501
+   ],
+   "box": [
+    47.39,
+    -52.95,
+    47.67,
+    -52.6
+   ],
+   "licence": "Metrobus GTFS licence (metrobus.com/gtfs.asp, 2026-11-15): use, reproduce, redistribute; notice 'Data used in this product or service is provided by Metrobus Transit' shown prominently; no Metrobus marks or domain; latest feed downloaded weekly (we fetch nightly); a fee to end users may add terms (we charge none)",
+   "credit": "Data used in this product or service is provided by Metrobus Transit.",
+   "checked": "2026-11-15"
+  },
+  "yqm": {
+   "name": "Moncton",
+   "agency": "Codiac Transpo",
+   "prov": "NB",
+   "tz": "America/Halifax",
+   "gtfs": "https://www7.moncton.ca/opendata/google_transit.zip",
+   "live": false,
+   "centre": [
+    46.0967,
+    -64.7595
+   ],
+   "box": [
+    45.99,
+    -64.97,
+    46.22,
+    -64.6
+   ],
+   "licence": "City of Moncton 'Open Data Terms of Use' (named on ArcGIS item fc9b9174351e4abe8a7584eb471dd638; text not found, moncton.ca terms page 404, 2026-11-15)",
+   "credit": "Transit data from the City of Moncton.",
+   "checked": "2026-11-15",
+   "hold": "terms unconfirmed: Moncton's open data terms text could not be found; not served until read"
+  },
+  "ysj": {
+   "name": "Saint John",
+   "agency": "Saint John Transit",
+   "prov": "NB",
+   "tz": "America/Halifax",
+   "gtfs": "https://www.arcgis.com/sharing/rest/content/items/d6f4783521364429a2e51a64c60ae234/data",
+   "live": false,
+   "centre": [
+    45.306,
+    -66.0176
+   ],
+   "box": [
+    45.18,
+    -66.28,
+    45.49,
+    -65.76
+   ],
+   "licence": "Open Government Licence - City of Saint John v1.0 (ArcGIS item d6f4783521364429a2e51a64c60ae234, read 2026-11-15): use, including commercial, copy, publish, distribute; acknowledge the source",
+   "credit": "Contains information licensed under the Open Government Licence – City of Saint John.",
+   "checked": "2026-11-15"
+  },
+  "yfc": {
+   "name": "Fredericton",
+   "agency": "Fredericton Transit",
+   "prov": "NB",
+   "tz": "America/Halifax",
+   "gtfs": "https://fredericton.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/gtfs.zip",
+   "live": false,
+   "centre": [
+    45.9615,
+    -66.643
+   ],
+   "box": [
+    45.86,
+    -66.81,
+    46.06,
+    -66.5
+   ],
+   "licence": "not found (the listed ArcGIS item no longer exists, 2026-11-15)",
+   "credit": "Transit data from the City of Fredericton.",
+   "checked": "2026-11-15",
+   "hold": "terms unconfirmed: no licence found; not served until confirmed"
+  },
+  "yyg": {
+   "name": "Charlottetown",
+   "agency": "T3 Transit",
+   "prov": "PE",
+   "tz": "America/Moncton",
+   "gtfs": "https://data.trilliumtransit.com/gtfs/coachatlantic-pe-ca/coachatlantic-pe-ca.zip",
+   "live": false,
+   "centre": [
+    46.2651,
+    -63.146
+   ],
+   "box": [
+    46.15,
+    -63.88,
+    46.47,
+    -63.0
+   ],
+   "licence": "not found (t3transit.ca has no terms; the feed is hosted by Trillium, 2026-11-15)",
+   "credit": "Transit data from T3 Transit.",
+   "checked": "2026-11-15",
+   "hold": "terms unconfirmed: no licence found; not served until confirmed"
   }
  }
 }
