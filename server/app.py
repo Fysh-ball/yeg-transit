@@ -1247,7 +1247,7 @@ class Handler(SimpleHTTPRequestHandler):
         # App files: make Cloudflare and the browser revalidate, or a deploy hides behind a 4 h edge cache.
         if not self.path.startswith("/api/"):
             self.send_header("Cache-Control", "no-cache")
-        # ponytail: no full Content-Security-Policy yet; Google ads load scripts from many hosts. Every page string goes through esc().
+        # ponytail: no full Content-Security-Policy yet; the map loads scripts and tiles from cdnjs, jsdelivr and openfreemap, and index.html has inline scripts; a policy must list each. Every page string goes through esc().
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("Content-Security-Policy", "frame-ancestors 'none'")
