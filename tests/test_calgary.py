@@ -264,6 +264,55 @@ class ScheduledCity(unittest.TestCase):
         self.assertNotIn("yxh", app.FEEDS)  # Medicine Hat: on hold until its terms are confirmed
 
 
+class BcTransitLive(unittest.TestCase):
+    """BC Transit: one shared keyless feed for every town (2026-11-15), read only for towns flipped live in feeds.json,
+    on demand, one call per 30 s, backed off on errors like Calgary's."""
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        zp, dbp = os.path.join(tmp.name, "z.zip"), os.path.join(tmp.name, "v.db")
+        build(zp); app.import_gtfs(zp, dbp)
+        self.db = sqlite3.connect(dbp); self.addCleanup(self.db.close)
+        self.now = int(datetime(2026, 11, 10, 7, 55, tzinfo=app.ZoneInfo("America/Vancouver")).timestamp())
+        self.live, self.host, self.asked = app.BcLive(), app.Host("test", 30, 3000), []
+        for patch in (mock.patch.object(app, "BCLIVE", self.live), mock.patch.object(app, "BCT_RT", self.host),
+                      mock.patch.dict(app.FEEDS["yyj"], live=True), mock.patch.dict(app.FEEDS["ypb"], live=False),
+                      mock.patch.object(app.time, "time", lambda: self.now)):
+            patch.start(); self.addCleanup(patch.stop)
+
+    def ask(self, c="yyj"):
+        return app.city_route(c, self.db, ["stops", f"{c}:6451", "departures"], {})[0]
+
+    def fetch(self, u, t):
+        self.asked.append(u)
+        return io.BytesIO(feed("t1", "6451", self.now + 540, self.now - 5))
+
+    def test_a_live_town_reads_the_shared_feed(self):
+        with mock.patch.object(app, "fetch", self.fetch):
+            d = self.ask()
+        self.assertEqual([(x["time"], x["live"]) for x in d["departures"]], [(self.now + 540, True)])
+        self.assertEqual(self.asked, ["https://bct.tmix.se/gtfs-realtime/tripupdates.pb"])  # every town, one copy
+
+    def test_a_town_not_flipped_live_never_asks(self):
+        with mock.patch.object(app, "fetch", self.fetch):
+            d = self.ask("ypb")
+        self.assertEqual([x["live"] for x in d["departures"]], [False])
+        self.assertEqual(self.asked, [])
+
+    def test_a_503_backs_off(self):
+        from test_outside_hosts import http_error
+        def fetch(u, t):
+            self.asked.append(u)
+            if len(self.asked) == 1:
+                return io.BytesIO(feed("t1", "6451", self.now + 540, self.now))
+            raise http_error(503, 600)
+        with mock.patch.object(app, "fetch", fetch):
+            self.ask()
+            for _ in range(8):  # 4 min of riders: the 503 and its Retry-After 600 keep the host unasked
+                self.now += 31; d = self.ask()
+        self.assertEqual(len(self.asked), 2)
+        self.assertFalse(d["departures"][0]["live"])  # older than 120 s: scheduled, never a stale "live"
+
+
 class WeatherPerCity(unittest.TestCase):
     """The sky chip follows the city (2026-11-10: Calgary showed Edmonton's temperature): own coordinates, own 15 min cache."""
     def setUp(self):

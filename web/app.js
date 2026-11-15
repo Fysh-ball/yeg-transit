@@ -456,7 +456,7 @@ const CITY = { yeg: { name: "Edmonton", agency: "ETS", box: [52.9, -114.2, 54.0,
 const cityOf = (id) => (/^[a-z]{3}:/.test(id || "") ? id.slice(0, 3) : "yeg"); // "cgy:6451", "yqf:123"; Edmonton's ids are bare
 function offAir(stops) { // the line under the stops when no time on screen is live
   const cs = [...new Set(stops.map((s) => cityOf(s.id)))];
-  if (cs.length === 1 && cs[0] !== "yeg") return CITY[cs[0]]?.live === false ? `Scheduled times only: ${agency(cs[0])} doesn't publish live times.` : `No live times from ${CITY[cs[0]]?.name || "this city"} right now: scheduled times.`;
+  if (cs.length === 1 && cs[0] !== "yeg") return CITY[cs[0]]?.live === false ? (CITY[cs[0]].rt ? "Scheduled times only for now." : `Scheduled times only: ${agency(cs[0])} doesn't publish live times.`) : `No live times from ${CITY[cs[0]]?.name || "this city"} right now: scheduled times.`;
   return "No live times from ETS right now: scheduled times.";
 }
 let cities = ["yeg"], city = "yeg";
@@ -1319,4 +1319,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=121").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=122").catch((e) => console.warn("sw:", e.message));

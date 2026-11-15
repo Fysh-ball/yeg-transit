@@ -311,6 +311,28 @@ class CgyVeh(CgyLive):
 CGYLIVE, CGYVEH = CgyLive(), CgyVeh()
 
 
+# BC Transit's live feeds, keyless. One copy with no operatorIds holds every BC town (measured 2026-11-15: 109 trips over 7
+# towns at midnight, trip ids matching the static feeds), so one shared poll serves them all, asked only when a rider asks.
+# BC Transit publishes no rate limit (unknown): one call per 30 s, at most 3000 a day per feed. Used only by towns whose
+# feeds.json "live" is true, flipped once daytime trips for that town were seen in the feed.
+BC_RT = "https://bct.tmix.se/gtfs-realtime/{}.pb"
+BCT_RT = Host("bct.tmix.se (realtime)", 30, 3000)
+BCT_VP = Host("bct.tmix.se (vehicles)", 30, 3000)
+
+
+class BcLive(CgyLive):
+    def get(self):
+        return BCT_RT.get_bytes(BC_RT.format("tripupdates"), 20)
+
+
+class BcVeh(CgyVeh):
+    def get(self):
+        return BCT_VP.get_bytes(BC_RT.format("vehicleupdates"), 20)
+
+
+BCLIVE, BCVEH = BcLive(), BcVeh()
+
+
 class NoLive(CgyLive):
     """A city that publishes no live times: never asked, never fresh, so every departure stays scheduled."""
     def refresh(self):
@@ -1140,9 +1162,18 @@ def cgy_route(db, parts, q):
     return city_route("cgy", db, parts, q)
 
 
+def city_live(c):
+    """The live feeds a city's departures and map read: Calgary's own, BC Transit's shared ones, or none (scheduled)."""
+    if c == "cgy":
+        return CGYLIVE, CGYVEH
+    if FEEDS[c]["agency"] == "BC Transit" and FEEDS[c]["live"]:
+        return BCLIVE, BCVEH
+    return NOLIVE, NOLIVE
+
+
 def city_route(c, db, parts, q):
     """(json, cache seconds) for a feeds.json city's few routes: search, near, a stop's departures and timetable."""
-    live, veh = (CGYLIVE, CGYVEH) if c == "cgy" else (NOLIVE, NOLIVE)  # only Calgary is live
+    live, veh = city_live(c)
     tz = ZoneInfo(FEEDS[c]["tz"])
     if parts == ["weather"]:
         return walk_weather(c), 600
@@ -1354,9 +1385,11 @@ class Handler(SimpleHTTPRequestHandler):
         if parts == ["version"]:
             return self.json({"sha": SHA})
         if parts == ["cities"]:  # the cities this box serves; the page shows a picker only when there is more than one
-            # info: what the page needs to draw each city (feeds.json); live false means scheduled times only, labelled so
+            # info: what the page needs to draw each city (feeds.json); live false means scheduled times only, labelled so.
+            # rt: the agency publishes a live feed (we may not read it yet), so the page can't say it publishes none.
             cs = served()
-            return self.json({"cities": ["yeg"] + cs, "info": {c: {k: FEEDS[c][k] for k in ("name", "agency", "box", "centre", "live", "credit")}
+            return self.json({"cities": ["yeg"] + cs, "info": {c: {**{k: FEEDS[c][k] for k in ("name", "agency", "box", "centre", "live",
+                                                                                              "credit")}, "rt": "rt" in FEEDS[c]}
                                                                for c in cs}}, cache=60)
         if parts == ["vehicles"]:
             # age: how old the positions are; a failing ETS feed leaves the last ones in place, so the map must say so
