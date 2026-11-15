@@ -36,7 +36,7 @@
       "live": false,
       "centre": [50.0405, -110.6766], "box": [49.94, -110.81, 50.11, -110.55],
       "licence": "none found (feed_info names only the vendor, Consat; the city has a GIS licence only)",
-      "hold": "terms unconfirmed: the public site carries ads; not served until the city confirms reuse",
+      "hold": "terms unconfirmed: no licence on the feed; not served until the city confirms we may republish it",
       "credit": "Transit data from the City of Medicine Hat.",
       "checked": "2026-11-15"
     },
