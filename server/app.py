@@ -348,6 +348,8 @@ def city_zip(c):
 
 def refresh_city(c):
     zpath = city_zip(c)
+    if not FEEDS[c]["gtfs"].startswith("https://"):  # a timetable fetched in the clear could be swapped on the way
+        raise ValueError(f"{c}: feeds.json gtfs url must be https")
     with open(zpath + ".part", "wb") as f:
         f.write(feed_host(c).get_bytes(FEEDS[c]["gtfs"], 120))
     import_gtfs(zpath + ".part", city_db(c))  # first: an error page served as 200 must not replace the last good zip

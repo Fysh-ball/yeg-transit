@@ -1027,7 +1027,7 @@
    "agency": "Winnipeg Transit",
    "prov": "MB",
    "tz": "America/Winnipeg",
-   "gtfs": "http://gtfs.winnipegtransit.com/google_transit.zip",
+   "gtfs": "https://gtfs.winnipegtransit.com/google_transit.zip",
    "live": false,
    "centre": [
     49.8839,
@@ -1092,12 +1092,12 @@
    "agency": "Halifax Transit",
    "prov": "NS",
    "tz": "America/Halifax",
-   "gtfs": "http://gtfs.halifax.ca/static/google_transit.zip",
+   "gtfs": "https://gtfs.halifax.ca/static/google_transit.zip",
    "live": false,
    "rt": {
-    "trip_updates": "http://gtfs.halifax.ca/realtime/TripUpdate/TripUpdates.pb",
-    "vehicles": "http://gtfs.halifax.ca/realtime/Vehicle/VehiclePositions.pb",
-    "alerts": "http://gtfs.halifax.ca/realtime/Alert/Alerts.pb"
+    "trip_updates": "https://gtfs.halifax.ca/realtime/TripUpdate/TripUpdates.pb",
+    "vehicles": "https://gtfs.halifax.ca/realtime/Vehicle/VehiclePositions.pb",
+    "alerts": "https://gtfs.halifax.ca/realtime/Alert/Alerts.pb"
    },
    "centre": [
     44.6456,
@@ -1118,7 +1118,7 @@
    "agency": "Metrobus",
    "prov": "NL",
    "tz": "America/St_Johns",
-   "gtfs": "http://www.metrobustransit.ca/google/google_transit.zip",
+   "gtfs": "https://www.metrobustransit.ca/google/google_transit.zip",
    "live": false,
    "centre": [
     47.5338,
