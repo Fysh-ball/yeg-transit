@@ -23,9 +23,10 @@ TZ = ZoneInfo("America/Edmonton")
 SKIPPED = gtfs_realtime_pb2.TripUpdate.StopTimeUpdate.SKIPPED
 
 
-def fetch(url, timeout):
+def fetch(url, timeout, headers=None):
     # gtfs.edmonton.ca answers 403 to Python's default User-Agent
-    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit/0.1"}), timeout=timeout)
+    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "yeg-transit/0.1", **(headers or {})}),
+                                  timeout=timeout)
 
 
 class Busy(Exception):
@@ -47,7 +48,19 @@ class Host:
     def get_bytes(self, url, timeout):
         return self._get(url, timeout, lambda r: r.read())
 
-    def _get(self, url, timeout, read):
+    def get_changed(self, url, timeout, seen):
+        """(body, validators) if the file changed since `seen` (its ETag / Last-Modified), else (None, seen): a 304 is cheap
+        for the host and for us (Metrobus asks for weekly downloads; we ask nightly, conditionally)."""
+        h = {k: v for k, v in (("If-None-Match", seen.get("etag")), ("If-Modified-Since", seen.get("modified"))) if v}
+        try:
+            return self._get(url, timeout, lambda r: (r.read(), {"etag": r.headers.get("ETag"),
+                                                                 "modified": r.headers.get("Last-Modified")}), h)
+        except urllib.error.HTTPError as e:
+            if e.code == 304:
+                return None, seen
+            raise
+
+    def _get(self, url, timeout, read, headers=None):
         with self.lock:
             now = time.time()
             today = time.strftime("%Y%m%d", time.localtime(now))
@@ -64,12 +77,12 @@ class Host:
                 raise Busy(f"{self.name} daily cap")
             self.at, self.count = now, self.count + 1
         try:
-            with fetch(url, timeout) as r:
+            with (fetch(url, timeout, headers) if headers else fetch(url, timeout)) as r:
                 body = read(r)
         except Exception as e:
             code = getattr(e, "code", 0)
             ra = (e.headers.get("Retry-After") or "") if code and e.headers else ""
-            if code not in (400, 404):  # our own bad query is not the host struggling
+            if code not in (304, 400, 404):  # unchanged, or our own bad query: not the host struggling
                 with self.lock:
                     self.wait = min(300, max(2, self.wait * 2))
                     self.until = time.time() + max(self.wait * random.uniform(0.8, 1.2), int(ra) if ra.isdigit() else 0)
@@ -350,10 +363,20 @@ def refresh_city(c):
     zpath = city_zip(c)
     if not FEEDS[c]["gtfs"].startswith("https://"):  # a timetable fetched in the clear could be swapped on the way
         raise ValueError(f"{c}: feeds.json gtfs url must be https")
+    try:
+        with open(zpath + ".seen") as f:
+            seen = json.load(f) if os.path.exists(city_db(c)) else {}
+    except (OSError, ValueError):
+        seen = {}
+    body, seen = feed_host(c).get_changed(FEEDS[c]["gtfs"], 120, seen)
+    if body is None:
+        return print(f"{FEEDS[c]['name']} GTFS unchanged (304)", file=sys.stderr)
     with open(zpath + ".part", "wb") as f:
-        f.write(feed_host(c).get_bytes(FEEDS[c]["gtfs"], 120))
+        f.write(body)
     import_gtfs(zpath + ".part", city_db(c))  # first: an error page served as 200 must not replace the last good zip
     os.replace(zpath + ".part", zpath)
+    with open(zpath + ".seen", "w") as f:
+        json.dump(seen, f)
 
 
 def refresh_cgy():

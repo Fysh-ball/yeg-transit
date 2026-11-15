@@ -95,3 +95,30 @@ class Hosts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConditionalTimetable(unittest.TestCase):
+    """A city's nightly timetable fetch asks "changed since?" (ETag / Last-Modified): a 304 keeps the last import, costs
+    the host nothing, and is not an error (Metrobus asks for weekly downloads, 2026-11-15)."""
+    def test_second_night_sends_validators_and_a_304_keeps_the_import(self):
+        import os, tempfile
+        from email.message import Message
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        asked, calls = [], []
+        def fetch(url, timeout, headers=None):
+            asked.append(headers or {})
+            if len(asked) == 2:
+                raise urllib.error.HTTPError(url, 304, "Not Modified", Message(), io.BytesIO(b""))
+            r = io.BytesIO(b"zip"); r.headers = {"ETag": '"v1"', "Last-Modified": "Sat, 14 Nov 2026 00:00:00 GMT"}
+            return r
+        host = app.Host("test", 0, 100)
+        with mock.patch.object(app, "DATA", tmp.name), mock.patch.object(app, "fetch", fetch), \
+                mock.patch.object(app, "feed_host", lambda c: host), \
+                mock.patch.object(app, "import_gtfs", lambda z, d: (calls.append(z), open(d, "w").close())):
+            app.refresh_city("yyt")
+            app.refresh_city("yyt")
+        self.assertEqual(asked[0], {})
+        self.assertEqual(asked[1], {"If-None-Match": '"v1"', "If-Modified-Since": "Sat, 14 Nov 2026 00:00:00 GMT"})
+        self.assertEqual(len(calls), 1)  # the 304 imported nothing
+        self.assertEqual(host.until, 0)  # and started no cooldown
+        self.assertTrue(os.path.exists(os.path.join(tmp.name, "yyt.zip")))
