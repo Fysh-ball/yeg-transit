@@ -80,7 +80,7 @@ function mins(t, now) {
 }
 
 // ETS short names are zero-padded ("005") and headsigns repeat the number ("5 Coliseum").
-function routeLabel(r) { return String(r).replace(/^0+(?=\w)/, ""); }
+function routeLabel(r) { return String(r).replace(/(^|\|)0+(?=\w)/g, "$1").replace(/\|/g, "/"); } // YRT's late-night "098|099" reads "98/99"
 function headLabel(h, r) {
   const n = routeLabel(r);
   return h.startsWith(n + " ") ? h.slice(n.length + 1) : h;
@@ -1333,4 +1333,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=124").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=125").catch((e) => console.warn("sw:", e.message));
