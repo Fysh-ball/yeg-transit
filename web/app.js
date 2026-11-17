@@ -461,10 +461,18 @@ function offAir(stops) { // the line under the stops when no time on screen is l
 }
 let cities = ["yeg"], city = "yeg";
 try { city = localStorage.getItem("yeg.city") || "yeg"; } catch { /* storage blocked: Edmonton */ }
-// nearest centre (the busiest stop) among the boxes holding the point: GTA boxes overlap (GO covers them all, MiWay's holds Brampton)
+// The city with the most stops within 650 m, among the boxes holding the point. Boxes overlap (GO's covers the GTA,
+// MiWay's holds Brampton), so the nearest busiest-stop centre sent North York to York Region, and the nearest single stop
+// sent Union and Finch to GO (a GO stop beside the TTC's); counting won at all 19 GTA points tried (2026-11-17).
+// One stops/near (n=60, its cap) per candidate, none when one box holds the point; no stop near falls back to the centre.
 const off = (c, p) => (CITY[c].centre[0] - p.lat) ** 2 + ((CITY[c].centre[1] - p.lon) * Math.cos(p.lat * Math.PI / 180)) ** 2;
-const cityAt = (p) => cities.filter((c) => p.lat >= CITY[c].box[0] && p.lon >= CITY[c].box[1] && p.lat <= CITY[c].box[2] && p.lon <= CITY[c].box[3])
-  .sort((a, b) => off(a, p) - off(b, p))[0];
+async function cityAt(p) {
+  const cs = cities.filter((c) => p.lat >= CITY[c].box[0] && p.lon >= CITY[c].box[1] && p.lat <= CITY[c].box[2] && p.lon <= CITY[c].box[3]);
+  if (cs.length < 2) return cs[0];
+  const n = await Promise.all(cs.map((c) => api(`stops/near?lat=${p.lat}&lon=${p.lon}&n=60${cq(c)}`).then((l) => l.length, () => 0)));
+  const most = Math.max(...n);
+  return most ? cs[n.indexOf(most)] : cs.sort((a, b) => off(a, p) - off(b, p))[0];
+}
 const cq = (c) => (c === "yeg" ? "" : `&city=${c}`);
 const agency = (c) => CITY[c]?.agency || "the transit agency"; // who feeds the map, for the notes under it
 function drawCityPick() {
@@ -507,8 +515,8 @@ async function autoCity() {
   try {
     if (cities.length < 2 || localStorage.getItem("yeg.cityset") || !navigator.geolocation) return;
     if ((await navigator.permissions.query({ name: "geolocation" })).state !== "granted") return;
-    navigator.geolocation.getCurrentPosition((p) => {
-      const c = cityAt({ lat: p.coords.latitude, lon: p.coords.longitude });
+    navigator.geolocation.getCurrentPosition(async (p) => {
+      const c = await cityAt({ lat: p.coords.latitude, lon: p.coords.longitude });
       if (c && !localStorage.getItem("yeg.cityset")) setCity(c, true);
     }, () => {}, { timeout: 8000, maximumAge: 600000 });
   } catch (e) { console.warn("auto city:", e.message); }
@@ -562,7 +570,7 @@ const PINS = 8;
 let nearMap = null;
 async function nearby(from, title, you = false) {
   let list;
-  const c = cityAt(from) || city;
+  const c = (await cityAt(from)) || city;
   setCity(c, true);
   try { list = await api(`stops/near?lat=${from.lat}&lon=${from.lon}${cq(c)}`); }
   catch (err) { $("#results").innerHTML = `<li>Needs a connection (${esc(err.message)}).</li>`; return; }
@@ -1322,4 +1330,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=123").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=124").catch((e) => console.warn("sw:", e.message));

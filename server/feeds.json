@@ -1240,8 +1240,7 @@
    ],
    "licence": "Metrolinx Access and Use Agreement (gotransit.com/en/partner-with-us/software-developers, read 2026-11-15): use, reproduce, redistribute; legend required",
    "credit": "Data used in this product or service is provided with the permission of Metrolinx. Metrolinx makes no representations or warranties of any kind, express or implied, with respect to the Data and assumes no responsibility for the accuracy or currency of the data used in this product or service.",
-   "checked": "2026-11-15",
-   "hold": "ships with the TTC: until then downtown Toronto phones would auto-pick GO trains instead of their bus"
+   "checked": "2026-11-15"
   },
   "brm": {
    "name": "Brampton",
@@ -1262,8 +1261,7 @@
    ],
    "licence": "CC BY (ArcGIS item a355aabd licenseInfo, read 2026-11-15)",
    "credit": "Transit data from Brampton Transit (CC BY).",
-   "checked": "2026-11-15",
-   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+   "checked": "2026-11-15"
   },
   "ysc": {
    "name": "Sherbrooke",
@@ -1430,8 +1428,7 @@
    ],
    "licence": "Region of Durham Open Data Licence v1.0 (durham.ca, read 2026-11-15): commercial use allowed, credit optional",
    "credit": "Contains public sector information made available under The Regional Municipality of Durham's Open Data Licence.",
-   "checked": "2026-11-15",
-   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+   "checked": "2026-11-15"
   },
   "yrk": {
    "name": "York Region",
@@ -1452,8 +1449,7 @@
    ],
    "licence": "YRT Open Data Licence (yrt.ca, read 2026-11-15): commercial use allowed, credit optional",
    "credit": "Contains public transit Information made available under YRT's Open Data Licence.",
-   "checked": "2026-11-15",
-   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+   "checked": "2026-11-15"
   },
   "mis": {
    "name": "Mississauga",
@@ -1474,8 +1470,7 @@
    ],
    "licence": "City of Mississauga open data Terms of Use (read 2026-11-15): credit not required",
    "credit": "Transit data from MiWay, City of Mississauga.",
-   "checked": "2026-11-15",
-   "hold": "ships with the TTC as one Toronto-area batch: until then Toronto phones would auto-pick this agency (box overlaps Toronto)"
+   "checked": "2026-11-15"
   },
   "ysb": {
    "name": "Greater Sudbury",
@@ -1805,6 +1800,30 @@
    "credit": "Données de la Ville de Rouyn-Noranda.",
    "checked": "2026-11-15",
    "hold": "terms not found 2026-11-15"
+  },
+  "yyz": {
+   "name": "Toronto",
+   "agency": "TTC",
+   "prov": "ON",
+   "tz": "America/Toronto",
+   "gtfs": "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/7795b45e-e65a-4465-81fc-c36b9dfff169/resource/cfb6b2b8-6191-41e3-bda1-b175c51148cb/download/opendata_ttc_schedules.zip",
+   "live": false,
+   "rt": {
+    "vehicles": "https://bustime.ttc.ca/gtfsrt/vehicles"
+   },
+   "centre": [
+    43.6876,
+    -79.4845
+   ],
+   "box": [
+    43.54,
+    -79.73,
+    43.96,
+    -79.04
+   ],
+   "licence": "Open Government Licence – Toronto (open.toronto.ca dataset ttc-routes-and-schedules, read 2026-11-17)",
+   "credit": "Contains information licensed under the Open Government Licence – Toronto.",
+   "checked": "2026-11-15"
   }
  }
 }

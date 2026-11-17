@@ -8,7 +8,7 @@ services:
     ports: ["127.0.0.1:8792:8792"]
     volumes: ["yeg-data:/data"]
     # Cities served besides Edmonton (owner go-live 2026-11-10); empty or unset = Edmonton only.
-    environment: ["YEG_CITIES=cgy,yqf,yql,yqu,cwv,ypb,ybl,ycw,yve,yyf,crv,yzt,snc,ycg,yxc,yxs,ypr,yxt,ydq,yxj,ypw,yyd,yqz,ywl,omh,clw,yrv,ymr,ash,ssi,ycd,sqm,whi,yqq,yka,ylw,yyj,pmb,yaz,yxe,yhz,yyt,ysj,ysc,yxk,yhm,ykf,bar,bur,ysb"]  # cities with a hold in feeds.json (unconfirmed terms) are left out
+    environment: ["YEG_CITIES=cgy,yqf,yql,yqu,cwv,ypb,ybl,ycw,yve,yyf,crv,yzt,snc,ycg,yxc,yxs,ypr,yxt,ydq,yxj,ypw,yyd,yqz,ywl,omh,clw,yrv,ymr,ash,ssi,ycd,sqm,whi,yqq,yka,ylw,yyj,pmb,yaz,yxe,yhz,yyt,ysj,ysc,yxk,yhm,ykf,bar,bur,ysb,yyz,got,brm,mis,yrk,dur"]  # cities with a hold in feeds.json (unconfirmed terms) are left out
     mem_limit: 512m
     cpus: 1
     # unhealthy = /api/health's 503: live times or the timetable stale. Shown in docker ps; nothing restarts on it.
