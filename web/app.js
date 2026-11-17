@@ -516,7 +516,10 @@ async function autoCity() {
     if (cities.length < 2 || localStorage.getItem("yeg.cityset") || !navigator.geolocation) return;
     if ((await navigator.permissions.query({ name: "geolocation" })).state !== "granted") return;
     navigator.geolocation.getCurrentPosition(async (p) => {
-      const c = await cityAt({ lat: p.coords.latitude, lon: p.coords.longitude });
+      // rounded to about 1 km: no "Near me" tap here, and privacy.html promises only a rounded area leaves the phone then
+      // (18 of 19 GTA points still pick right; the miss sits on the Steeles city line)
+      const r = (x) => Math.round(x * 100) / 100;
+      const c = await cityAt({ lat: r(p.coords.latitude), lon: r(p.coords.longitude) });
       if (c && !localStorage.getItem("yeg.cityset")) setCity(c, true);
     }, () => {}, { timeout: 8000, maximumAge: 600000 });
   } catch (e) { console.warn("auto city:", e.message); }
