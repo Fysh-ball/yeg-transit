@@ -121,6 +121,17 @@ class CalgaryLive(unittest.TestCase):
                 time.sleep(0.1)
             self.assertEqual(self.live.ts, self.now)  # the poll behind it landed
 
+    def test_a_copy_too_old_to_show_waits_briefly_for_the_poll(self):
+        # 2026-11-17: after a quiet spell the held copy is past 120 s; the ask that starts the poll must get its answer
+        sched = self.now + 300
+        self.live.trips, self.live.ts, self.live.fetched = {"t1": {"6451": sched + 40}}, self.now - 600, self.now - 600
+        def fetch(u, t):
+            time.sleep(0.3); return io.BytesIO(feed("t1", "6451", sched + 240, self.now - 5))  # slower than building the answer
+        with mock.patch.object(app, "fetch", fetch):
+            d = self.ask()
+        self.assertEqual([(x["time"], x["live"]) for x in d["departures"]], [(sched + 240, True)])
+        self.assertEqual(d["live_age"], 5)
+
     def test_riders_share_one_poll_for_30_s(self):
         asked = []
         def fetch(u, t):

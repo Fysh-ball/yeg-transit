@@ -299,7 +299,13 @@ class CgyLive:
         # waits for us, 2026-11-12: Pi 4 s, TrueNAS 6 s, so riders got 503). The poll runs behind, the answer uses the held copy.
         if self.lock.acquire(blocking=False):  # else a poll is already running
             self.lock.release()
-            threading.Thread(target=self._poll, daemon=True).start()
+            t = threading.Thread(target=self._poll, daemon=True)
+            t.start()
+            # A copy past STALE can't be shown, so this rider gets nothing from not waiting: wait up to 3 s (under the
+            # edge's 4 s) for the new one. Without it the first ask after a quiet spell never saw its own poll, and one
+            # cut-short Calgary file failed both of the check's looks and paged the phone (2026-11-17 03:15-03:45Z).
+            if time.time() - self.ts > self.STALE:
+                t.join(3)
 
     def _poll(self):
         with self.lock:  # one poll at a time; a late second caller finds it fresh and leaves
