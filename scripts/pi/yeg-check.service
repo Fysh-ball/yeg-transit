@@ -5,3 +5,6 @@ After=docker.service
 [Service]
 Type=oneshot
 ExecStart=/home/Apollo/stacks/yeg-transit/scripts/pi/yeg-check.sh run
+# 3 = wrong, paging now; 4 = still wrong, paged already (check_live.py main). Both are delivered verdicts,
+# not a broken check, so systemd must not mark the unit failed (11-21: 13 "failures" in 2 days were ETS/Calgary outages).
+SuccessExitStatus=3 4
