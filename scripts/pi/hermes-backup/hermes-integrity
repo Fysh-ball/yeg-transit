@@ -201,12 +201,18 @@ def restore(gen, entry, root=""):
     if sha256(src) != sha:
         raise RuntimeError("the reference copy of %s fails its own manifest" % rel)
     dst = root + rel
-    tmp = dst + ".hermes-integrity-restore"
+    # mkstemp: O_EXCL, a fresh random name, so a link planted in a user-writable dir (/home/Apollo/stacks)
+    # can't redirect the root write.
+    import tempfile
+    if os.path.realpath(os.path.dirname(dst)) != os.path.dirname(dst):
+        raise RuntimeError("a directory on the path of %s is now a symlink; not restoring through it" % rel)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(dst), prefix=".hermes-integrity-")
     try:
-        shutil.copyfile(src, tmp)
         st = os.lstat(src)
-        os.chown(tmp, st.st_uid, st.st_gid)     # before copystat: chown clears setuid and file capabilities
-        shutil.copystat(src, tmp)               # mode, xattrs (security.capability too), mtime
+        with open(src, "rb") as s, os.fdopen(fd, "wb") as d:
+            shutil.copyfileobj(s, d)
+            os.fchown(d.fileno(), st.st_uid, st.st_gid)   # before copystat: chown clears setuid and capabilities
+        shutil.copystat(src, tmp, follow_symlinks=False)  # mode, xattrs (security.capability too), mtime
         os.replace(tmp, dst)
     except BaseException:
         try:
