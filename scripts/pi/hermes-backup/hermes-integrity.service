@@ -1,0 +1,20 @@
+[Unit]
+Description=After an unclean shutdown, check the SD card against the SSD reference before services start
+# 2026-11-21 (Hermes). A clean last shutdown: marks the boot trusted and exits. Otherwise hermes-integrity check
+# restores corrupt files from the newest CLEAN copy on the SSD and tells Lumi. A failure here does not hold the
+# services back (a tailnet down is worse than a logged corrupt file); the boot just stays untrusted, so the
+# nightly backup makes no new reference from it.
+DefaultDependencies=no
+After=local-fs.target hermes-clean-shutdown.service
+Before=headscale.service docker.service keepalived.service AdGuardHome.service AdGuardHome-tailnet.service multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/hermes-integrity boot
+# After an unclean boot only, and in the background: package files and the kiwix ZIMs (both slow).
+ExecStartPost=/bin/sh -c '[ -e /run/hermes-integrity/unclean ] && systemctl start --no-block hermes-integrity-slow.service; exit 0'
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target

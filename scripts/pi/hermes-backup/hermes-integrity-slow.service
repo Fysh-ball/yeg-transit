@@ -1,0 +1,12 @@
+[Unit]
+Description=After an unclean shutdown: debsums package check and kiwix ZIM check (2026-11-21, Hermes)
+After=network-online.target hermes-integrity.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Nice=19
+IOSchedulingClass=idle
+ExecStart=-/usr/local/bin/hermes-integrity flush
+ExecStart=-/usr/local/bin/hermes-integrity packages
+ExecStart=/usr/local/bin/hermes-integrity kiwix

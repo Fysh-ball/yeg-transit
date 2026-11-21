@@ -13,7 +13,11 @@ DEV=${HB_DEV:-/dev/disk/by-label/hermes-backup}
 MNT=${HB_MNT:-/mnt/hermes-backup}
 STATE=${HB_STATE:-/var/lib/hermes-backup}
 KEEP=7
-read -ra SRC <<< "${HB_SRC:-/etc /var/lib/tang /var/lib/alertpath-watch /usr/local/bin}"
+# 2026-11-21: /usr/local, /opt (AdGuard), the compose dirs added: this copy is also the corruption reference
+# hermes-integrity checks the SD card against after an unclean shutdown.
+read -ra SRC <<< "${HB_SRC:-/etc /var/lib/tang /var/lib/alertpath-watch /usr/local /opt /home/Apollo/stacks}"
+TRUSTED=${HB_TRUSTED:-/run/hermes-integrity/trusted}
+INTEGRITY=${HB_INTEGRITY:-/usr/local/bin/hermes-integrity}
 HS_DIR=${HB_HS_DIR:-/var/lib/headscale}
 # Files that must come out byte-identical, checked after the copy (contents never printed).
 VERIFY_GLOBS=${HB_VERIFY:-/var/lib/tang/*.jwk /etc/app-commands/keys /etc/app-commands/config.json $HS_DIR/*_private.key}
@@ -22,6 +26,9 @@ MOUNT=${HB_MOUNT:-1}
 
 umask 077
 mkdir -p "$STATE"
+# One user of the SSD at a time (hermes-integrity takes the same lock).
+exec 9>"${HB_LOCK:-/run/lock/hermes-backup.lock}"
+flock 9
 fail() {
   trap - ERR
   echo "$(date '+%F %T %Z') $*" > "$STATE/last-fail"
@@ -54,7 +61,7 @@ prev=$(dated | tail -1)
 link=(); [ -n "$prev" ] && link=(--link-dest="$prev")
 
 # Exit 24 = a file vanished mid-copy (alertpath-watch rewrites its state every minute): not a failure.
-rsync -aHAX --numeric-ids --relative "${link[@]}" "${SRC[@]}" "$new/" || [ $? = 24 ]
+rsync -aHAX --numeric-ids --relative "${link[@]}" --exclude='querylog.json*' "${SRC[@]}" "$new/" || [ $? = 24 ]
 rsync -aHAX --numeric-ids --relative "${link[@]}" --exclude='db.sqlite*' --exclude='.db.sqlite*' "$HS_DIR" "$new/"
 if [ -e "$HS_DIR/db.sqlite" ]; then
   python3 -I - "$HS_DIR/db.sqlite" "$new$HS_DIR/db.sqlite" <<'PY'
@@ -77,15 +84,21 @@ for f in $VERIFY_GLOBS; do
   n=$((n+1))
 done
 [ "$n" -gt 0 ] || fail "no key files found to verify ($VERIFY_GLOBS)"
+"$INTEGRITY" manifest "$new" >/dev/null || fail "manifest of the new copy failed"
+# Only a trusted boot (clean shutdown, or hermes-integrity check passed) makes a reference: a copy taken
+# after an unchecked crash could carry corruption into it.
+clean=untrusted; [ -e "$TRUSTED" ] && { touch "$new/CLEAN"; clean=CLEAN; }
 
 rm -rf "${B:?}/$day"
 mv "$new" "$B/$day"
-for old in $(dated | head -n -$KEEP); do rm -rf "${old:?}"; done
+# The newest CLEAN copy is never pruned, however many untrusted days follow it.
+keepclean=$(for d in $(dated); do [ -e "$d/CLEAN" ] && echo "$d"; done | tail -1)
+for old in $(dated | head -n -$KEEP); do [ "$old" = "$keepclean" ] || rm -rf "${old:?}"; done
 sync
 copies=$(dated | wc -l)
 [ -d "$B/$day" ] || fail "today's copy $B/$day is gone after the prune"
 # Write then rename, so a full disk can't leave a fresh-looking empty last-ok.
-echo "$(date '+%F %T %Z') $day: $n key files MATCH, $copies copies kept" > "$STATE/last-ok.new"
+echo "$(date '+%F %T %Z') $day ($clean): $n key files MATCH, $copies copies kept" > "$STATE/last-ok.new"
 mv "$STATE/last-ok.new" "$STATE/last-ok"
 rm -f "$STATE/last-fail"
-logger -t hermes-backup "ok: $day, $n key files MATCH, $copies copies kept" || true
+logger -t hermes-backup "ok: $day ($clean), $n key files MATCH, $copies copies kept" || true
