@@ -89,8 +89,13 @@ done
 # after an unchecked crash could carry corruption into it.
 clean=untrusted; [ -e "$TRUSTED" ] && { touch "$new/CLEAN"; clean=CLEAN; }
 
-rm -rf "${B:?}/$day"
-mv "$new" "$B/$day"
+# A second, untrusted run the same day keeps that day's CLEAN copy (it may be the only reference).
+if [ "$clean" = untrusted ] && [ -e "$B/$day/CLEAN" ]; then
+  rm -rf "${new:?}"; clean="untrusted, kept today's CLEAN copy"
+else
+  rm -rf "${B:?}/$day"
+  mv "$new" "$B/$day"
+fi
 # The newest CLEAN copy is never pruned, however many untrusted days follow it.
 keepclean=$(for d in $(dated); do [ -e "$d/CLEAN" ] && echo "$d"; done | tail -1)
 for old in $(dated | head -n -$KEEP); do [ "$old" = "$keepclean" ] || rm -rf "${old:?}"; done

@@ -1,0 +1,14 @@
+#!/bin/sh
+# hermes-clean-mark: systemd-shutdown hook (/usr/lib/systemd/system-shutdown/), 2026-11-21 (Hermes).
+# Runs at the very end of a shutdown, after every service stopped and root was remounted read-only.
+# Root has max-mount-count 1; resetting the count to 0 here is the only "clean shutdown" mark. A crash, a
+# power cut, a hang before this point, or a root that failed to go read-only leaves the count at 1, so the
+# next boot's initramfs fsck runs a full e2fsck -y and hermes-integrity checks the SD card against the SSD.
+# Revert: rm this file; tune2fs -c -1 /dev/disk/by-partuuid/015164ca-02
+dev=/dev/disk/by-partuuid/015164ca-02
+opts=$(awk '$2 == "/" { o = $4 } END { print o }' /proc/mounts)
+case ",$opts," in
+  *,ro,*) /sbin/tune2fs -C 0 "$dev" >/dev/null 2>&1 && echo "hermes-clean-mark: root read-only, mount count reset" >/dev/kmsg ;;
+  *) echo "hermes-clean-mark: root still read-write ($opts); next boot runs the full check" >/dev/kmsg ;;
+esac
+exit 0

@@ -15,7 +15,8 @@
                         against kiwix's own published .sha256 before replacing it
   kiwix-manifest        (re)build kiwix.sha256 for ZIMs that are new or legitimately changed (trusted boot only)
 
-Trust: /run/hermes-integrity/trusted exists when the last shutdown was clean or `check` passed. hermes-backup
+Trust: /run/hermes-integrity/trusted exists when the initramfs fsck found root clean (only a clean shutdown
+leaves it so; see cmd_boot) or `check` passed with nothing corrupt, missing or suspect. hermes-backup
 refuses to make a new reference generation without it, so corruption never gets copied into the reference.
 Results go to Lumi through spool-notify (never to the owner's phone directly); she fixes or escalates.
 """
@@ -34,7 +35,9 @@ KIWIX_DIR = "/srv/kiwix"
 KIWIX_MAN = "kiwix.sha256"           # in GENS, beside the generations
 STATE = "/var/lib/hermes-integrity"
 RUN = "/run/hermes-integrity"
-CLEAN_STAMP = STATE + "/clean-shutdown"   # written by hermes-clean-shutdown at a clean stop, removed at boot
+FSCK_LOG = "/run/initramfs/fsck.log"
+ROOT_DEV = "mmcblk0p2"
+LOCAL_EDITS = STATE + "/debsums-baseline.txt"   # package files changed on purpose before this was installed
 LOCK = "/run/lock/hermes-backup.lock"     # shared with hermes-backup: one user of the SSD at a time
 COND = "hermes-integrity"
 
@@ -61,14 +64,17 @@ def notify(status, text):
         os.makedirs(STATE, exist_ok=True)
         with open(STATE + "/pending", "a") as f:
             f.write("%s\t%s\n" % (status, text.replace("\n", " ")))
-        return
+        return True
     try:
         r = subprocess.run(["/usr/local/bin/spool-notify", COND, status], input="hermes integrity: " + text,
                            capture_output=True, text=True, timeout=60)
         if r.returncode != 0:
             log("NOTIFY FAILED: %s" % (r.stdout + r.stderr).strip()[-200:])
+            return False
+        return True
     except (OSError, subprocess.TimeoutExpired) as e:
         log("NOTIFY FAILED: %s" % e)
+        return False
 
 
 def sha256(path):
@@ -84,8 +90,9 @@ def sha256(path):
 
 class Mounted:
     """Mount the SSD for the run, under the lock hermes-backup also takes."""
-    def __init__(self, rw=False):
+    def __init__(self, rw=False, wait=90):
         self.rw = rw
+        self.wait = wait
 
     def __enter__(self):
         import fcntl
@@ -93,8 +100,17 @@ class Mounted:
             if os.path.exists(DEV):
                 break
             time.sleep(1)
+        os.makedirs(os.path.dirname(LOCK), exist_ok=True)
         self.lf = open(LOCK, "w")
-        fcntl.flock(self.lf, fcntl.LOCK_EX)       # waits for a running backup
+        for _ in range(self.wait):                # a running backup holds it for ~30 s
+            try:
+                fcntl.flock(self.lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                time.sleep(1)
+        else:
+            self.lf.close()
+            raise RuntimeError("the SSD is busy (backup lock held for %d s)" % self.wait)
         os.makedirs(MNT, mode=0o700, exist_ok=True)
         self.mine = subprocess.run(["mountpoint", "-q", MNT]).returncode != 0
         if self.mine:
@@ -134,6 +150,8 @@ def cmd_manifest(gen):
                 p = os.path.join(root, name)
                 rel = "/" + os.path.relpath(p, gen)
                 if rel in ("/MANIFEST.tsv.part", "/MANIFEST.tsv", "/CLEAN") or "\t" in rel or "\n" in rel:
+                    continue
+                if rel.startswith("/var/lib/headscale/") and ".sqlite" in rel:
                     continue
                 st = os.lstat(p)
                 if not os.path.isfile(p) or os.path.islink(p):
@@ -184,10 +202,18 @@ def restore(gen, entry, root=""):
         raise RuntimeError("the reference copy of %s fails its own manifest" % rel)
     dst = root + rel
     tmp = dst + ".hermes-integrity-restore"
-    shutil.copy2(src, tmp)                      # content, mode, mtime
-    st = os.lstat(src)
-    os.chown(tmp, st.st_uid, st.st_gid)
-    os.replace(tmp, dst)
+    try:
+        shutil.copyfile(src, tmp)
+        st = os.lstat(src)
+        os.chown(tmp, st.st_uid, st.st_gid)     # before copystat: chown clears setuid and file capabilities
+        shutil.copystat(src, tmp)               # mode, xattrs (security.capability too), mtime
+        os.replace(tmp, dst)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def scan(gen, root=""):
@@ -247,6 +273,18 @@ def cmd_check(root=""):
         notify("failed", "after an unclean shutdown %d file(s) are corrupt and could not be restored from the SSD: %s"
                % (len(still) or len(failed), ", ".join((still or failed)[:5])))
         return 1
+    odd = [e[3] for k in ("missing", "suspect") for e, _ in res.get(k, [])]
+    if odd:
+        # Not restored (a deletion or a hand-copied older file may be on purpose), but not trusted either:
+        # the nightly copy stays untrusted until a clean shutdown, so nothing odd becomes the reference.
+        # ponytail: a file torn mid-write with a newer mtime still reads "legit"; only its own format check
+        # (like the sqlite integrity_check) can catch that.
+        log("CHECK: %d missing or suspect file(s); boot left untrusted: %s" % (len(odd), ", ".join(odd[:10])))
+        notify("partial", "after an unclean shutdown %d file(s) are missing or older than the SSD reference "
+               "(not restored; boot left untrusted until a clean shutdown): %s%s"
+               % (len(odd), ", ".join(odd[:5]), " (restored %d corrupt: %s)" % (len(restored), ", ".join(restored[:5]))
+                  if restored else ""))
+        return 0
     if root == "":
         open(RUN + "/trusted", "w").close()
     if restored:
@@ -261,13 +299,21 @@ def cmd_check(root=""):
 def cmd_flush():
     """Send the alerts queued at boot (hermes-integrity-slow runs this once the network is up)."""
     p = STATE + "/pending"
-    if not os.path.exists(p):
+    q = p + ".sending"
+    if os.path.exists(p):
+        with open(p) as src, open(q, "a") as dst:
+            dst.write(src.read())
+        os.unlink(p)
+    if not os.path.exists(q):
         return 0
-    os.replace(p, p + ".sending")
-    for line in open(p + ".sending"):
-        st, _, text = line.rstrip("\n").partition("\t")
-        notify(st, text)
-    os.unlink(p + ".sending")
+    left = [line for line in open(q) if not notify(*line.rstrip("\n").partition("\t")[::2])]
+    if left:
+        with open(q + ".part", "w") as f:
+            f.writelines(left)
+        os.replace(q + ".part", q)
+        log("FLUSH: %d alert(s) not sent; kept for the next flush" % len(left))
+        return 1
+    os.unlink(q)
     return 0
 
 
@@ -278,20 +324,32 @@ def cmd_boot():
     os.makedirs(RUN, exist_ok=True)
     # The root fsck runs in the initramfs (Pi OS: fsck.repair=yes, so systemd-fsck-root is skipped by design);
     # its output lives only in /run/initramfs/fsck.log. Put it in this boot's journal.
+    # Clean or not comes from that fsck: root has max-mount-count 1 and only the system-shutdown hook
+    # (hermes-clean-mark, run after root is remounted read-only) resets the count. So after a clean shutdown
+    # e2fsck says "<dev>: clean, ..."; after a crash it says "check forced" and runs the full check.
+    # No log, or anything else, counts as unclean.
+    clean = False
     try:
-        with open("/run/initramfs/fsck.log", errors="replace") as f:
-            for line in f.read().splitlines()[-20:]:
-                print("root fsck (initramfs): " + line, flush=True)
+        with open(FSCK_LOG, errors="replace") as f:
+            lines = f.read().splitlines()
+        for line in lines[-20:]:
+            print("root fsck (initramfs): " + line, flush=True)
+        clean = any(ROOT_DEV + ": clean," in l for l in lines) and not any("check forced" in l for l in lines)
     except OSError as e:
         print("root fsck log unreadable: %s" % e, flush=True)
-    if os.path.exists(CLEAN_STAMP):
-        os.unlink(CLEAN_STAMP)                  # a crash before the next clean stop leaves it absent
+    if clean:
         open(RUN + "/trusted", "w").close()
-        log("BOOT: last shutdown was clean; boot trusted")
+        log("BOOT: last shutdown was clean (fsck: clean); boot trusted")
         return 0
     log("BOOT: last shutdown was NOT clean; checking against the SSD before services start")
     open(RUN + "/unclean", "w").close()
-    return cmd_check()
+    try:
+        return cmd_check()
+    except Exception as e:
+        log("CHECK FAILED TO RUN: %s: %s" % (type(e).__name__, e))
+        notify("failed", "after an unclean shutdown the SSD check could not run (%s: %s); boot left untrusted"
+               % (type(e).__name__, str(e)[:200]))
+        return 1
 
 
 def cmd_packages():
@@ -305,16 +363,35 @@ def cmd_packages():
     if not files:
         log("PACKAGES: debsums -c found no changed package files")
         return 0
+    try:
+        known = {l.strip() for l in open(LOCAL_EDITS) if l.startswith("/")}
+    except OSError:
+        known = set()
+    files = [f for f in files if f not in known]
+    if not files:
+        log("PACKAGES: only the known local edits differ (%d)" % len(known))
+        return 0
     pkgs = set()
     for f in files:
         q = subprocess.run(["dpkg", "-S", f], capture_output=True, text=True, timeout=60)
-        if q.returncode == 0:
-            pkgs.add(q.stdout.split(":")[0].strip())
-    log("PACKAGES: %d changed file(s) in %s" % (len(files), " ".join(sorted(pkgs))))
+        if q.returncode == 0:   # "pkg1, pkg2:arch: /path"
+            for name in q.stdout.rsplit(": ", 1)[0].split(","):
+                pkgs.add(name.strip())
+    pins = []
+    for name in sorted(pkgs):   # the installed version from the apt cache, never an upgrade
+        q = subprocess.run(["dpkg-query", "-W", "-f=${Version}", name], capture_output=True, text=True, timeout=60)
+        if q.returncode == 0 and q.stdout:
+            pins.append("%s=%s" % (name, q.stdout.strip()))
+    log("PACKAGES: %d changed file(s) in %s" % (len(files), " ".join(pins)))
     env = dict(os.environ, DEBIAN_FRONTEND="noninteractive")
-    r = subprocess.run(["apt-get", "install", "--reinstall", "-y", "-q"] + sorted(pkgs), capture_output=True,
-                       text=True, timeout=3600, env=env)
-    again = subprocess.run(["debsums", "-c"] + sorted(pkgs), capture_output=True, text=True, timeout=1800)
+    try:
+        r = subprocess.run(["apt-get", "install", "--reinstall", "--no-upgrade", "-y", "-q"] + pins,
+                           capture_output=True, text=True, timeout=3600, env=env)
+        again = subprocess.run(["debsums", "-c"] + sorted(pkgs), capture_output=True, text=True, timeout=1800)
+    except subprocess.TimeoutExpired as e:
+        log("PACKAGES: reinstall timed out: %s" % e)
+        notify("failed", "package files are damaged and the reinstall timed out: %s" % " ".join(sorted(pkgs)[:6]))
+        return 1
     left = [l for l in again.stdout.splitlines() if l.startswith("/")]
     if r.returncode != 0 or left:
         log("PACKAGES: reinstall rc=%d, still changed %d: %s" % (r.returncode, len(left), (r.stderr or "")[-200:]))
@@ -367,22 +444,24 @@ def cmd_kiwix_manifest():
     if not os.path.exists(RUN + "/trusted"):
         log("KIWIX: boot not trusted; the manifest is not refreshed")
         return 1
-    with Mounted(rw=True):
+    with Mounted(rw=False):
         m = kiwix_read_manifest()
-        n = 0
-        for z in zims():
-            st = os.stat(os.path.join(KIWIX_DIR, z))
-            old = m.get(z)
-            if old and old[1] == st.st_size and old[2] == st.st_mtime_ns:
-                continue
-            if old and st.st_mtime_ns <= old[2]:
-                log("KIWIX: %s differs from its manifest without a newer mtime; not refreshed (run `kiwix`)" % z)
-                continue
-            m[z] = (sha256(os.path.join(KIWIX_DIR, z)), st.st_size, st.st_mtime_ns)
-            n += 1
-        for z in list(m):
-            if z not in zims():
-                del m[z]
+    n = 0
+    # Hash with the SSD unmounted and unlocked: tens of GB must not hold the lock the boot check needs.
+    for z in zims():
+        st = os.stat(os.path.join(KIWIX_DIR, z))
+        old = m.get(z)
+        if old and old[1] == st.st_size and old[2] == st.st_mtime_ns:
+            continue
+        if old and st.st_mtime_ns <= old[2]:
+            log("KIWIX: %s differs from its manifest without a newer mtime; not refreshed (run `kiwix`)" % z)
+            continue
+        m[z] = (sha256(os.path.join(KIWIX_DIR, z)), st.st_size, st.st_mtime_ns)
+        n += 1
+    for z in list(m):
+        if z not in zims():
+            del m[z]
+    with Mounted(rw=True):
         tmp = os.path.join(GENS, KIWIX_MAN + ".part")
         with open(tmp, "w") as f:
             for z, (h, s, t) in sorted(m.items()):
@@ -425,6 +504,11 @@ def cmd_kiwix():
             continue
         open(stamp, "w").close()
         part = os.path.join(KIWIX_DIR, "." + z + ".part")
+        free = shutil.disk_usage(KIWIX_DIR).free
+        if free < m[z][1] + (4 << 30):
+            failed.append("%s (needs %d GB, %d GB free)" % (z, m[z][1] >> 30, free >> 30))
+            log("KIWIX: %s needs a re-download but the disk has %d GB free" % (z, free >> 30))
+            continue
         try:
             fetch(kiwix_url(z), part)
             with urllib.request.urlopen(kiwix_url(z) + ".sha256", timeout=60) as r:

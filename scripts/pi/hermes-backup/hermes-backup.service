@@ -5,6 +5,8 @@ Description=Nightly root-only copy of hermes keys and state to the SSD (LABEL=he
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/hermes-backup
+# After the lock is released: hash new or changed kiwix ZIMs into the SSD manifest (trusted boots only).
+ExecStartPost=-/usr/local/bin/hermes-integrity kiwix-manifest
 Nice=19
 IOSchedulingClass=idle
 TimeoutStartSec=30min
