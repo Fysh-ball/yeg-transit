@@ -142,16 +142,32 @@ function showWeather() {
 }
 // Tap the sky chip: the next 24 hours and the week, from the same /api/weather answer (no extra call).
 const wxSvg = (k) => (WX_ICON[k] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${WX_ICON[k]}</svg>` : "");
-const wxPop = (p) => (p >= 20 ? `<span class="pop">${p}%</span>` : "");
+const UMB = '<svg class="umb" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9zM12 12v6.5a2 2 0 0 1-4 0"/></svg>';
+const wxPop = (p) => (typeof p === "number" ? `<span class="pop">${UMB}${p}%</span>` : "");
 const deg = (v) => (typeof v === "number" ? `${v}\u00b0` : "");
+const COL = 52; // px per hour column; the temperature line is drawn on the same grid
+function tempLine(hours) {
+  const t = hours.map((x) => x.temp), ok = t.filter((v) => typeof v === "number");
+  if (ok.length < 2) return "";
+  const lo = Math.min(...ok), hi = Math.max(...ok), H = 54, top = 18, span = H - top - 6;
+  const y = (v) => top + (hi === lo ? span / 2 : ((hi - v) / (hi - lo)) * span);
+  const pts = t.map((v, i) => (typeof v === "number" ? [i * COL + COL / 2, y(v)] : null)).filter(Boolean);
+  const path = pts.map(([x, yy], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${yy.toFixed(1)}`).join("");
+  const dots = t.map((v, i) => (typeof v === "number" ? `<circle cx="${i * COL + COL / 2}" cy="${y(v).toFixed(1)}" r="3"/><text x="${i * COL + COL / 2}" y="${(y(v) - 7).toFixed(1)}">${v}\u00b0</text>` : "")).join("");
+  return `<svg class="tline" width="${hours.length * COL}" height="${H}" style="width:${hours.length * COL}px" aria-hidden="true"><path d="${path}"/>${dots}</svg>`;
+}
 function wxPanel() {
   const hours = wx.hours || [], days = wx.days || [];
   if (!hours.length && !days.length) { $("#wx-panel").innerHTML = '<p class="hint">No forecast right now. Try again in a few minutes.</p>'; return; }
-  const h = hours.map((x, i) => `<div class="wx-h" title="${WX_WORD[x.icon] || ""}">
-    <span>${i ? new Date(x.t).toLocaleTimeString([], { hour: "numeric" }) : "Now"}</span>${wxSvg(x.icon)}<b>${deg(x.temp)}</b>${wxPop(x.pop)}</div>`).join("");
+  const today = days[0], tmr = days[1];
+  const line = [`${WX_WORD[wx.icon] || ""}${typeof wx.temp === "number" ? `, ${wx.temp}\u00b0` : ""}.`,
+    today ? `High ${deg(today.hi)}, low ${deg(today.lo)}.` : "", wx.soon ? `${wx.soon}.` : "",
+    tmr ? `Tomorrow: ${(WX_WORD[tmr.icon] || "").toLowerCase()}, high ${deg(tmr.hi)}.` : ""].filter(Boolean).join(" ");
+  const cols = hours.map((x, i) => `<div class="wx-h" title="${WX_WORD[x.icon] || ""}">
+    <span>${i ? new Date(x.t).toLocaleTimeString([], { hour: "numeric" }) : "Now"}</span>${wxSvg(x.icon)}${wxPop(x.pop)}</div>`).join("");
   const d = days.map((x, i) => `<div class="wx-d"><span>${i ? new Date(`${x.d}T12:00`).toLocaleDateString([], { weekday: "short" }) : "Today"}</span>
     ${wxSvg(x.icon)}<span class="w">${WX_WORD[x.icon] || ""} ${wxPop(x.pop)}</span><span class="lohi">${deg(x.lo)} <b>${deg(x.hi)}</b></span></div>`).join("");
-  $("#wx-panel").innerHTML = `${h ? `<h3>Next 24 hours</h3><div class="wx-hours">${h}</div>` : ""}${d ? `<h3>This week</h3>${d}` : ""}`;
+  $("#wx-panel").innerHTML = `<p class="wx-sum">${line}</p>${cols ? `<h3>Next 24 hours</h3><div class="wx-hours"><div class="wx-cols">${cols}</div>${tempLine(hours)}</div>` : ""}${d ? `<h3>This week</h3>${d}` : ""}`;
 }
 function setWx(open) {
   $("#wx-panel").hidden = !open;
@@ -1355,4 +1371,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=126").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=127").catch((e) => console.warn("sw:", e.message));

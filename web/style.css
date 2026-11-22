@@ -197,9 +197,17 @@ footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1p
   border-radius: 16px; padding: 4px 12px 10px; box-shadow: var(--shadow); max-height: 70dvh; overflow-y: auto; }
 #wx-panel h3 { font-size: .85rem; color: var(--muted); margin: 10px 0 6px; font-weight: 600; }
 #wx-panel .pop { color: #3d8fe6; font-size: .8rem; font-weight: 600; }
-.wx-hours { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
-.wx-h { display: grid; justify-items: center; gap: 2px; min-width: 48px; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.wx-sum { margin: 10px 0 2px; font-weight: 600; }
+.wx-hours { overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.wx-cols { display: flex; }
+.wx-h { display: grid; justify-items: center; gap: 4px; flex: 0 0 52px; font-size: .85rem; font-variant-numeric: tabular-nums; }
 .wx-h > span:first-child { color: var(--muted); white-space: nowrap; }
+#wx-panel .pop { display: inline-flex; align-items: center; gap: 1px; }
+#wx-panel svg.umb { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+#wx-panel svg.tline { display: block; height: 54px; overflow: visible; }
+.tline path { fill: none; stroke: var(--muted); stroke-width: 2; stroke-linejoin: round; }
+.tline circle { fill: var(--text); }
+.tline text { fill: var(--text); font-size: 12px; font-weight: 600; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .wx-d { display: grid; grid-template-columns: 3.4em 28px 1fr auto; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line);
   font-variant-numeric: tabular-nums; }
 .wx-d:first-of-type { border-top: 0; }
