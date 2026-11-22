@@ -1611,23 +1611,41 @@ def main():
         # a new schema: keep serving the old database (older features degrade) while the import runs
         threading.Thread(target=load, daemon=True).start() if os.path.exists(DB) else first_import(load)
 
+    def until_due(db, fails):
+        """Seconds until the next schedule fetch: a day after the database was last written, so a restart no longer
+        resets the clock (it did, and the schedule sat 12 days stale behind restarts, 2026-11-21). After a failure,
+        10 min doubling to a day, jittered. gtfs.edmonton.ca's limit is unknown: this stays at one zip a day."""
+        if fails:
+            return min(24 * 3600, 600 * 2 ** (fails - 1)) * random.uniform(0.8, 1.2)
+        age = time.time() - os.path.getmtime(db) if os.path.exists(db) else 24 * 3600
+        return max(60, 24 * 3600 - age)
+
     def nightly():
+        fails = 0
         while True:
-            time.sleep(24 * 3600)
+            time.sleep(until_due(DB, fails))
             try:
                 refresh_gtfs()
+                os.utime(DB)  # the clock above reads this, so a refresh that leaves it untouched must not loop
+                fails = 0
             except Exception as e:
+                fails += 1
                 print("GTFS refresh failed:", repr(e), file=sys.stderr)
 
     def city_loop(c):  # one thread per city: a city down or slow never touches Edmonton or the others
         if not os.path.exists(city_db(c)):
             first_import(lambda: import_gtfs(city_zip(c), city_db(c)) if os.path.exists(city_zip(c))
                          else feed_host(c).take_turn(lambda: refresh_city(c)), name=c)
+        fails = 0
         while True:
-            time.sleep(24 * 3600)
+            time.sleep(until_due(city_db(c), fails))
             try:  # a host serving many feeds takes one call per 5 min: wait in its queue, not a day
                 feed_host(c).take_turn(lambda: refresh_city(c))
+                if os.path.exists(city_db(c)):
+                    os.utime(city_db(c))
+                fails = 0
             except Exception as e:
+                fails += 1
                 print(f"{c}: GTFS refresh failed:", repr(e), file=sys.stderr)
 
     for c in FEEDS:
