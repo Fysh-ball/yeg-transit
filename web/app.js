@@ -136,9 +136,31 @@ function showWeather() {
   if (!el || !svg) { if (el) el.hidden = true; return; }
   const t = typeof wx.temp === "number" ? `${wx.temp}\u00b0` : "";
   el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${svg}</svg>${t}`;
-  el.title = el.ariaLabel = `${WX_WORD[wx.icon]}${t ? `, ${t}` : ""}`;
+  el.title = el.ariaLabel = `${WX_WORD[wx.icon]}${t ? `, ${t}` : ""}. Forecast`;
   el.hidden = false;
+  if (!$("#wx-panel").hidden) wxPanel();
 }
+// Tap the sky chip: the next 24 hours and the week, from the same /api/weather answer (no extra call).
+const wxSvg = (k) => (WX_ICON[k] ? `<svg viewBox="0 0 24 24" aria-hidden="true">${WX_ICON[k]}</svg>` : "");
+const wxPop = (p) => (p >= 20 ? `<span class="pop">${p}%</span>` : "");
+const deg = (v) => (typeof v === "number" ? `${v}\u00b0` : "");
+function wxPanel() {
+  const hours = wx.hours || [], days = wx.days || [];
+  if (!hours.length && !days.length) { $("#wx-panel").innerHTML = '<p class="hint">No forecast right now. Try again in a few minutes.</p>'; return; }
+  const h = hours.map((x, i) => `<div class="wx-h" title="${WX_WORD[x.icon] || ""}">
+    <span>${i ? new Date(x.t).toLocaleTimeString([], { hour: "numeric" }) : "Now"}</span>${wxSvg(x.icon)}<b>${deg(x.temp)}</b>${wxPop(x.pop)}</div>`).join("");
+  const d = days.map((x, i) => `<div class="wx-d"><span>${i ? new Date(`${x.d}T12:00`).toLocaleDateString([], { weekday: "short" }) : "Today"}</span>
+    ${wxSvg(x.icon)}<span class="w">${WX_WORD[x.icon] || ""} ${wxPop(x.pop)}</span><span class="lohi">${deg(x.lo)} <b>${deg(x.hi)}</b></span></div>`).join("");
+  $("#wx-panel").innerHTML = `${h ? `<h3>Next 24 hours</h3><div class="wx-hours">${h}</div>` : ""}${d ? `<h3>This week</h3>${d}` : ""}`;
+}
+function setWx(open) {
+  $("#wx-panel").hidden = !open;
+  $("#wx").setAttribute("aria-expanded", String(open));
+  if (open) wxPanel();
+}
+$("#wx").onclick = (e) => { e.stopPropagation(); setWx($("#wx-panel").hidden); };
+document.addEventListener("click", (e) => { if (!$("#wx-panel").hidden && !e.target.closest("#wx-panel")) setWx(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#wx-panel").hidden) { setWx(false); $("#wx").focus(); } });
 async function loadWeather() {
   try { wx = await api(city === "yeg" ? "weather" : `weather?${cq(city).slice(1)}`); } catch (e) { console.warn("weather:", e.message); }
   showWeather();
@@ -1333,4 +1355,4 @@ window.addEventListener("pageshow", (e) => e.persisted && renderAll()); // back 
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { renderAll(); wake(); nearestGroup(); } });
 // The version this page runs, from its own script tag (bumped with every release), so you can tell an update arrived.
 $("#version").textContent = `Version ${(document.querySelector('script[src*="app.js"]')?.src.match(/v=(\d+)/) || [, "?"])[1]}`;
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=125").catch((e) => console.warn("sw:", e.message));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=126").catch((e) => console.warn("sw:", e.message));

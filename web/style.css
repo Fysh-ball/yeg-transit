@@ -185,13 +185,26 @@ footer a { color: var(--accent); }
 .policy h2 { font-size: 1.05rem; margin: 22px 0 6px; }
 .policy a { color: var(--accent); }
 footer select { font: inherit; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
-#wx { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: .95rem; color: var(--text); font-variant-numeric: tabular-nums; }
-#wx[hidden] { display: none; }
-#wx svg { width: 28px; height: 28px; overflow: visible; --cl: #9fb3c8; --clo: #7f93a6; }
-#wx .f { stroke: var(--bg); stroke-width: 1.2; paint-order: stroke; stroke-linejoin: round; }
-#wx .s { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-#wx .sun { fill: #f7b32b; } #wx .ray { stroke: #f7b32b; } #wx .moon { fill: #f2cf6b; } #wx .cl { fill: var(--cl); }
-#wx .drop { stroke: #3d8fe6; } #wx .flake { stroke: #59b4ee; } #wx .bolt { fill: #f5a00b; } #wx .fog { stroke: var(--clo); } #wx .wind { stroke: #6f93b3; }
+#wx { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: .95rem; color: var(--text); font-variant-numeric: tabular-nums;
+  border: 0; background: none; padding: 0 6px; border-radius: 10px; }
+#wx[hidden], #wx-panel[hidden] { display: none; }
+:is(#wx, #wx-panel) svg { width: 28px; height: 28px; overflow: visible; --cl: #9fb3c8; --clo: #7f93a6; flex: none; }
+:is(#wx, #wx-panel) .f { stroke: var(--bg); stroke-width: 1.2; paint-order: stroke; stroke-linejoin: round; }
+:is(#wx, #wx-panel) .s { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+:is(#wx, #wx-panel) .sun { fill: #f7b32b; } :is(#wx, #wx-panel) .ray { stroke: #f7b32b; } :is(#wx, #wx-panel) .moon { fill: #f2cf6b; } :is(#wx, #wx-panel) .cl { fill: var(--cl); }
+:is(#wx, #wx-panel) .drop { stroke: #3d8fe6; } :is(#wx, #wx-panel) .flake { stroke: #59b4ee; } :is(#wx, #wx-panel) .bolt { fill: #f5a00b; } :is(#wx, #wx-panel) .fog { stroke: var(--clo); } :is(#wx, #wx-panel) .wind { stroke: #6f93b3; }
+#wx-panel { position: absolute; top: 100%; left: 0; right: 0; z-index: 3; background: var(--card); border: 1px solid var(--line);
+  border-radius: 16px; padding: 4px 12px 10px; box-shadow: var(--shadow); max-height: 70dvh; overflow-y: auto; }
+#wx-panel h3 { font-size: .85rem; color: var(--muted); margin: 10px 0 6px; font-weight: 600; }
+#wx-panel .pop { color: #3d8fe6; font-size: .8rem; font-weight: 600; }
+.wx-hours { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+.wx-h { display: grid; justify-items: center; gap: 2px; min-width: 48px; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.wx-h > span:first-child { color: var(--muted); white-space: nowrap; }
+.wx-d { display: grid; grid-template-columns: 3.4em 28px 1fr auto; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line);
+  font-variant-numeric: tabular-nums; }
+.wx-d:first-of-type { border-top: 0; }
+.wx-d .w { color: var(--muted); font-size: .9rem; }
+.wx-d .lohi { color: var(--muted); white-space: nowrap; } .wx-d .lohi b { color: var(--text); }
 #clock { display: none; }
 
 /* Wall board: read from across the room. */

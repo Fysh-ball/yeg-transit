@@ -941,8 +941,11 @@ def walk_weather(city="yeg"):
     if time.time() - w["at"] < 900:
         return w["value"]
     url = "https://api.open-meteo.com/v1/forecast?" + urlencode({"latitude": CITY_XY[city][0], "longitude": CITY_XY[city][1], "current":
-          "temperature_2m,apparent_temperature,rain,showers,snowfall,snow_depth,weather_code,wind_speed_10m,wind_gusts_10m,is_day", "hourly": "precipitation_probability,snowfall",
-          "forecast_hours": 12, "timezone": FEEDS[city]["tz"] if city in FEEDS else "America/Edmonton"})
+          "temperature_2m,apparent_temperature,rain,showers,snowfall,snow_depth,weather_code,wind_speed_10m,wind_gusts_10m,is_day",
+          "hourly": "precipitation_probability,snowfall,temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,is_day",
+          # the same one call feeds the forecast drop-down (24 h and 7 days): no extra Open-Meteo traffic
+          "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max",
+          "forecast_hours": 24, "forecast_days": 7, "timezone": FEEDS[city]["tz"] if city in FEEDS else "America/Edmonton"})
     try:
         r = OPEN_METEO.get_json(url, 5)
         c, hr = r["current"], r.get("hourly") or {}
@@ -964,13 +967,25 @@ def walk_weather(city="yeg"):
         extra, why = extra + 1, why + ["extreme cold"]
     # The next 12 hours, for the widget's word by the clock: "Rain soon" (within 3 h) or "Rain later", at 50% or more.
     soon, chance = "", [p or 0 for p in hr.get("precipitation_probability") or []]
-    wet = [i for i, p in enumerate(chance) if p >= 50]
+    wet = [i for i, p in enumerate(chance[:12]) if p >= 50]
     if wet:
-        soon = ("Snow" if any((x or 0) > 0 for x in hr.get("snowfall") or []) else "Rain") + (" soon" if wet[0] < 3 else " later")
+        soon = ("Snow" if any((x or 0) > 0 for x in (hr.get("snowfall") or [])[:12]) else "Rain") + (" soon" if wet[0] < 3 else " later")
+    col = lambda d, k, i: ((d.get(k) or []) + [None] * (i + 1))[i]  # a missing or short column reads as None, never an IndexError
+    rnd = lambda v: None if v is None else round(v)
+    hours = [{"t": t, "temp": rnd(col(hr, "temperature_2m", i)), "pop": col(hr, "precipitation_probability", i),
+              "icon": weather_icon(col(hr, "weather_code", i), col(hr, "wind_speed_10m", i), col(hr, "wind_gusts_10m", i),
+                                   col(hr, "is_day", i) if col(hr, "is_day", i) is not None else 1)}
+             for i, t in enumerate(hr.get("time") or [])]
+    dl = r.get("daily") or {}
+    days = [{"d": d, "hi": rnd(col(dl, "temperature_2m_max", i)), "lo": rnd(col(dl, "temperature_2m_min", i)),
+             "pop": col(dl, "precipitation_probability_max", i),
+             "icon": weather_icon(col(dl, "weather_code", i), col(dl, "wind_speed_10m_max", i), col(dl, "wind_gusts_10m_max", i), 1)}
+            for i, d in enumerate(dl.get("time") or [])]
     temp = c.get("temperature_2m")
     w.update(at=time.time(), good=time.time(), value={"extra": min(extra, 3), "why": " and ".join(why), "soon": soon,
                                           "temp": None if temp is None else round(temp),
-                                          "icon": weather_icon(c.get("weather_code"), c.get("wind_speed_10m"), c.get("wind_gusts_10m"), c.get("is_day", 1))})
+                                          "icon": weather_icon(c.get("weather_code"), c.get("wind_speed_10m"), c.get("wind_gusts_10m"), c.get("is_day", 1)),
+                                          "hours": hours, "days": days})
     return w["value"]
 
 
