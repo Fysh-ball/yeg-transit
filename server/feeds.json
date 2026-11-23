@@ -274,7 +274,7 @@
    "prov": "BC",
    "tz": "America/Creston",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=16",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=16",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=16",
@@ -300,7 +300,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=17",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=17",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=17",
@@ -352,7 +352,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=20",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=20",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=20",
@@ -430,7 +430,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=23",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=23",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=23",
@@ -482,7 +482,7 @@
    "prov": "BC",
    "tz": "America/Dawson_Creek",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=27",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=27",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=27",
@@ -508,7 +508,7 @@
    "prov": "BC",
    "tz": "America/Dawson_Creek",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=28",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=28",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=28",
@@ -560,7 +560,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=31",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=31",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=31",
@@ -586,7 +586,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=32",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=32",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=32",
@@ -612,7 +612,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=33",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=33",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=33",
@@ -638,7 +638,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=34",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=34",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=34",
@@ -664,7 +664,7 @@
    "prov": "BC",
    "tz": "America/Vancouver",
    "gtfs": "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=35",
-   "live": false,
+   "live": true,
    "rt": {
     "trip_updates": "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=35",
     "vehicles": "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=35",
